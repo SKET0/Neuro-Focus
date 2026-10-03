@@ -1,0 +1,117 @@
+/* Shared responsive layout for the student and teacher dashboards.
+   Wide screens: fixed sidebar + scrolling main area.
+   1024px and below: the sidebar becomes a slide-out drawer opened from the header. */
+
+/* The sidebar brand links back to the home page */
+a.brand-box { color: inherit; text-decoration: none; border-radius: 8px 8px 0 0; transition: background 0.15s ease; }
+a.brand-box:hover { background: #17171b; }
+
+.nav-toggle {
+  display: none; align-items: center; justify-content: center; width: 34px; height: 34px; flex: none;
+  background: #1c1c20; color: var(--text-main); border: 1px solid var(--border); border-radius: 7px;
+  font-size: 17px; line-height: 1; cursor: pointer;
+}
+.nav-toggle:hover { background: #27272a; }
+.header-lead { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.label-short { display: none; }
+.nav-backdrop { display: none; }
+
+@media (max-width: 1024px) {
+  body { display: block; height: auto; overflow: auto; }
+  main { overflow: visible; min-height: 100vh; }
+
+  aside {
+    position: fixed; top: 0; left: 0; bottom: 0; z-index: 60; width: 264px; max-width: 85vw;
+    overflow-y: auto; transform: translateX(-100%); transition: transform 0.22s ease;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.6);
+  }
+  body.nav-open aside { transform: none; }
+  body.nav-open { overflow: hidden; }
+  .nav-backdrop { position: fixed; inset: 0; z-index: 55; background: rgba(0, 0, 0, 0.55); }
+  body.nav-open .nav-backdrop { display: block; }
+
+  .nav-toggle { display: inline-flex; }
+  header { padding: 0 16px; }
+  .portal-main { padding: 20px 16px 32px; }
+}
+
+@media (max-width: 640px) {
+  .breadcrumbs { display: none; }
+  .header-actions { gap: 6px; }
+  .header-actions .btn-action { padding: 7px 9px; }
+  .label-long { display: none; }
+  .label-short { display: inline; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  aside { transition: none; }
+}
+
+/* ---------- Dialogs (class-live.js confirmAction + page dialogs) ---------- */
+.nf-dialog {
+  margin: auto; width: min(440px, calc(100vw - 32px)); padding: 0; border: 1px solid #2e2e34; border-radius: 14px;
+  background: #141417; color: var(--text-main); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+}
+.nf-dialog::backdrop { background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(3px); }
+.nf-dialog form { padding: 22px; display: flex; flex-direction: column; gap: 12px; }
+.nf-dialog h2 { font-size: 17px; font-weight: 600; letter-spacing: -0.2px; }
+.nf-dialog p { font-size: 13px; color: #b4b4bc; line-height: 1.55; }
+.nf-dialog-label { display: flex; flex-direction: column; gap: 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-weight: 600; }
+.nf-dialog-input {
+  background: #101013; border: 1px solid var(--border); border-radius: 6px; padding: 9px 12px;
+  color: var(--text-main); font-size: 13px; text-transform: none; letter-spacing: 0; font-weight: 400; outline: none;
+}
+.nf-dialog-input:focus { border-color: #383842; }
+.nf-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+.nf-dialog-message { font-size: 12.5px; color: var(--text-muted); min-height: 18px; }
+.nf-dialog-message[data-state="error"] { color: #fca5a5; }
+.nf-btn-danger {
+  background: #3b1416; color: #fecaca; border: 1px solid rgba(239, 68, 68, 0.45); border-radius: 6px;
+  padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.nf-btn-danger:hover { background: #4a1a1d; }
+.nf-btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ---------- Notices ---------- */
+.nf-notices {
+  position: fixed; top: 68px; right: 16px; z-index: 90; display: flex; flex-direction: column; gap: 8px;
+  width: min(340px, calc(100vw - 32px)); pointer-events: none;
+}
+.nf-notice {
+  position: relative; pointer-events: auto; background: #17171b; border: 1px solid #2e2e34; border-left: 3px solid var(--cyan);
+  border-radius: 10px; padding: 12px 34px 12px 14px; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5); animation: nf-notice-in 0.2s ease;
+}
+.nf-notice[data-kind="success"] { border-left-color: var(--green); }
+.nf-notice[data-kind="live"] { border-left-color: var(--red, #ef4444); }
+.nf-notice[data-kind="error"] { border-left-color: var(--red, #ef4444); }
+.nf-notice strong { display: block; font-size: 13.5px; }
+.nf-notice p { font-size: 12.5px; color: #b4b4bc; margin-top: 3px; line-height: 1.45; }
+.nf-notice-actions { display: flex; gap: 8px; margin-top: 10px; }
+.nf-notice-actions .btn-primary, .nf-notice-actions .btn-action { padding: 6px 11px; font-size: 12px; }
+.nf-notice-close {
+  position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; border: 0; border-radius: 5px;
+  background: transparent; color: var(--text-muted); font-size: 16px; cursor: pointer;
+}
+.nf-notice-close:hover { background: #222227; color: var(--text-main); }
+@keyframes nf-notice-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .nf-notice { animation: none; } }
+
+/* ---------- Live badge ---------- */
+.live-dot {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--red, #ef4444);
+  box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); animation: live-pulse 1.8s infinite; flex: none;
+}
+@keyframes live-pulse { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.55); } 70% { box-shadow: 0 0 0 7px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
+@media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
+
+/* ---------- Database setup banner (class-live.js) ---------- */
+.nf-setup {
+  border: 1px solid rgba(245, 183, 72, 0.4); background: rgba(245, 183, 72, 0.08); border-radius: 12px;
+  padding: 16px 18px; color: #fde68a; font-size: 13px; line-height: 1.55;
+}
+.nf-setup strong { display: block; font-size: 14.5px; color: #fef3c7; margin-bottom: 4px; }
+.nf-setup ol { margin: 8px 0 8px 20px; display: flex; flex-direction: column; gap: 4px; }
+.nf-setup code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: #fef3c7;
+  background: rgba(0, 0, 0, 0.3); border-radius: 5px; padding: 2px 6px; overflow-wrap: anywhere;
+}

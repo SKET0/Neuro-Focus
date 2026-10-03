@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="en" class="auth-check-pending">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#09090b">
+  <title>Neuro-Focus | Student Workspace</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #09090b;
+      --sidebar: #0c0c0f;
+      --card: #131316;
+      --card-2: #101013;
+      --border: #222226;
+      --border-strong: #2e2e34;
+      --text-main: #f4f4f5;
+      --text-soft: #b4b4bc;
+      --text-muted: #82828c;
+      --green: #22c55e;
+      --red: #ef4444;
+      --amber: #f5b748;
+      --cyan: #00d9ff;
+    }
+
+    /* Hidden until auth-guard.js confirms a signed-in student */
+    .auth-check-pending body { visibility: hidden; }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; -webkit-font-smoothing: antialiased; }
+    [hidden] { display: none !important; }
+    button, input, select, textarea { font: inherit; color: inherit; }
+    button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+    .icon { width: 17px; height: 17px; flex: none; }
+
+    /* ---------- Sidebar ---------- */
+    aside {
+      width: 248px; flex-shrink: 0; background: var(--sidebar); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; justify-content: space-between; padding: 16px 12px; overflow-y: auto;
+    }
+    .brand-box { display: flex; align-items: center; gap: 10px; padding: 6px 10px 18px; border-bottom: 1px solid var(--border); }
+    .brand-mark {
+      width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; flex: none;
+      background: linear-gradient(145deg, #13232b, #0c0c0f); border: 1px solid #1f3a44; color: var(--cyan);
+      box-shadow: 0 0 18px rgba(0, 217, 255, 0.16);
+    }
+    .brand-mark svg { width: 18px; height: 18px; }
+    .brand-text b { display: block; font-size: 14px; font-weight: 650; letter-spacing: -0.2px; }
+    .brand-text small { font-size: 11.5px; color: var(--text-muted); }
+    .nav-group { margin-top: 18px; display: flex; flex-direction: column; gap: 2px; }
+    .nav-label { display: flex; align-items: center; justify-content: space-between; font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; padding: 0 10px 6px; letter-spacing: 0.6px; }
+    .nav-add {
+      width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--border-strong); background: transparent;
+      color: var(--text-soft); display: grid; place-items: center; cursor: pointer; font-size: 15px; line-height: 1;
+    }
+    .nav-add:hover { background: #1c1c20; color: var(--text-main); }
+    .nav-item {
+      display: flex; align-items: center; gap: 11px; width: 100%; padding: 8px 10px; border-radius: 8px; border: 0; background: none;
+      font-size: 13.5px; font-weight: 500; color: var(--text-muted); text-decoration: none; text-align: left; cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+    .nav-item:hover { background: #17171b; color: var(--text-main); }
+    .nav-item[aria-current] { background: #1c1c21; color: var(--text-main); box-shadow: inset 2px 0 0 var(--cyan); }
+    .nav-item[aria-current] .icon { color: var(--cyan); }
+    .sidebar-classes { display: flex; flex-direction: column; gap: 2px; }
+    .sidebar-classes .nav-item span.name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .class-initial {
+      width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; flex: none; font-size: 11px; font-weight: 700;
+      color: var(--cyan); background: rgba(0, 217, 255, 0.09); border: 1px solid rgba(0, 217, 255, 0.22);
+    }
+    .sidebar-empty { font-size: 12.5px; color: var(--text-muted); padding: 2px 10px 6px; }
+    .user-card {
+      display: flex; align-items: center; gap: 10px; padding: 10px; margin-top: 16px; border: 1px solid var(--border);
+      border-radius: 12px; background: #111114;
+    }
+    .avatar {
+      width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; flex: none; font-size: 12.5px; font-weight: 700;
+      color: #052e16; background: linear-gradient(135deg, #5eead4, #22c55e);
+    }
+    .user-card b { display: block; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .user-card small { font-size: 11.5px; color: var(--text-muted); }
+    .user-card > div { min-width: 0; }
+
+    /* ---------- Main + header ---------- */
+    main { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow-y: auto; background: var(--bg); scroll-behavior: smooth; }
+    header {
+      height: 60px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 28px;
+      position: sticky; top: 0; z-index: 20; background: rgba(9, 9, 11, 0.82); backdrop-filter: blur(14px); border-bottom: 1px solid var(--border);
+    }
+    .breadcrumbs { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); font-weight: 500; white-space: nowrap; }
+    .breadcrumbs b { color: var(--text-main); font-weight: 600; }
+    .header-actions { display: flex; align-items: center; gap: 8px; }
+
+    .btn-action {
+      display: inline-flex; align-items: center; justify-content: center; gap: 7px; background: #18181c; color: var(--text-main);
+      border: 1px solid var(--border-strong); border-radius: 8px; font-size: 12.5px; font-weight: 500; padding: 7px 12px;
+      cursor: pointer; text-decoration: none; white-space: nowrap; transition: background 0.15s ease, border-color 0.15s ease;
+    }
+    .btn-action:hover { background: #222227; border-color: #3a3a42; }
+    .btn-action:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-action .icon { width: 15px; height: 15px; }
+    .btn-primary {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: var(--text-main); color: #09090b; border: 0;
+      border-radius: 9px; padding: 10px 16px; font-size: 13.5px; font-weight: 600; cursor: pointer; white-space: nowrap;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 8px 22px rgba(0, 217, 255, 0.10); transition: background 0.15s ease, box-shadow 0.15s ease;
+    }
+    .btn-primary:hover { background: #fff; box-shadow: 0 0 0 1px rgba(255,255,255,0.18), 0 10px 26px rgba(0, 217, 255, 0.18); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary .icon { width: 16px; height: 16px; }
+    .btn-ghost { background: rgba(20, 20, 23, 0.7); border: 1px solid var(--border-strong); color: var(--text-main); }
+    .btn-join {
+      display: inline-flex; align-items: center; gap: 8px; background: var(--green); color: #052e16; border: 0; border-radius: 9px;
+      padding: 10px 16px; font-size: 13.5px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 22px rgba(34, 197, 94, 0.22);
+    }
+    .btn-join:hover { filter: brightness(1.08); }
+
+    .portal-main { padding: 28px; max-width: 1440px; margin: 0 auto; width: 100%; }
+    .view { display: flex; flex-direction: column; gap: 20px; animation: view-in 0.25s ease; }
+    @keyframes view-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    .portal-main section[id] { scroll-margin-top: 76px; }
+
+    /* Page heading */
+    .page-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+    .page-kicker { font-size: 12px; color: var(--text-muted); font-weight: 600; letter-spacing: 0.4px; }
+    .welcome-title, .page-title { font-size: 28px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.15; margin-top: 2px; }
+    .page-sub { font-size: 14px; color: var(--text-muted); margin-top: 4px; }
+    .page-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+    /* ---------- Cards ---------- */
+    .panel-card {
+      background: linear-gradient(180deg, #141417, #111114); border: 1px solid var(--border); border-radius: 16px;
+      padding: 22px; display: flex; flex-direction: column; min-width: 0;
+    }
+    .panel-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 18px; }
+    .panel-title { display: flex; align-items: center; gap: 10px; font-size: 15.5px; font-weight: 650; letter-spacing: -0.2px; }
+    .panel-title .chip-icon { width: 30px; height: 30px; }
+    .panel-sub { font-size: 12.5px; color: var(--text-muted); margin-top: 4px; line-height: 1.5; }
+    .panel-sub[data-state="error"], .form-message[data-state="error"] { color: #fca5a5; }
+    .chip-icon {
+      width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; flex: none;
+      color: var(--cyan); background: rgba(0, 217, 255, 0.08); border: 1px solid rgba(0, 217, 255, 0.2);
+    }
+    .chip-icon svg { width: 17px; height: 17px; }
+    .chip-icon.green { color: var(--green); background: rgba(34, 197, 94, 0.08); border-color: rgba(34, 197, 94, 0.22); }
+    .chip-icon.amber { color: var(--amber); background: rgba(245, 183, 72, 0.08); border-color: rgba(245, 183, 72, 0.22); }
+    .chip-icon.red { color: #f87171; background: rgba(239, 68, 68, 0.08); border-color: rgba(239, 68, 68, 0.22); }
+    .field-select {
+      background: #101013; color: var(--text-main); border: 1px solid var(--border-strong); border-radius: 8px;
+      padding: 7px 10px; font-size: 12.5px;
+    }
+    .field-input {
+      width: 100%; background: #0e0e11; border: 1px solid var(--border-strong); border-radius: 9px;
+      padding: 10px 12px; color: var(--text-main); font-size: 13.5px; outline: none; transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .field-input:focus { border-color: rgba(0, 217, 255, 0.45); box-shadow: 0 0 0 3px rgba(0, 217, 255, 0.08); }
+    .field-input:disabled { opacity: 0.55; }
+    textarea.field-input { resize: vertical; min-height: 120px; line-height: 1.55; }
+    .empty-state {
+      list-style: none; font-size: 13px; color: var(--text-muted); background: #0e0e11; border: 1px dashed var(--border-strong);
+      border-radius: 12px; padding: 18px; text-align: center; line-height: 1.5;
+    }
+
+    /* Class banner (student-classes.js) */
+    .class-banner {
+      display: flex; justify-content: space-between; align-items: center; gap: 14px 20px; flex-wrap: wrap;
+      border: 1px solid var(--border); border-radius: 16px; padding: 18px 20px; position: relative; overflow: hidden;
+      background: linear-gradient(100deg, rgba(0, 217, 255, 0.06), #121215 45%);
+    }
+    .class-banner[data-state="live"] { border-color: rgba(239, 68, 68, 0.35); background: linear-gradient(100deg, rgba(239, 68, 68, 0.12), #121215 50%); }
+    .class-banner[data-state="sharing"] { border-color: rgba(34, 197, 94, 0.35); background: linear-gradient(100deg, rgba(34, 197, 94, 0.12), #121215 50%); }
+    .class-banner[data-state="error"] { border-color: rgba(245, 183, 72, 0.35); }
+    .class-banner-text { min-width: 0; }
+    .class-banner-kicker { display: flex; align-items: center; gap: 8px; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px; color: var(--text-muted); }
+    .class-banner[data-state="live"] .class-banner-kicker { color: #fca5a5; }
+    .class-banner[data-state="sharing"] .class-banner-kicker { color: #86efac; }
+    .class-banner-title { font-size: 19px; font-weight: 650; letter-spacing: -0.3px; margin-top: 4px; overflow-wrap: anywhere; }
+    .class-banner-sub { font-size: 13.5px; color: var(--text-soft); margin-top: 3px; line-height: 1.45; }
+    .class-banner-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    /* KPI cards */
+    .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    .stat-card {
+      background: linear-gradient(180deg, #141417, #111114); border: 1px solid var(--border); border-radius: 16px; padding: 18px 20px;
+      display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto auto; column-gap: 12px;
+    }
+    .stat-label { font-size: 12.5px; color: var(--text-muted); font-weight: 500; }
+    .stat-card .chip-icon { grid-column: 2; grid-row: 1 / span 2; }
+    .stat-card strong { font-size: 30px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.15; margin-top: 6px; font-variant-numeric: tabular-nums; }
+    .stat-card small { grid-column: 1 / -1; font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+    .stat-card small[data-state="Focused"] { color: var(--green); }
+    .stat-card small[data-state="Distracted"] { color: #fca5a5; }
+    .stat-card small[data-state="Away"] { color: var(--amber); }
+
+    /* Dashboard layout */
+    .dash-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr); gap: 20px; align-items: start; }
+    .dash-col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+
+    /* Attention tracker */
+    .video-viewport {
+      width: 100%; aspect-ratio: 16 / 9; max-height: 420px; background: radial-gradient(ellipse at 50% 40%, #11161a, #09090b);
+      border: 1px solid var(--border); border-radius: 14px; position: relative; overflow: hidden; margin-bottom: 14px;
+    }
+    #analyzerVideo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+    .video-placeholder {
+      position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+      padding: 20px; text-align: center; color: var(--text-muted); font-size: 13.5px; line-height: 1.5;
+    }
+    .video-placeholder .chip-icon { width: 52px; height: 52px; border-radius: 16px; margin-bottom: 4px; }
+    .video-placeholder .chip-icon svg { width: 24px; height: 24px; }
+    .video-placeholder b { color: var(--text-main); font-size: 15px; }
+    .live-kpi-chip {
+      position: absolute; top: 12px; right: 12px; z-index: 1; display: flex; align-items: center; gap: 7px;
+      background: rgba(9, 9, 11, 0.78); backdrop-filter: blur(8px); border: 1px solid var(--border-strong);
+      padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--green);
+    }
+    .live-kpi-chip span { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px rgba(34, 197, 94, 0.7); }
+    .privacy-chip {
+      position: absolute; left: 12px; bottom: 12px; z-index: 1; display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-soft);
+      background: rgba(9, 9, 11, 0.7); backdrop-filter: blur(8px); border: 1px solid var(--border); padding: 5px 10px; border-radius: 999px;
+    }
+    .privacy-chip svg { width: 13px; height: 13px; color: var(--green); }
+    .status-readout {
+      display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 11px 14px; margin-bottom: 14px;
+      background: #0e0e11; border: 1px solid var(--border); border-radius: 11px; font-size: 13px;
+    }
+    .status-readout span { color: var(--text-muted); }
+    .status-readout strong { text-align: right; font-weight: 600; }
+    .camera-actions { display: flex; gap: 10px; }
+    .btn-camera, .btn-stop { flex: 1; padding: 11px 16px; border-radius: 10px; font-size: 14px; font-weight: 650; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+    .btn-camera { background: var(--text-main); color: #09090b; border: 0; box-shadow: 0 8px 22px rgba(0, 217, 255, 0.12); }
+    .btn-camera:hover { background: #fff; }
+    .btn-camera:disabled { opacity: 0.6; cursor: progress; }
+    .btn-stop { background: rgba(239, 68, 68, 0.08); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.35); }
+    .btn-stop:hover { background: rgba(239, 68, 68, 0.14); }
+
+    /* Switch toggles (real checkboxes keep their ids) */
+    .toggle-row { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+    .switch { display: inline-flex; align-items: center; gap: 9px; font-size: 13px; color: var(--text-soft); cursor: pointer; user-select: none; }
+    .switch input {
+      appearance: none; -webkit-appearance: none; width: 34px; height: 20px; border-radius: 999px; background: #2a2a30; position: relative;
+      cursor: pointer; flex: none; transition: background 0.2s ease; border: 1px solid #34343b;
+    }
+    .switch input::after {
+      content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #d4d4d8;
+      transition: transform 0.2s ease, background 0.2s ease;
+    }
+    .switch input:checked { background: rgba(0, 217, 255, 0.35); border-color: rgba(0, 217, 255, 0.55); }
+    .switch input:checked::after { transform: translateX(14px); background: #fff; }
+    .share-status { margin-top: 12px; font-size: 12.5px; color: var(--text-muted); line-height: 1.45; display: flex; gap: 8px; align-items: baseline; }
+    .share-status::before { content: ""; flex: none; width: 7px; height: 7px; border-radius: 50%; background: #3a3a42; transform: translateY(-1px); }
+    .share-status[data-state="live"] { color: #86efac; }
+    .share-status[data-state="live"]::before { background: var(--green); box-shadow: 0 0 6px rgba(34, 197, 94, 0.6); }
+
+    /* Focus timer */
+    .timer-body { display: flex; justify-content: center; padding: 2px 0 10px; }
+    .timer-ring { position: relative; width: 196px; height: 196px; }
+    .timer-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); filter: drop-shadow(0 0 14px rgba(0, 217, 255, 0.25)); }
+    .timer-ring circle { fill: none; stroke-width: 7; }
+    .ring-track { stroke: #1f1f24; }
+    #timerRing { stroke: var(--cyan); stroke-linecap: round; stroke-dasharray: 326.73; transition: stroke-dashoffset 0.9s linear; }
+    [data-phase="break"] #timerRing { stroke: var(--green); }
+    [data-phase="break"] .timer-ring svg { filter: drop-shadow(0 0 14px rgba(34, 197, 94, 0.25)); }
+    .timer-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+    #timerDisplay { font-size: 40px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -1px; }
+    #timerPhase { font-size: 11.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; font-weight: 650; }
+    [data-phase="break"] #timerPhase { color: var(--green); }
+    .timer-meta { font-size: 12.5px; color: var(--text-muted); text-align: center; margin-bottom: 14px; }
+    .timer-actions { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; }
+
+    /* Timeline */
+    .chart-box { position: relative; height: 240px; }
+    .chart-empty {
+      position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 16px;
+      color: var(--text-muted); font-size: 13px; background: #0e0e11; border: 1px dashed var(--border-strong); border-radius: 12px;
+    }
+
+    /* Micro-goals */
+    .inline-form { display: flex; gap: 8px; }
+    .progress { height: 6px; background: #1f1f24; border-radius: 4px; overflow: hidden; margin-top: 14px; }
+    .progress span { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #00b8d9, var(--green)); transition: width 0.3s ease; }
+    .goal-summary { font-size: 12.5px; color: var(--text-muted); margin: 8px 0 10px; }
+    .goal-list { list-style: none; display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; }
+    .goal-item { display: flex; align-items: center; gap: 8px; padding: 9px 11px; background: #0e0e11; border: 1px solid var(--border); border-radius: 10px; font-size: 13.5px; }
+    .goal-item label { flex: 1; display: flex; gap: 10px; align-items: center; cursor: pointer; min-width: 0; }
+    .goal-item label span { overflow-wrap: anywhere; }
+    .goal-item input[type="checkbox"] { accent-color: var(--green); width: 16px; height: 16px; flex: none; cursor: pointer; }
+    .goal-item[data-done="true"] label span { text-decoration: line-through; color: var(--text-muted); }
+    .goal-delete { background: none; border: 0; color: var(--text-muted); cursor: pointer; font-size: 17px; line-height: 1; padding: 2px 6px; border-radius: 6px; }
+    .goal-delete:hover { color: #fca5a5; background: #1c1c20; }
+    .card-foot { display: flex; justify-content: flex-end; margin-top: 12px; }
+
+    /* NeuroBuddy */
+    .buddy-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 20px; align-items: start; }
+    .panel-tools { display: flex; gap: 6px; align-items: center; flex: none; }
+    .prompt-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+    .chip {
+      display: inline-flex; align-items: center; gap: 7px; background: #0e0e11; border: 1px solid var(--border-strong); color: var(--text-soft);
+      border-radius: 999px; padding: 6px 12px; font-size: 12.5px; cursor: pointer; transition: border-color 0.15s ease, color 0.15s ease;
+    }
+    .chip:hover { border-color: rgba(0, 217, 255, 0.45); color: var(--text-main); }
+    .chip svg { width: 14px; height: 14px; color: var(--cyan); }
+    .chat-box {
+      height: max(360px, calc(100vh - 380px)); background: #0c0c0e; border: 1px solid var(--border); border-radius: 14px;
+      padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; margin-bottom: 14px;
+    }
+    .chat-bubble { padding: 11px 15px; border-radius: 14px; font-size: 13.5px; max-width: 80%; line-height: 1.55; white-space: pre-wrap; }
+    .assistant-bubble { background: #17171b; border: 1px solid var(--border); align-self: flex-start; border-bottom-left-radius: 4px; }
+    .assistant-error-bubble { color: #fca5a5; border-color: rgba(239, 68, 68, 0.3); }
+    .student-bubble { background: linear-gradient(135deg, #0c6f86, #0a4f61); align-self: flex-end; color: #fff; border-bottom-right-radius: 4px; }
+    .tutor-form-row { display: flex; gap: 10px; }
+    .tutor-form-row .field-input { padding: 12px 14px; }
+    .tips-card ul { list-style: none; display: grid; gap: 14px; }
+    .tips-card li { display: flex; gap: 12px; font-size: 13px; color: var(--text-soft); line-height: 1.5; }
+    .tips-card li b { display: block; color: var(--text-main); font-weight: 600; margin-bottom: 2px; }
+    .tips-card .chip-icon { width: 30px; height: 30px; }
+
+    /* Notes */
+    .notes-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .field-label { display: flex; flex-direction: column; gap: 8px; font-size: 11.5px; text-transform: uppercase; color: var(--text-muted); font-weight: 650; letter-spacing: 0.6px; }
+    .notes-grid textarea.field-input { min-height: 340px; text-transform: none; letter-spacing: 0; font-weight: 400; }
+    .notes-actions { display: flex; justify-content: flex-end; margin-top: 14px; }
+    .notes-state { font-size: 12px; color: var(--text-muted); white-space: nowrap; padding: 5px 10px; border: 1px solid var(--border); border-radius: 999px; }
+
+    /* History (student-history.js) */
+    .range-switch { display: inline-flex; gap: 3px; padding: 3px; background: #0e0e11; border: 1px solid var(--border); border-radius: 10px; }
+    .range-switch button {
+      background: transparent; border: 0; border-radius: 7px; padding: 6px 12px; font-size: 12.5px; font-weight: 500; color: var(--text-muted);
+      cursor: pointer; white-space: nowrap; transition: background 0.15s ease, color 0.15s ease;
+    }
+    .range-switch button:hover { color: var(--text-main); }
+    .range-switch button[aria-pressed="true"] { background: #1c1c21; color: var(--text-main); box-shadow: inset 0 0 0 1px var(--border-strong); }
+    .stat-card small .delta { font-weight: 600; }
+    .stat-card small .delta.up { color: var(--green); }
+    .stat-card small .delta.down { color: #fca5a5; }
+    .history-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(300px, 1fr); gap: 20px; align-items: stretch; }
+
+    .insight-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+    .insight { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; background: #0e0e11; border: 1px solid var(--border); border-radius: 12px; }
+    .insight .chip-icon { width: 30px; height: 30px; border-radius: 9px; }
+    .insight .chip-icon svg { width: 15px; height: 15px; }
+    .insight b { display: block; font-size: 13.5px; font-weight: 650; line-height: 1.4; }
+    .insight p { font-size: 12.5px; color: var(--text-muted); line-height: 1.5; margin-top: 2px; }
+    .unlock-meter { height: 6px; background: #1f1f24; border-radius: 4px; overflow: hidden; margin-top: 10px; }
+    .unlock-meter span { display: block; height: 100%; background: linear-gradient(90deg, #00b8d9, var(--green)); border-radius: 4px; }
+
+    .session-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; font-size: 12px; color: var(--text-muted); margin: -6px 0 14px; }
+    .session-legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .session-legend i { width: 10px; height: 10px; border-radius: 3px; }
+    .session-legend .legend-tip { margin-left: auto; }
+    .focused { background: var(--green); }
+    .distracted { background: var(--amber); }
+    .away { background: #4a4a52; }
+    .history-days { display: flex; flex-direction: column; gap: 18px; }
+    .day-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 0 4px 8px; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
+    .day-head b { font-size: 13.5px; font-weight: 650; }
+    .day-head span { font-size: 12.5px; color: var(--text-muted); }
+    .session-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+    .session-item { border: 1px solid transparent; border-radius: 12px; transition: background 0.15s ease, border-color 0.15s ease; }
+    .session-item:hover, .session-item[data-open="true"] { background: #111114; border-color: var(--border); }
+    .session-row {
+      width: 100%; display: grid; grid-template-columns: 44px minmax(0, 1fr) auto 18px; align-items: center; gap: 14px;
+      padding: 10px 12px; background: none; border: 0; border-radius: 12px; text-align: left; cursor: pointer;
+    }
+    .focus-ring { position: relative; width: 44px; height: 44px; }
+    .focus-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+    .focus-ring circle { fill: none; stroke-width: 4; }
+    .focus-ring .track { stroke: #222228; }
+    .focus-ring .fill { stroke-linecap: round; }
+    .focus-ring b { position: absolute; inset: 0; display: grid; place-items: center; font-size: 11.5px; font-weight: 700; }
+    .session-main { min-width: 0; }
+    .session-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 14px; font-weight: 600; }
+    .class-tag { font-size: 11.5px; font-weight: 600; color: var(--text-soft); background: #18181c; border: 1px solid var(--border-strong); border-radius: 999px; padding: 1px 8px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .session-main > span { display: block; }
+    .session-main > .session-title { display: flex; }
+    .session-meta { font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }
+    .history-days .empty-state a { color: var(--cyan); }
+    .verdict { font-size: 11.5px; font-weight: 650; border-radius: 999px; padding: 3px 10px; border: 1px solid; white-space: nowrap; }
+    .verdict[data-level="great"] { color: #86efac; border-color: rgba(34, 197, 94, 0.3); background: rgba(34, 197, 94, 0.08); }
+    .verdict[data-level="good"] { color: #67e8f9; border-color: rgba(0, 217, 255, 0.3); background: rgba(0, 217, 255, 0.07); }
+    .verdict[data-level="mixed"] { color: #fcd34d; border-color: rgba(245, 183, 72, 0.3); background: rgba(245, 183, 72, 0.08); }
+    .verdict[data-level="tough"] { color: #fca5a5; border-color: rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.08); }
+    .chevron { width: 16px; height: 16px; color: var(--text-muted); transition: transform 0.2s ease; }
+    .session-item[data-open="true"] .chevron { transform: rotate(90deg); }
+    .session-detail { padding: 4px 14px 14px 70px; display: flex; flex-direction: column; gap: 10px; }
+    .session-facts { display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 12.5px; color: var(--text-soft); }
+    .session-facts b { color: var(--text-main); font-weight: 600; }
+    .focus-strip { display: flex; height: 14px; gap: 2px; border-radius: 4px; overflow: hidden; }
+    .focus-strip span { min-width: 2px; border-radius: 2px; }
+    .strip-axis { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+    .strip-note { font-size: 12.5px; color: var(--text-muted); }
+    .history-more { align-self: center; margin-top: 16px; }
+
+    /* Classes (student-classes.js) */
+    .my-class-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+    .my-class-card {
+      background: #0f0f12; border: 1px solid var(--border); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 10px;
+      transition: border-color 0.15s ease;
+    }
+    .my-class-card:hover { border-color: #33333b; }
+    .my-class-card[aria-current="true"] { border-color: rgba(0, 217, 255, 0.45); box-shadow: 0 0 0 1px rgba(0, 217, 255, 0.12), 0 10px 30px rgba(0, 217, 255, 0.06); }
+    .my-class-card h3 { font-size: 16px; font-weight: 650; overflow-wrap: anywhere; }
+    .my-class-card .code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; color: var(--cyan); }
+    .my-class-status { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--text-muted); }
+    .my-class-status[data-live="true"] { color: #fca5a5; }
+    .my-class-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; padding-top: 4px; }
+    .my-class-actions .btn-action, .my-class-actions .btn-join { padding: 7px 11px; font-size: 12.5px; }
+    .btn-leave { background: transparent; color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 7px 11px; font-size: 12.5px; cursor: pointer; margin-left: auto; }
+    .btn-leave:hover { background: rgba(239, 68, 68, 0.1); }
+
+    /* Nudge / timer toast (student-focus.js) */
+    .focus-toast {
+      position: fixed; right: 24px; bottom: 24px; z-index: 50; width: min(380px, calc(100vw - 32px));
+      background: rgba(23, 23, 27, 0.92); backdrop-filter: blur(12px); border: 1px solid var(--border-strong); border-left: 3px solid var(--cyan);
+      border-radius: 14px; padding: 16px; display: flex; gap: 12px; box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55); animation: toast-in 0.25s ease;
+    }
+    .focus-toast[data-kind="nudge"] { border-left-color: var(--amber); }
+    .focus-toast[data-kind="praise"] { border-left-color: var(--green); }
+    .toast-icon { font-size: 22px; line-height: 1.2; }
+    .toast-body strong { display: block; font-size: 14px; margin-bottom: 4px; }
+    .toast-body p { font-size: 13px; color: var(--text-soft); line-height: 1.5; }
+    .toast-actions { display: flex; gap: 8px; margin-top: 12px; }
+    .toast-actions:empty { display: none; }
+    @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+    @media (prefers-reduced-motion: reduce) {
+      main { scroll-behavior: auto; }
+      .view, .focus-toast { animation: none; }
+      #timerRing, .progress span, .switch input::after { transition: none; }
+    }
+
+    @media (max-width: 1280px) {
+      .dash-grid { grid-template-columns: minmax(0, 1fr) 320px; }
+    }
+    @media (max-width: 1100px) {
+      .stat-grid { grid-template-columns: repeat(2, 1fr); }
+      .dash-grid, .buddy-grid, .history-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 760px) {
+      .notes-grid { grid-template-columns: 1fr; }
+      .notes-grid textarea.field-input { min-height: 200px; }
+      .portal-main { padding: 20px 16px 32px; }
+      .welcome-title, .page-title { font-size: 24px; }
+    }
+    @media (max-width: 520px) {
+      .stat-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+      .stat-card { padding: 14px; grid-template-columns: 1fr; }
+      .stat-card strong { font-size: 24px; }
+      .stat-card .chip-icon { display: none; }
+      .timer-actions { grid-template-columns: 1fr 1fr; }
+      .timer-actions .btn-primary { grid-column: 1 / -1; }
+      .page-actions { width: 100%; }
+      .page-actions > * { flex: 1; }
+      .chat-bubble { max-width: 92%; }
+      .range-switch { width: 100%; }
+      .range-switch button { flex: 1; }
+      .session-row { grid-template-columns: 40px minmax(0, 1fr) 16px; gap: 12px; padding: 10px 8px; }
+      .session-row .verdict { display: none; }
+      .focus-ring { width: 40px; height: 40px; }
+      .session-detail { padding: 2px 10px 12px; }
+      .session-legend .legend-tip { display: none; }
+    }
+  </style>
+  <link rel="stylesheet" href="dashboard-layout.css?v=2">
+</head>
+<body data-required-role="student">
+  <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+    <symbol id="i-brain" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M12 5v13"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/><path d="M8.5 11h.01M12 11h.01M15.5 11h.01"/></symbol>
+    <symbol id="i-note" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></symbol>
+    <symbol id="i-trend" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 17 6-6 4 4 8-8"/><path d="M15 7h6v6"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></symbol>
+    <symbol id="i-school" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m2 9 10-5 10 5-10 5Z"/><path d="M6 11v5c3 2.5 9 2.5 12 0v-5"/></symbol>
+    <symbol id="i-video" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="m16 10 6-3v10l-6-3"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></symbol>
+    <symbol id="i-flame" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c4 0 7-3 7-7 0-5-5-7-5-12-3 2-5 5-5 8-1-1-2-2-2-4-2 2-2 5-2 8 0 4 3 7 7 7Z"/></symbol>
+    <symbol id="i-flag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22V4M4 4h12l-2 4 2 4H4"/></symbol>
+    <symbol id="i-timer" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="m8 12 3 3 5-6"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5Z"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1Z"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8Z"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 4.9.7c0 1.7-2.4 2.3-2.4 3.8M12 17h.01"/></symbol>
+    <symbol id="i-rocket" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15c-1.5 1.5-2 5-2 5s3.5-.5 5-2M14 4c4-1 6-1 6-1s0 2-1 6l-6 6-5-5Z"/><path d="M9 10 6 9l-2 2 5 1M14 15l1 3-2 2-1-5"/></symbol>
+  </svg>
+
+  <aside id="sidebar" aria-label="Student navigation">
+    <div>
+      <a class="brand-box" href="index.html" aria-label="Neuro-Focus home">
+        <span class="brand-mark"><svg><use href="#i-brain"/></svg></span>
+        <span class="brand-text"><b>Neuro-Focus</b><small>Student workspace</small></span>
+      </a>
+
+      <nav class="nav-group" aria-label="Workspace">
+        <div class="nav-label">Workspace</div>
+        <a class="nav-item" href="#dashboard" data-view-link="dashboard"><svg class="icon"><use href="#i-grid"/></svg>Dashboard</a>
+        <a class="nav-item" href="#buddy" data-view-link="buddy"><svg class="icon"><use href="#i-chat"/></svg>NeuroBuddy</a>
+        <a class="nav-item" href="#notes" data-view-link="notes"><svg class="icon"><use href="#i-note"/></svg>Class notes</a>
+        <a class="nav-item" href="#history" data-view-link="history"><svg class="icon"><use href="#i-history"/></svg>Focus history</a>
+        <a class="nav-item" href="#classes" data-view-link="classes"><svg class="icon"><use href="#i-school"/></svg>Classes</a>
+      </nav>
+
+      <div class="nav-group">
+        <div class="nav-label">My classes <button class="nav-add" type="button" data-action="join-class" aria-label="Join a class">+</button></div>
+        <div id="sidebarClassList" class="sidebar-classes"><p class="sidebar-empty">Loading…</p></div>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-label">Meetings</div>
+        <div class="nav-item" data-open="zoom" data-start-camera role="button" tabindex="0"><svg class="icon"><use href="#i-video"/></svg>Join Zoom</div>
+        <div class="nav-item" data-open="meet" data-start-camera role="button" tabindex="0"><svg class="icon"><use href="#i-video"/></svg>Join Google Meet</div>
+      </div>
+    </div>
+
+    <div class="user-card">
+      <span class="avatar" id="userInitials">S</span>
+      <div>
+        <b data-profile-name>Student</b>
+        <small>Student account</small>
+      </div>
+    </div>
+  </aside>
+
+  <main>
+    <header>
+      <div class="header-lead">
+        <button id="navToggle" class="nav-toggle" type="button" aria-label="Open navigation" aria-controls="sidebar" aria-expanded="false">☰</button>
+        <div class="breadcrumbs"><span>Workspace</span><span>/</span><b id="pageCrumb">Dashboard</b></div>
+      </div>
+      <div class="header-actions">
+        <a class="btn-action" href="index.html"><svg class="icon"><use href="#i-home"/></svg><span class="label-long">Home</span></a>
+        <button class="btn-action" type="button" data-export-report="session"><svg class="icon"><use href="#i-download"/></svg><span class="label-long">Export session</span><span class="label-short">Export</span></button>
+        <button id="signOutButton" class="btn-action" type="button"><svg class="icon"><use href="#i-logout"/></svg><span class="label-long">Sign out</span></button>
+      </div>
+    </header>
+
+    <div class="portal-main">
+      <!-- ================= Dashboard ================= -->
+      <section class="view" id="view-dashboard" data-view="dashboard" aria-labelledby="welcomeTitle">
+        <div class="page-head">
+          <div>
+            <div class="page-kicker" id="todayLabel">Today</div>
+            <h1 class="welcome-title" id="welcomeTitle">Student workspace</h1>
+            <p class="page-sub">Track your focus, work in short blocks, and get help whenever you need it.</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn-action" type="button" data-action="join-class"><svg class="icon"><use href="#i-plus"/></svg>Join a class</button>
+            <button class="btn-primary" type="button" id="quickStart"><svg class="icon"><use href="#i-play"/></svg><span>Start focus session</span></button>
+          </div>
+        </div>
+
+        <!-- Current class + live session status (student-classes.js) -->
+        <section class="class-banner" id="classBanner" data-state="loading" aria-live="polite">
+          <div class="class-banner-text">
+            <div class="class-banner-kicker" id="bannerKicker">Your class</div>
+            <div class="class-banner-title" id="bannerTitle">Loading your classes…</div>
+            <div class="class-banner-sub" id="bannerSub"></div>
+          </div>
+          <div class="class-banner-actions" id="bannerActions"></div>
+        </section>
+
+        <!-- Live focus stats (student-focus.js) -->
+        <div class="stat-grid" aria-label="Live focus statistics">
+          <article class="stat-card">
+            <span class="stat-label">Live attention</span>
+            <span class="chip-icon"><svg><use href="#i-eye"/></svg></span>
+            <strong id="statLiveScore">—</strong>
+            <small id="statLiveState">Start tracking to begin</small>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">Session focus</span>
+            <span class="chip-icon green"><svg><use href="#i-target"/></svg></span>
+            <strong id="statSessionFocus">—</strong>
+            <small id="statTracked">0:00 tracked</small>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">Focus streak</span>
+            <span class="chip-icon amber"><svg><use href="#i-flame"/></svg></span>
+            <strong id="statStreak">0:00</strong>
+            <small id="statBestStreak">Best this session: 0:00</small>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">Attention lapses</span>
+            <span class="chip-icon red"><svg><use href="#i-flag"/></svg></span>
+            <strong id="statLapses">0</strong>
+            <small id="statNudges">0 nudges shown</small>
+          </article>
+        </div>
+
+        <div class="dash-grid">
+          <div class="dash-col">
+            <!-- Attention tracker (eye-analyzer.js) -->
+            <section class="panel-card" id="focus-session" aria-labelledby="trackerTitle">
+              <div class="panel-head">
+                <div>
+                  <div class="panel-title" id="trackerTitle"><span class="chip-icon"><svg><use href="#i-eye"/></svg></span>Attention tracker</div>
+                  <div class="panel-sub" id="analyzerMessage">Gaze and head orientation are processed on this device.</div>
+                </div>
+              </div>
+
+              <div class="video-viewport">
+                <video id="analyzerVideo" autoplay playsinline muted></video>
+                <div id="cameraPlaceholder" class="video-placeholder">
+                  <span class="chip-icon"><svg><use href="#i-video"/></svg></span>
+                  <b>Your camera is off</b>
+                  <span>Start a focus session to begin real-time attention tracking.</span>
+                </div>
+                <div class="live-kpi-chip"><span></span><strong id="shiftedPercent">—</strong></div>
+                <div class="privacy-chip"><svg><use href="#i-lock"/></svg>Video never leaves this device</div>
+              </div>
+
+              <div class="status-readout">
+                <span>Current orientation</span>
+                <strong id="gazeStatus">Camera inactive</strong>
+              </div>
+
+              <div class="camera-actions">
+                <button id="startAnalyzer" class="btn-camera" type="button">Start attention tracking</button>
+                <button id="stopAnalyzer" class="btn-stop" type="button" hidden>Stop camera</button>
+              </div>
+
+              <div class="toggle-row">
+                <label class="switch"><input type="checkbox" id="nudgeToggle" checked> Re-engagement nudges</label>
+                <label class="switch"><input type="checkbox" id="chimeToggle"> Gentle chime</label>
+                <label class="switch"><input type="checkbox" id="shareToggle" checked> Share with my teacher</label>
+              </div>
+              <p class="share-status" id="shareStatus" aria-live="polite">Checking your class…</p>
+            </section>
+
+            <!-- Focus timeline (student-focus.js) -->
+            <section class="panel-card" id="focus-timeline" aria-labelledby="timelineTitle">
+              <div class="panel-head">
+                <div>
+                  <div class="panel-title" id="timelineTitle"><span class="chip-icon"><svg><use href="#i-chart"/></svg></span>Focus timeline</div>
+                  <div class="panel-sub">Your attention each second over the last 2 minutes. Above 70% counts as focused.</div>
+                </div>
+              </div>
+              <div class="chart-box">
+                <canvas id="focusTimeline" role="img" aria-label="Your attention score over time"></canvas>
+                <div class="chart-empty" id="timelineEmpty">Start attention tracking to see your focus timeline.</div>
+              </div>
+            </section>
+          </div>
+
+          <div class="dash-col">
+            <!-- Focus timer (student-focus.js) -->
+            <section class="panel-card" id="focus-timer" data-phase="focus" aria-labelledby="timerTitle">
+              <div class="panel-head">
+                <div>
+                  <div class="panel-title" id="timerTitle"><span class="chip-icon"><svg><use href="#i-timer"/></svg></span>Focus timer</div>
+                  <div class="panel-sub">Short blocks with built-in breaks.</div>
+                </div>
+                <select id="timerPreset" class="field-select" aria-label="Focus and break length">
+                  <option value="25-5">25 / 5 min</option>
+                  <option value="15-3">15 / 3 min</option>
+                  <option value="10-2">10 / 2 min</option>
+                  <option value="45-10">45 / 10 min</option>
+                </select>
+              </div>
+              <div class="timer-body">
+                <div class="timer-ring">
+                  <svg viewBox="0 0 120 120" aria-hidden="true">
+                    <circle class="ring-track" cx="60" cy="60" r="52"></circle>
+                    <circle id="timerRing" cx="60" cy="60" r="52"></circle>
+                  </svg>
+                  <div class="timer-center" role="timer" aria-live="off">
+                    <div id="timerDisplay">25:00</div>
+                    <div id="timerPhase">Focus block</div>
+                  </div>
+                </div>
+              </div>
+              <p class="timer-meta"><span id="timerRounds">0</span> focus blocks completed this session</p>
+              <div class="timer-actions">
+                <button id="timerToggle" class="btn-primary" type="button">Start focus</button>
+                <button id="timerSkip" class="btn-action" type="button">Skip</button>
+                <button id="timerReset" class="btn-action" type="button">Reset</button>
+              </div>
+              <div class="toggle-row">
+                <label class="switch"><input type="checkbox" id="timerWithTracking" checked> Start tracking with each block</label>
+              </div>
+            </section>
+
+            <!-- Micro-goals (student-focus.js) -->
+            <section class="panel-card" id="micro-goals" aria-labelledby="goalsTitle">
+              <div class="panel-head">
+                <div>
+                  <div class="panel-title" id="goalsTitle"><span class="chip-icon green"><svg><use href="#i-check"/></svg></span>Micro-goals</div>
+                  <div class="panel-sub">Small, doable steps. Nudges remind you of the next one.</div>
+                </div>
+              </div>
+              <form id="goalForm" class="inline-form">
+                <input id="goalInput" class="field-input" type="text" maxlength="120" placeholder="Add a small step…" autocomplete="off" aria-label="New micro-goal">
+                <button class="btn-primary" type="submit" aria-label="Add step"><svg class="icon"><use href="#i-plus"/></svg></button>
+              </form>
+              <div class="progress" aria-hidden="true"><span id="goalProgress"></span></div>
+              <p class="goal-summary" id="goalSummary" aria-live="polite">No steps yet</p>
+              <ul class="goal-list" id="goalList"></ul>
+              <div class="card-foot">
+                <button id="goalClearDone" class="btn-action" type="button" disabled>Clear completed</button>
+              </div>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= NeuroBuddy ================= -->
+      <section class="view" id="view-buddy" data-view="buddy" hidden aria-labelledby="buddyTitle">
+        <div class="page-head">
+          <div>
+            <div class="page-kicker">AI study buddy</div>
+            <h1 class="page-title" id="buddyTitle">NeuroBuddy</h1>
+            <p class="page-sub">Explanations, summaries and quizzes in plain language, at your pace.</p>
+          </div>
+        </div>
+        <div class="buddy-grid">
+          <section class="panel-card" id="study-assistant" aria-labelledby="tutorTitle">
+            <div class="panel-head">
+              <div>
+                <div class="panel-title" id="tutorTitle"><span class="chip-icon"><svg><use href="#i-chat"/></svg></span>Chat</div>
+                <div class="panel-sub" id="tutorMessage">Ask questions or request re-engagement hints whenever focus drops.</div>
+              </div>
+              <div class="panel-tools">
+                <button id="clearChat" class="btn-action" type="button" title="Clear this chat">Clear</button>
+                <select id="supportStyle" class="field-select" aria-label="Explanation style">
+                  <option value="simple">Direct &amp; simple</option>
+                  <option value="step-by-step">Step-by-step</option>
+                  <option value="examples">With examples</option>
+                  <option value="short">Short answers</option>
+                </select>
+              </div>
+            </div>
+            <div class="prompt-chips" aria-label="Quick prompts">
+              <button class="chip" type="button" data-tutor-prompt="Explain this simply: "><svg><use href="#i-spark"/></svg>Explain simply</button>
+              <button class="chip" type="button" data-tutor-prompt="Summarize this in 3 short bullet points: "><svg><use href="#i-list"/></svg>3-point summary</button>
+              <button class="chip" type="button" data-tutor-prompt="Quiz me with 3 quick questions about "><svg><use href="#i-help"/></svg>Quiz me</button>
+              <button class="chip" type="button" data-tutor-prompt="I'm stuck getting started. Break this task into tiny first steps: "><svg><use href="#i-rocket"/></svg>Help me start</button>
+            </div>
+            <div class="chat-box" id="tutorConversation" aria-live="polite">
+              <p class="chat-bubble assistant-bubble">Hi, I'm NeuroBuddy, your AI study buddy! Ask me anything you need help understanding.</p>
+            </div>
+            <form id="tutorForm" class="tutor-form-row">
+              <input id="tutorPrompt" class="field-input" type="text" placeholder="Ask NeuroBuddy a question or request a summary…" required autocomplete="off" aria-label="Question for NeuroBuddy">
+              <button class="btn-primary" type="submit">Ask</button>
+            </form>
+          </section>
+
+          <aside class="panel-card tips-card" aria-label="Tips for using NeuroBuddy">
+            <div class="panel-title" style="margin-bottom: 16px;">Get the most from NeuroBuddy</div>
+            <ul>
+              <li><span class="chip-icon"><svg><use href="#i-spark"/></svg></span><div><b>Paste the hard part</b>A sentence, formula or question you’re stuck on works best.</div></li>
+              <li><span class="chip-icon green"><svg><use href="#i-rocket"/></svg></span><div><b>Stuck starting?</b>Ask for tiny first steps and add them to your micro-goals.</div></li>
+              <li><span class="chip-icon amber"><svg><use href="#i-help"/></svg></span><div><b>Check yourself</b>“Quiz me” turns what you learned into three quick questions.</div></li>
+              <li><span class="chip-icon"><svg><use href="#i-lock"/></svg></span><div><b>Keep it private</b>Don’t share personal details. Your class name gives NeuroBuddy context.</div></li>
+            </ul>
+          </aside>
+        </div>
+      </section>
+
+      <!-- ================= Class notes ================= -->
+      <section class="view" id="view-notes" data-view="notes" hidden aria-labelledby="notesPageTitle">
+        <div class="page-head">
+          <div>
+            <div class="page-kicker">Private to you</div>
+            <h1 class="page-title" id="notesPageTitle">Class notes</h1>
+            <p class="page-sub">Jot down rough ideas, then let NeuroBuddy organize them into clear study notes.</p>
+          </div>
+        </div>
+        <section class="panel-card" id="class-notes" aria-labelledby="notesTitle">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title" id="notesTitle"><span class="chip-icon"><svg><use href="#i-note"/></svg></span>Notes for your current class</div>
+              <div class="panel-sub" id="notesMessage">Join a class before creating class notes.</div>
+            </div>
+            <span class="notes-state" id="notesSaveState">Choose a class</span>
+          </div>
+          <div class="notes-grid">
+            <label class="field-label">Rough notes or key ideas
+              <textarea id="noteCaptureInput" class="field-input" maxlength="6000" placeholder="Jot down anything from class, even messy bullet points…"></textarea>
+            </label>
+            <label class="field-label">Your organized notes (autosaves)
+              <textarea id="classNotes" class="field-input" disabled placeholder="Organized notes appear here. You can edit them too."></textarea>
+            </label>
+          </div>
+          <div class="notes-actions">
+            <button id="generateNotesButton" class="btn-primary" type="button" disabled><svg class="icon"><use href="#i-spark"/></svg>Organize my notes</button>
+          </div>
+        </section>
+      </section>
+
+      <!-- ================= Focus history ================= -->
+      <section class="view" id="view-history" data-view="history" hidden aria-labelledby="historyPageTitle">
+        <div class="page-head">
+          <div>
+            <div class="page-kicker">Saved to your account</div>
+            <h1 class="page-title" id="historyPageTitle">Focus history</h1>
+            <p class="page-sub">See how your focus is changing and what helps you focus best.</p>
+          </div>
+          <div class="page-actions">
+            <div class="range-switch" role="group" aria-label="Time range">
+              <button type="button" data-range="7" aria-pressed="true">7 days</button>
+              <button type="button" data-range="30" aria-pressed="false">30 days</button>
+              <button type="button" data-range="all" aria-pressed="false">All time</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Summary for the selected range (student-history.js) -->
+        <div class="stat-grid" id="historyStats" aria-live="polite">
+          <article class="stat-card">
+            <span class="stat-label">Time focused</span>
+            <span class="chip-icon"><svg><use href="#i-timer"/></svg></span>
+            <strong id="hsFocusTime">—</strong>
+            <small id="hsFocusTimeNote">Loading…</small>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">Average focus</span>
+            <span class="chip-icon green"><svg><use href="#i-target"/></svg></span>
+            <strong id="hsAverage">—</strong>
+            <small id="hsAverageNote">&nbsp;</small>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">Longest streak</span>
+            <span class="chip-icon amber"><svg><use href="#i-flame"/></svg></span>
+            <strong id="hsStreak">—</strong>
+            <small id="hsStreakNote">&nbsp;</small>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">Days in a row</span>
+            <span class="chip-icon"><svg><use href="#i-check"/></svg></span>
+            <strong id="hsDays">—</strong>
+            <small id="hsDaysNote">&nbsp;</small>
+          </article>
+        </div>
+
+        <div class="history-grid">
+          <section class="panel-card" aria-labelledby="dailyChartTitle">
+            <div class="panel-head">
+              <div>
+                <div class="panel-title" id="dailyChartTitle"><span class="chip-icon"><svg><use href="#i-chart"/></svg></span><span id="dailyChartName">Focus time per day</span></div>
+                <div class="panel-sub">Minutes you spent focused. Tap or hover over a bar for details.</div>
+              </div>
+            </div>
+            <div class="chart-box">
+              <canvas id="dailyFocusChart" role="img" aria-label="Focus time per day"></canvas>
+              <div class="chart-empty" id="dailyFocusEmpty">No sessions in this range yet.</div>
+            </div>
+          </section>
+
+          <section class="panel-card" aria-labelledby="insightsTitle">
+            <div class="panel-head">
+              <div>
+                <div class="panel-title" id="insightsTitle"><span class="chip-icon"><svg><use href="#i-spark"/></svg></span>What your history shows</div>
+                <div class="panel-sub">Patterns from your sessions, in plain words.</div>
+              </div>
+            </div>
+            <ul class="insight-list" id="insightList">
+              <li class="empty-state">Loading…</li>
+            </ul>
+          </section>
+        </div>
+
+        <section class="panel-card" id="focus-history" aria-labelledby="historyTitle">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title" id="historyTitle"><span class="chip-icon"><svg><use href="#i-history"/></svg></span>Your sessions</div>
+              <div class="panel-sub" id="historyCount">Loading your saved sessions…</div>
+              <div class="panel-sub" id="historyStatus" aria-live="polite"></div>
+            </div>
+          </div>
+          <div class="session-legend" aria-hidden="true">
+            <span><i class="focused"></i>Focused</span>
+            <span><i class="distracted"></i>Looked away</span>
+            <span><i class="away"></i>Not at screen</span>
+            <span class="legend-tip">Open a session to see when you were focused.</span>
+          </div>
+          <div id="historyDays" class="history-days"></div>
+          <button class="btn-action history-more" id="historyMore" type="button" hidden>Show more sessions</button>
+        </section>
+      </section>
+
+      <!-- ================= Classes ================= -->
+      <section class="view" id="view-classes" data-view="classes" hidden aria-labelledby="classesPageTitle">
+        <div class="page-head">
+          <div>
+            <div class="page-kicker">Your teachers and live sessions</div>
+            <h1 class="page-title" id="classesPageTitle">Classes</h1>
+            <p class="page-sub">Pick the class you’re working in. It’s where you join live sessions, and it gives your notes and NeuroBuddy context.</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn-primary" type="button" data-action="join-class"><svg class="icon"><use href="#i-plus"/></svg>Join a class</button>
+          </div>
+        </div>
+        <section class="panel-card" id="my-classes" aria-label="My classes">
+          <div id="studentClassList" class="my-class-grid">
+            <p class="empty-state">Loading classes…</p>
+          </div>
+        </section>
+      </section>
+    </div>
+  </main>
+
+  <!-- Join a class -->
+  <dialog class="nf-dialog" id="joinDialog" aria-labelledby="joinTitle">
+    <form id="joinClassForm" method="dialog">
+      <h2 id="joinTitle">Join a class</h2>
+      <p>Enter the join code your teacher shared. If you were in the class before, the same code gets you back in.</p>
+      <label class="nf-dialog-label">Join code
+        <input class="nf-dialog-input" id="joinCode" type="text" placeholder="NF-XXXXXXXXXXXXXXXX" required autocomplete="off" spellcheck="false">
+      </label>
+      <label class="nf-dialog-label">Class password (only if your teacher set one)
+        <input class="nf-dialog-input" id="joinPassword" type="password" placeholder="Leave blank if none" autocomplete="off">
+      </label>
+      <p class="nf-dialog-message" id="joinClassMessage" role="status" aria-live="polite"></p>
+      <div class="nf-dialog-actions">
+        <button class="btn-action" type="button" id="cancelJoin">Cancel</button>
+        <button class="btn-primary" type="submit">Join class</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Re-engagement nudges and timer messages -->
+  <div class="focus-toast" id="focusToast" role="status" aria-live="polite" hidden>
+    <div class="toast-icon" id="toastIcon" aria-hidden="true">🌱</div>
+    <div class="toast-body">
+      <strong id="toastTitle"></strong>
+      <p id="toastText"></p>
+      <div class="toast-actions" id="toastActions"></div>
+    </div>
+  </div>
+
+  <script src="app.js?v=2"></script>
+  <script src="dashboard-nav.js?v=2"></script>
+  <script src="student-ui.js?v=1"></script>
+  <!-- auth-guard.js must load first: the other modules wait on window.neuroFocusReady -->
+  <script type="module" src="auth-guard.js?v=2"></script>
+  <script type="module" src="eye-analyzer.js?v=2"></script>
+  <script type="module" src="learning-assistant.js?v=2"></script>
+  <script type="module" src="student-classes.js?v=5"></script>
+  <script type="module" src="student-focus.js?v=4"></script>
+  <script type="module" src="student-history.js?v=1"></script>
+</body>
+</html>

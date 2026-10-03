@@ -1,0 +1,621 @@
+// Teacher analytics with two data sources:
+// - Live classroom: real-time attention readings streamed by students in the selected
+//   class (relayed by teacher-classes.js from Supabase Realtime; numbers only, never video).
+// - Simulator: generated attention scores for demonstrations.
+
+const DEMO_NAMES = [
+  "Ayesha Khan", "Hamza Ali", "Fatima Noor", "Usman Tariq",
+  "Zainab Raza", "Bilal Ahmed", "Hira Shah", "Saad Iqbal"
+];
+const HISTORY = 30;      // points kept on the attention curve
+const HEAT_COLUMNS = 20; // readings shown in the heatmap
+const FOCUSED = 70;
+const DRIFTING = 45;
+const LIVE_TICK_MS = 1000;
+const LIVE_STALE_MS = 5000; // no reading for this long = not tracking
+const FLAG_AFTER_TICKS = { sim: 2, live: 3 };
+
+const $ = (selector) => document.querySelector(selector);
+const els = {
+  toggle: $("#simToggle"),
+  reset: $("#simReset"),
+  distract: $("#simDistract"),
+  speed: $("#simSpeed"),
+  status: $("#simStatus"),
+  avg: $("#statAverage"),
+  avgTrend: $("#statAverageTrend"),
+  focused: $("#statFocused"),
+  focusedSub: $("#statFocusedSub"),
+  flags: $("#statFlags"),
+  flagsSub: $("#statFlagsSub"),
+  time: $("#statTime"),
+  timeSub: $("#statTimeSub"),
+  table: $("#liveStudentRows"),
+  heatmap: $("#engagementHeatmap"),
+  alerts: $("#alertFeed"),
+  source: $("#simSource"),
+  analyticsSource: $("#analyticsSource"),
+  modeLive: $("#modeLive"),
+  modeSim: $("#modeSim"),
+  liveCard: $("#liveCard"),
+  simCard: $("#simulatorCard"),
+  liveClassName: $("#liveClassName"),
+  liveCount: $("#liveTrackingCount"),
+  liveLabel: $("#liveTrackingLabel")
+};
+
+let mode = "live";
+let students = [];       // rendered rows: { name, score (null = not tracking), flagged, heat[] }
+let classHistory = [];
+let lowHistory = [];
+let labels = [];
+let tick = 0;
+let flagCount = 0;
+let timer = null;
+let chart = null;
+
+// Live state
+const liveReadings = new Map(); // studentId -> { score, state, cumulativeFocus, lastSeen }
+const liveStudents = new Map(); // studentId -> { name, score, flagged, heat[], distractedTicks }
+let liveClassId = window.neuroFocusClass?.id || "";
+let liveStartedAt = 0;
+
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+const stateFor = (score) => (score >= FOCUSED ? "Focused" : score >= DRIFTING ? "Drifting" : "Distracted");
+const initials = (name) => name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase().padEnd(2, "X");
+const clockLabel = (ms) => {
+  const seconds = Math.floor(ms / 1000);
+  return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+};
+const elapsedLabel = () => (mode === "sim" ? clockLabel(tick * 2000) : clockLabel(liveStartedAt ? Date.now() - liveStartedAt : 0));
+
+function rosterMembers() {
+  // The open class's roster, published by teacher-classes.js
+  return Array.isArray(window.neuroFocusRoster) ? window.neuroFocusRoster : [];
+}
+
+// Whether the teacher has a live session running in the open class (teacher-classes.js)
+// teacher-classes.js may have announced the session before this script started listening.
+let sessionLive = window.neuroFocusLiveSession?.classId === liveClassId && Boolean(window.neuroFocusLiveSession?.live);
+let sessionSince = sessionLive ? window.neuroFocusLiveSession.since : null;
+window.addEventListener("neurofocus:live-session", (event) => {
+  const detail = event.detail || {};
+  if (detail.classId && detail.classId !== liveClassId) return;
+  sessionLive = Boolean(detail.live);
+  sessionSince = detail.since || null;
+  render();
+});
+
+function selectedClassName() {
+  return window.neuroFocusClass?.name || "";
+}
+
+// ---------- Simulator ----------
+function createSimStudents() {
+  const roster = rosterMembers().map((member) => member.name);
+  const names = roster.length ? roster : DEMO_NAMES;
+  els.source.textContent = roster.length
+    ? `${names.length} learners from ${selectedClassName()}`
+    : "Demo learners · select a class with students to use its roster";
+  students = names.map((name) => {
+    const baseline = 70 + Math.random() * 24;
+    return { name, baseline, score: baseline, lapse: 0, distractedTicks: 0, flagged: false, heat: [] };
+  });
+}
+
+function simStep() {
+  tick += 1;
+  students.forEach((student) => {
+    if (student.lapse > 0) {
+      student.lapse -= 1;
+      student.score = clamp(student.score - 8 - Math.random() * 8, 18, 100);
+    } else {
+      if (Math.random() < 0.02) student.lapse = 2 + Math.floor(Math.random() * 3);
+      const pull = (student.baseline - student.score) * 0.35;
+      student.score = clamp(student.score + pull + (Math.random() - 0.5) * 8, 18, 100);
+    }
+    updateFlagState(student);
+    pushHeat(student, student.score);
+  });
+  pushHistory(students.map((student) => student.score));
+  render();
+}
+
+// ---------- Live classroom ----------
+function liveStep() {
+  tick += 1;
+  const now = Date.now();
+  const roster = rosterMembers();
+  const ids = new Set(roster.map((member) => member.id));
+  [...liveStudents.keys()].forEach((id) => { if (!ids.has(id)) liveStudents.delete(id); });
+
+  students = roster.map(({ id, name }) => {
+    const student = liveStudents.get(id) || { name, score: null, flagged: false, heat: [], distractedTicks: 0 };
+    student.name = name;
+    const reading = liveReadings.get(id);
+    const active = reading && reading.score !== null && now - reading.lastSeen < LIVE_STALE_MS;
+    student.score = active ? reading.score : null;
+    if (active) updateFlagState(student);
+    else { student.distractedTicks = 0; student.flagged = false; }
+    pushHeat(student, student.score);
+    liveStudents.set(id, student);
+    return student;
+  });
+
+  const activeScores = students.filter((student) => student.score !== null).map((student) => student.score);
+  if (activeScores.length && !liveStartedAt) liveStartedAt = now;
+  pushHistory(activeScores);
+  render();
+}
+
+function resetLive() {
+  liveReadings.clear();
+  liveStudents.clear();
+  liveStartedAt = 0;
+}
+
+window.addEventListener("neurofocus:live-attention", (event) => {
+  const reading = event.detail || {};
+  if (!reading.studentId || reading.classId !== liveClassId) return;
+  const stopped = reading.state === "Stopped";
+  liveReadings.set(reading.studentId, {
+    score: stopped ? null : clamp(Number(reading.score) || 0, 0, 100),
+    state: String(reading.state || ""),
+    cumulativeFocus: Number(reading.cumulativeFocus) || 0,
+    lastSeen: Date.now()
+  });
+});
+
+// Classes whose live channel is currently refused (teacher-classes.js); clears when Supabase reconnects.
+const blockedClasses = new Set();
+window.addEventListener("neurofocus:live-channel-error", (event) => {
+  blockedClasses.add(event.detail?.classId);
+  render();
+});
+window.addEventListener("neurofocus:live-channel-ok", (event) => {
+  blockedClasses.delete(event.detail?.classId);
+  render();
+});
+
+window.addEventListener("neurofocus:classchange", (event) => {
+  const nextId = event.detail?.id || "";
+  if (nextId === liveClassId) return;
+  liveClassId = nextId;
+  window.neuroFocusRoster = [];
+  if (mode === "live") {
+    clearData();
+    resetLive();
+    render();
+  }
+});
+
+// ---------- Saved history (Supabase) ----------
+// After a refresh the live view is rebuilt from the last 10 minutes of saved samples
+// (one per student every 5 seconds), and the Session History card lists saved sessions.
+const appReady = window.neuroFocusReady;
+const historyEls = { rows: $("#sessionHistoryRows"), status: $("#sessionHistoryStatus") };
+const SETUP_HINT = "Saved history needs the Phase 2 database update (see README).";
+const missingTables = (error) => error && (error.code === "PGRST205" || error.code === "42P01" || /attention_sessions|attention_samples/.test(error.message || ""));
+const shortTime = (date) => date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+let seededClassId = "";
+
+function setHistoryStatus(text, isError = false) {
+  historyEls.status.textContent = text;
+  historyEls.status.dataset.state = isError ? "error" : "";
+}
+
+async function seedLiveFromSaved(classId, members) {
+  const app = await appReady;
+  if (!app || mode !== "live" || classId !== liveClassId) return;
+  const since = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+  const { data, error } = await app.supabase
+    .from("attention_samples")
+    .select("student_id, recorded_at, score, state")
+    .eq("class_id", classId)
+    .gte("recorded_at", since)
+    .order("recorded_at", { ascending: true })
+    .limit(3000);
+  if (mode !== "live" || classId !== liveClassId || error || !data?.length) return;
+
+  // Attention curve: class average and lowest learner per 5-second slot
+  const slots = new Map();
+  data.forEach((sample) => {
+    const slot = Math.floor(new Date(sample.recorded_at).getTime() / 5000) * 5000;
+    const entry = slots.get(slot) || { sum: 0, n: 0, min: 100 };
+    entry.sum += sample.score;
+    entry.n += 1;
+    entry.min = Math.min(entry.min, sample.score);
+    slots.set(slot, entry);
+  });
+  const points = [...slots.entries()].sort((a, b) => a[0] - b[0]).slice(-HISTORY);
+  classHistory.length = 0;
+  lowHistory.length = 0;
+  labels.length = 0;
+  points.forEach(([slot, entry]) => {
+    classHistory.push(entry.sum / entry.n);
+    lowHistory.push(entry.min);
+    labels.push(shortTime(new Date(slot)));
+  });
+  liveStartedAt = new Date(data[0].recorded_at).getTime();
+
+  // Heatmap rows and distraction alerts per student (2+ unfocused samples in a row = 10s+)
+  const names = new Map(members.map((member) => [member.id, member.name]));
+  const byStudent = new Map();
+  data.forEach((sample) => {
+    if (!byStudent.has(sample.student_id)) byStudent.set(sample.student_id, []);
+    byStudent.get(sample.student_id).push(sample);
+  });
+  const alerts = [];
+  byStudent.forEach((samples, id) => {
+    const name = names.get(id) || "Student";
+    const student = liveStudents.get(id) || { name, score: null, flagged: false, heat: [], distractedTicks: 0 };
+    student.heat = samples.slice(-HEAT_COLUMNS).map((sample) => sample.score);
+    liveStudents.set(id, student);
+    let run = 0;
+    samples.forEach((sample) => {
+      run = sample.state === "Focused" ? 0 : run + 1;
+      if (run === 2) alerts.push({ name, score: sample.score, at: new Date(sample.recorded_at) });
+    });
+  });
+  alerts.sort((a, b) => a.at - b.at).forEach((alert) => {
+    addAlert(alert.name, alert.score, "10s+ (saved)", alert.at.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+  });
+  render();
+}
+
+async function loadSessionHistory() {
+  const app = await appReady;
+  const classId = window.neuroFocusClass?.id;
+  if (!app || !classId) {
+    historyEls.rows.replaceChildren();
+    setHistoryStatus("Select a class to see its saved sessions.");
+    return;
+  }
+  const { data, error } = await app.supabase
+    .from("attention_sessions")
+    .select("id, student_id, started_at, last_seen_at, ended_at, tracked_seconds, focus_percent, average_score, lapses, profiles(display_name)")
+    .eq("class_id", classId)
+    .gt("tracked_seconds", 4)
+    .order("started_at", { ascending: false })
+    .limit(25);
+  if (classId !== window.neuroFocusClass?.id) return;
+  historyEls.rows.replaceChildren();
+  if (error) {
+    setHistoryStatus(missingTables(error) ? SETUP_HINT : "Couldn’t load saved sessions. Refresh to try again.", true);
+    return;
+  }
+  setHistoryStatus(data.length
+    ? `Last ${data.length} saved session${data.length === 1 ? "" : "s"} in ${window.neuroFocusClass.name}. Updates every minute.`
+    : `No saved sessions in ${window.neuroFocusClass.name} yet. They appear once students track their attention.`);
+  data.forEach((session) => {
+    const live = !session.ended_at && Date.now() - new Date(session.last_seen_at).getTime() < 30000;
+    const minutes = Math.floor(session.tracked_seconds / 60);
+    const cells = [
+      session.profiles?.display_name || "Student",
+      new Date(session.started_at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }),
+      `${minutes}:${String(session.tracked_seconds % 60).padStart(2, "0")}`,
+      session.focus_percent === null ? "—" : `${session.focus_percent}%`,
+      session.average_score === null ? "—" : `${session.average_score}%`,
+      String(session.lapses)
+    ];
+    const row = document.createElement("tr");
+    cells.forEach((text) => {
+      const cell = document.createElement("td");
+      cell.textContent = text;
+      row.append(cell);
+    });
+    const statusCell = document.createElement("td");
+    const pill = document.createElement("span");
+    pill.className = "state-pill";
+    pill.dataset.state = live ? "Focused" : "Offline";
+    pill.textContent = live ? "Live now" : "Ended";
+    statusCell.append(pill);
+    row.append(statusCell);
+    historyEls.rows.append(row);
+  });
+}
+
+window.addEventListener("neurofocus:roster-loaded", (event) => {
+  const { classId, members } = event.detail;
+  if (classId !== seededClassId) {
+    seededClassId = classId;
+    void seedLiveFromSaved(classId, members);
+  }
+  void loadSessionHistory();
+});
+// A student stopping tracking finishes a session, so refresh the list shortly after.
+window.addEventListener("neurofocus:live-attention", (event) => {
+  if (event.detail?.state === "Stopped") window.setTimeout(() => { void loadSessionHistory(); }, 2500);
+});
+window.addEventListener("neurofocus:classchange", () => { if (!window.neuroFocusClass) void loadSessionHistory(); });
+window.setInterval(() => { void loadSessionHistory(); }, 60000);
+
+// ---------- Shared ----------
+function updateFlagState(student) {
+  const state = stateFor(student.score);
+  student.distractedTicks = state === "Distracted" ? student.distractedTicks + 1 : 0;
+  if (student.distractedTicks === FLAG_AFTER_TICKS[mode]) raiseFlag(student);
+  if (state === "Focused") student.flagged = false;
+}
+
+function pushHeat(student, score) {
+  student.heat.push(score);
+  if (student.heat.length > HEAT_COLUMNS) student.heat.shift();
+}
+
+function pushHistory(scores) {
+  classHistory.push(scores.length ? scores.reduce((sum, value) => sum + value, 0) / scores.length : null);
+  lowHistory.push(scores.length ? Math.min(...scores) : null);
+  labels.push(mode === "sim" ? elapsedLabel() : new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+  if (classHistory.length > HISTORY) { classHistory.shift(); lowHistory.shift(); labels.shift(); }
+}
+
+function raiseFlag(student) {
+  student.flagged = true;
+  const readings = FLAG_AFTER_TICKS[mode];
+  addAlert(student.name, student.score, `${readings}+ readings`,
+    mode === "sim" ? elapsedLabel() : new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+}
+
+function addAlert(name, score, duration, timeText) {
+  flagCount += 1;
+  const item = document.createElement("li");
+  const dot = document.createElement("span");
+  dot.className = "alert-dot";
+  const body = document.createElement("div");
+  const title = document.createElement("strong");
+  title.textContent = `${name} lost focus`;
+  const detail = document.createElement("small");
+  detail.textContent = `Attention ${Math.round(score)}% for ${duration} · adaptive prompt suggested`;
+  body.append(title, detail);
+  const time = document.createElement("time");
+  time.textContent = timeText;
+  item.append(dot, body, time);
+  els.alerts.querySelector(".empty-state")?.remove();
+  els.alerts.prepend(item);
+  while (els.alerts.children.length > 6) els.alerts.lastElementChild.remove();
+}
+
+function render() {
+  const active = students.filter((student) => student.score !== null);
+  const latest = [...classHistory].reverse().find((value) => value !== null);
+  const recent = classHistory.slice(-6).filter((value) => value !== null);
+  const focusedCount = active.filter((student) => student.score >= FOCUSED).length;
+
+  els.avg.textContent = latest === undefined || !active.length ? "—" : `${Math.round(latest)}%`;
+  if (active.length && recent.length > 1) {
+    const delta = recent.at(-1) - recent[0];
+    const span = mode === "sim" ? "10s" : `${recent.length - 1}s`;
+    els.avgTrend.textContent = `${delta >= 0 ? "↗" : "↘"} ${Math.abs(delta).toFixed(1)} pts vs. ${span} ago`;
+    els.avgTrend.dataset.trend = delta >= 0 ? "up" : "down";
+  } else {
+    els.avgTrend.textContent = mode === "sim" ? "Start the simulator" : sessionLive ? "Waiting for students to join" : "Start a live session to see scores";
+    els.avgTrend.dataset.trend = "";
+  }
+  els.focused.textContent = active.length ? `${focusedCount}/${active.length}` : "—";
+  els.focusedSub.textContent = mode === "live"
+    ? `${active.length} of ${students.length} student${students.length === 1 ? "" : "s"} tracking now`
+    : active.length ? `${Math.round((focusedCount / active.length) * 100)}% of class attentive` : "No learners loaded";
+  els.flags.textContent = String(flagCount);
+  els.flagsSub.textContent = `Distracted for ${FLAG_AFTER_TICKS[mode]}+ consecutive readings`;
+  els.time.textContent = elapsedLabel();
+  els.timeSub.textContent = mode === "sim" ? "Simulated class time" : "Live session time";
+
+  if (mode === "live") {
+    const className = selectedClassName();
+    const since = sessionSince ? new Date(sessionSince).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "";
+    els.liveClassName.textContent = blockedClasses.has(liveClassId)
+      ? "Live updates are blocked: run the Phase 2 database updates (see README), then refresh."
+      : !className ? "Open a class to watch it live."
+        : sessionLive ? `Live session in ${className}${since ? ` since ${since}` : ""}.`
+          : `${className} isn’t live. Press Start live session to begin.`;
+    els.liveCount.textContent = String(active.length);
+    els.liveLabel.textContent = `of ${students.length} student${students.length === 1 ? "" : "s"} sharing live attention`;
+    els.status.textContent = !sessionLive ? "Not live" : active.length ? `Live · ${active.length} sharing` : "Live · waiting for students";
+    els.status.dataset.state = sessionLive ? "live" : "";
+  }
+
+  renderTable();
+  renderHeatmap();
+  if (chart) {
+    chart.data.labels = labels;
+    chart.data.datasets[0].data = classHistory;
+    chart.data.datasets[1].data = lowHistory;
+    chart.update("none");
+  }
+}
+
+function renderTable() {
+  els.table.replaceChildren();
+  if (!students.length) {
+    const row = document.createElement("tr");
+    const cell = document.createElement("td");
+    cell.colSpan = 3;
+    cell.className = "empty-state";
+    cell.textContent = mode === "live" ? "No students in this class yet. Share its join code from the Students tab." : "Start the simulator.";
+    row.append(cell);
+    els.table.append(row);
+    return;
+  }
+  // Tracking students first, lowest attention at the top; then students not tracking.
+  const sorted = [...students].sort((a, b) => (a.score ?? 101) - (b.score ?? 101));
+  sorted.forEach((student) => {
+    const row = document.createElement("tr");
+    row.dataset.demoStudent = "";
+    const tracking = student.score !== null;
+    const state = tracking ? stateFor(student.score) : "Offline";
+
+    const nameCell = document.createElement("td");
+    const avatar = document.createElement("span");
+    avatar.className = "mini-avatar";
+    avatar.textContent = initials(student.name);
+    const name = document.createElement("span");
+    name.textContent = student.name;
+    nameCell.append(avatar, " ", name);
+
+    const scoreCell = document.createElement("td");
+    const value = document.createElement("span");
+    value.className = "score-value";
+    value.textContent = tracking ? `${Math.round(student.score)}%` : "—";
+    const bar = document.createElement("span");
+    bar.className = "score-bar";
+    const fill = document.createElement("span");
+    fill.style.width = tracking ? `${Math.round(student.score)}%` : "0%";
+    fill.dataset.state = state;
+    bar.append(fill);
+    scoreCell.append(value, bar);
+
+    const stateCell = document.createElement("td");
+    const pill = document.createElement("span");
+    pill.className = "state-pill";
+    pill.dataset.state = state;
+    pill.textContent = !tracking ? "Not tracking" : student.flagged ? `${state} · Flagged` : state;
+    stateCell.append(pill);
+
+    row.append(nameCell, scoreCell, stateCell);
+    els.table.append(row);
+  });
+}
+
+function renderHeatmap() {
+  els.heatmap.replaceChildren();
+  students.forEach((student) => {
+    const label = document.createElement("div");
+    label.className = "heat-label";
+    label.textContent = student.name;
+    els.heatmap.append(label);
+    const offset = HEAT_COLUMNS - student.heat.length;
+    for (let i = 0; i < HEAT_COLUMNS; i += 1) {
+      const cell = document.createElement("div");
+      cell.className = "heat-cell";
+      const score = i >= offset ? student.heat[i - offset] : null;
+      if (score !== null && score !== undefined) {
+        cell.dataset.state = stateFor(score);
+        cell.style.setProperty("--level", (0.25 + (score / 100) * 0.75).toFixed(2));
+        cell.title = `${student.name}: ${Math.round(score)}%`;
+      }
+      els.heatmap.append(cell);
+    }
+  });
+}
+
+function setupChart() {
+  if (!window.Chart) {
+    $("#attentionChart").replaceWith(Object.assign(document.createElement("p"), {
+      className: "empty-state",
+      textContent: "Chart library could not load. Check your internet connection and refresh."
+    }));
+    return;
+  }
+  const muted = "#82828c";
+  chart = new window.Chart($("#attentionChart"), {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "Class average", data: classHistory, borderColor: "#00d9ff", borderWidth: 2, tension: 0.35,
+          pointRadius: 0, fill: true, backgroundColor: "rgba(0, 217, 255, 0.08)"
+        },
+        {
+          label: "Lowest learner", data: lowHistory, borderColor: "#ef4444", borderWidth: 1.5, borderDash: [4, 4],
+          tension: 0.35, pointRadius: 0, fill: false
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      interaction: { mode: "index", intersect: false },
+      scales: {
+        y: { min: 0, max: 100, ticks: { color: muted, callback: (v) => `${v}%`, stepSize: 25 }, grid: { color: "#1c1c20" }, border: { display: false } },
+        x: { ticks: { color: muted, maxTicksLimit: 6 }, grid: { display: false }, border: { color: "#222226" } }
+      },
+      plugins: {
+        legend: { labels: { color: "#f4f4f5", boxWidth: 10, boxHeight: 10, usePointStyle: true } },
+        tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${Math.round(ctx.parsed.y)}%` } }
+      }
+    }
+  });
+}
+
+function clearData() {
+  tick = 0;
+  flagCount = 0;
+  students = [];
+  classHistory.length = 0;
+  lowHistory.length = 0;
+  labels.length = 0;
+  els.alerts.replaceChildren(Object.assign(document.createElement("p"), {
+    className: "empty-state", textContent: "No distraction flags yet."
+  }));
+}
+
+function setSimRunning(running) {
+  window.clearInterval(timer);
+  timer = running ? window.setInterval(simStep, Number(els.speed.value)) : null;
+  els.toggle.textContent = running ? "Pause simulation" : (tick ? "Resume simulation" : "Start simulation");
+  els.status.textContent = running ? "Simulating" : (tick ? "Paused" : "Idle");
+  els.status.dataset.state = running ? "live" : "";
+}
+
+function resetSim() {
+  setSimRunning(false);
+  clearData();
+  createSimStudents();
+  setSimRunning(false);
+  render();
+}
+
+function setMode(next) {
+  mode = next;
+  window.clearInterval(timer);
+  timer = null;
+  const live = mode === "live";
+  els.modeLive.classList.toggle("active", live);
+  els.modeSim.classList.toggle("active", !live);
+  els.modeLive.setAttribute("aria-pressed", String(live));
+  els.modeSim.setAttribute("aria-pressed", String(!live));
+  els.liveCard.hidden = !live;
+  els.simCard.hidden = live;
+  els.analyticsSource.textContent = live
+    ? "Real-time attention scores from students in the selected class (numbers only, never video)."
+    : "Simulated attention scores for demonstrations.";
+  try { localStorage.setItem("neuroFocusTeacherMode", mode); } catch { /* storage unavailable */ }
+  if (live) {
+    clearData();
+    resetLive();
+    timer = window.setInterval(liveStep, LIVE_TICK_MS);
+    liveStep();
+    const members = rosterMembers();
+    if (liveClassId && members.length) {
+      seededClassId = liveClassId;
+      void seedLiveFromSaved(liveClassId, members);
+    }
+  } else {
+    resetSim();
+  }
+}
+
+els.modeLive.addEventListener("click", () => { if (mode !== "live") setMode("live"); });
+els.modeSim.addEventListener("click", () => { if (mode !== "sim") setMode("sim"); });
+els.toggle.addEventListener("click", () => {
+  if (!students.length) createSimStudents();
+  setSimRunning(!timer);
+  if (timer && !tick) simStep();
+});
+els.reset.addEventListener("click", resetSim);
+els.speed.addEventListener("change", () => { if (timer && mode === "sim") setSimRunning(true); });
+els.distract.addEventListener("click", () => {
+  if (!students.length) return;
+  const focusedStudents = students.filter((student) => student.lapse === 0);
+  const target = focusedStudents[Math.floor(Math.random() * focusedStudents.length)] || students[0];
+  target.lapse = 4;
+  if (!timer) setSimRunning(true);
+});
+
+setupChart();
+let savedMode = "live";
+try { savedMode = localStorage.getItem("neuroFocusTeacherMode") === "sim" ? "sim" : "live"; } catch { /* storage unavailable */ }
+setMode(savedMode);
+// teacher-classes.js may have picked a class before this script started listening.
+void loadSessionHistory();

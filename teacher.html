@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en" class="auth-check-pending">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#09090b">
+  <title>Neuro-Focus | Teacher Dashboard</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #09090b;
+      --sidebar: #0c0c0f;
+      --card: #131316;
+      --border: #222226;
+      --border-strong: #2e2e34;
+      --text-main: #f4f4f5;
+      --text-soft: #b4b4bc;
+      --text-muted: #82828c;
+      --green: #22c55e;
+      --red: #ef4444;
+      --amber: #f5b748;
+      --cyan: #00d9ff;
+    }
+
+    /* Hidden until auth-guard.js confirms a signed-in teacher */
+    .auth-check-pending body { visibility: hidden; }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; -webkit-font-smoothing: antialiased; }
+    [hidden] { display: none !important; }
+    button, input, select, textarea { font: inherit; color: inherit; }
+    button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+    .icon { width: 17px; height: 17px; flex: none; }
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+    /* ---------- Sidebar ---------- */
+    aside {
+      width: 248px; flex-shrink: 0; background: var(--sidebar); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; justify-content: space-between; padding: 16px 12px; overflow-y: auto;
+    }
+    .brand-box { display: flex; align-items: center; gap: 10px; padding: 6px 10px 18px; border-bottom: 1px solid var(--border); }
+    .brand-mark {
+      width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; flex: none;
+      background: linear-gradient(145deg, #13232b, #0c0c0f); border: 1px solid #1f3a44; color: var(--cyan);
+      box-shadow: 0 0 18px rgba(0, 217, 255, 0.16);
+    }
+    .brand-mark svg { width: 18px; height: 18px; }
+    .brand-text b { display: block; font-size: 14px; font-weight: 650; letter-spacing: -0.2px; }
+    .brand-text small { font-size: 11.5px; color: var(--text-muted); }
+    .nav-group { margin-top: 18px; display: flex; flex-direction: column; gap: 2px; }
+    .nav-label { font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; padding: 0 10px 6px; letter-spacing: 0.6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .nav-item {
+      display: flex; align-items: center; gap: 11px; width: 100%; padding: 8px 10px; border-radius: 8px; border: 0; background: none;
+      font-size: 13.5px; font-weight: 500; color: var(--text-muted); text-decoration: none; text-align: left; cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+    .nav-item:hover { background: #17171b; color: var(--text-main); }
+    .nav-item[aria-current] { background: #1c1c21; color: var(--text-main); box-shadow: inset 2px 0 0 var(--cyan); }
+    .nav-item[aria-current] .icon { color: var(--cyan); }
+    .nav-count { margin-left: auto; font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; background: #1c1c21; border: 1px solid var(--border); border-radius: 999px; padding: 0 7px; }
+    .nav-count:empty { display: none; }
+    .nav-live { margin-left: auto; display: inline-flex; }
+    .user-card {
+      display: flex; align-items: center; gap: 10px; padding: 10px; margin-top: 16px; border: 1px solid var(--border);
+      border-radius: 12px; background: #111114;
+    }
+    .avatar {
+      width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; flex: none; font-size: 12.5px; font-weight: 700;
+      color: #062a33; background: linear-gradient(135deg, #67e8f9, #00b8d9);
+    }
+    .user-card > div { min-width: 0; }
+    .user-card b { display: block; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .user-card small { font-size: 11.5px; color: var(--text-muted); }
+
+    /* ---------- Main + header ---------- */
+    main { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow-y: auto; background: var(--bg); }
+    header {
+      height: 60px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 28px;
+      position: sticky; top: 0; z-index: 20; background: rgba(9, 9, 11, 0.82); backdrop-filter: blur(14px); border-bottom: 1px solid var(--border);
+    }
+    .breadcrumbs { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); font-weight: 500; white-space: nowrap; min-width: 0; }
+    .breadcrumbs b { color: var(--text-main); font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+    .header-actions { display: flex; align-items: center; gap: 8px; }
+
+    .btn-action {
+      display: inline-flex; align-items: center; justify-content: center; gap: 7px; background: #18181c; color: var(--text-main);
+      border: 1px solid var(--border-strong); border-radius: 8px; font-size: 12.5px; font-weight: 500; padding: 7px 12px;
+      cursor: pointer; text-decoration: none; white-space: nowrap; transition: background 0.15s ease, border-color 0.15s ease;
+    }
+    .btn-action:hover { background: #222227; border-color: #3a3a42; }
+    .btn-action:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-action .icon { width: 15px; height: 15px; }
+    .btn-primary {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: var(--text-main); color: #09090b; border: 0;
+      border-radius: 9px; padding: 10px 16px; font-size: 13.5px; font-weight: 600; cursor: pointer; white-space: nowrap;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 8px 22px rgba(0, 217, 255, 0.10); transition: background 0.15s ease, box-shadow 0.15s ease;
+    }
+    .btn-primary:hover { background: #fff; box-shadow: 0 0 0 1px rgba(255,255,255,0.18), 0 10px 26px rgba(0, 217, 255, 0.18); }
+    .btn-primary:disabled { opacity: 0.55; cursor: progress; }
+    .btn-primary .icon { width: 16px; height: 16px; }
+
+    .portal-main { padding: 28px; max-width: 1440px; margin: 0 auto; width: 100%; display: flex; flex-direction: column; gap: 20px; }
+    .stack { display: flex; flex-direction: column; gap: 20px; animation: view-in 0.25s ease; }
+    @keyframes view-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+    /* Page heading */
+    .page-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+    .page-kicker { font-size: 12px; color: var(--text-muted); font-weight: 600; letter-spacing: 0.4px; }
+    .page-title { font-size: 28px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.15; margin-top: 2px; }
+    .page-sub { font-size: 14px; color: var(--text-muted); margin-top: 4px; }
+    .section-label { font-size: 13px; font-weight: 650; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.6px; margin-top: 4px; }
+
+    /* ---------- Cards ---------- */
+    .panel-card {
+      background: linear-gradient(180deg, #141417, #111114); border: 1px solid var(--border); border-radius: 16px;
+      padding: 22px; display: flex; flex-direction: column; min-width: 0;
+    }
+    .panel-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 18px; }
+    .panel-title { display: flex; align-items: center; gap: 10px; font-size: 15.5px; font-weight: 650; letter-spacing: -0.2px; }
+    .panel-title .chip-icon { width: 30px; height: 30px; }
+    .panel-sub { font-size: 12.5px; color: var(--text-muted); margin-top: 4px; line-height: 1.5; }
+    .panel-sub[data-state="error"] { color: #fca5a5; }
+    .chip-icon {
+      width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; flex: none;
+      color: var(--cyan); background: rgba(0, 217, 255, 0.08); border: 1px solid rgba(0, 217, 255, 0.2);
+    }
+    .chip-icon svg { width: 17px; height: 17px; }
+    .chip-icon.green { color: var(--green); background: rgba(34, 197, 94, 0.08); border-color: rgba(34, 197, 94, 0.22); }
+    .chip-icon.amber { color: var(--amber); background: rgba(245, 183, 72, 0.08); border-color: rgba(245, 183, 72, 0.22); }
+    .chip-icon.red { color: #f87171; background: rgba(239, 68, 68, 0.08); border-color: rgba(239, 68, 68, 0.22); }
+    .field-input {
+      width: 100%; background: #0e0e11; border: 1px solid var(--border-strong); border-radius: 9px;
+      padding: 10px 12px; color: var(--text-main); font-size: 13.5px; outline: none; transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .field-input:focus { border-color: rgba(0, 217, 255, 0.45); box-shadow: 0 0 0 3px rgba(0, 217, 255, 0.08); }
+    .empty-state {
+      font-size: 13px; color: var(--text-muted); background: #0e0e11; border: 1px dashed var(--border-strong);
+      border-radius: 12px; padding: 22px; text-align: center; line-height: 1.5;
+    }
+
+    /* KPI cards */
+    .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    .stat-card {
+      background: linear-gradient(180deg, #141417, #111114); border: 1px solid var(--border); border-radius: 16px; padding: 18px 20px;
+      display: grid; grid-template-columns: 1fr auto; column-gap: 12px; align-content: start;
+    }
+    .stat-label { font-size: 12.5px; color: var(--text-muted); font-weight: 500; }
+    .stat-card .chip-icon { grid-column: 2; grid-row: 1 / span 2; }
+    .stat-card strong { font-size: 30px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.15; margin-top: 6px; font-variant-numeric: tabular-nums; }
+    .stat-card small { grid-column: 1 / -1; font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+    .stat-card small[data-trend="up"] { color: var(--green); }
+    .stat-card small[data-trend="down"] { color: #fca5a5; }
+    .stat-card[data-live="true"] { border-color: rgba(239, 68, 68, 0.35); background: linear-gradient(160deg, rgba(239, 68, 68, 0.1), #111114 60%); }
+    .stat-card[data-live="true"] strong { color: #fca5a5; }
+
+    /* ---------- All classes ---------- */
+    .class-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+    .class-card {
+      background: linear-gradient(180deg, #141417, #111114); border: 1px solid var(--border); border-radius: 16px; padding: 20px; display: flex;
+      flex-direction: column; gap: 14px; text-align: left; color: inherit; cursor: pointer;
+      transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .class-card:hover { border-color: #3a3a42; transform: translateY(-2px); box-shadow: 0 14px 34px rgba(0, 0, 0, 0.35); }
+    .class-card-top { display: flex; align-items: center; gap: 12px; }
+    .class-card h3 { flex: 1; font-size: 16px; font-weight: 650; letter-spacing: -0.2px; overflow-wrap: anywhere; }
+    .class-initial {
+      width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center; flex: none; font-size: 16px; font-weight: 700;
+      color: var(--cyan); background: rgba(0, 217, 255, 0.09); border: 1px solid rgba(0, 217, 255, 0.24);
+    }
+    .class-card-stats { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; color: var(--text-muted); }
+    .class-card-stats .online { color: var(--green); }
+    .class-card-foot { font-size: 12.5px; font-weight: 600; color: var(--text-soft); border-top: 1px solid var(--border); padding-top: 12px; }
+    .class-card:hover .class-card-foot { color: var(--cyan); }
+    .live-pill {
+      display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.5px; color: #fca5a5; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.35);
+      border-radius: 999px; padding: 3px 9px; white-space: nowrap;
+    }
+    .code-chip {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--cyan);
+      background: rgba(0, 217, 255, 0.08); border: 1px solid rgba(0, 217, 255, 0.25); border-radius: 7px; padding: 4px 9px;
+      cursor: pointer; width: fit-content;
+    }
+    button.code-chip:hover { background: rgba(0, 217, 255, 0.14); }
+
+    /* ---------- One class ---------- */
+    .back-link { width: fit-content; padding: 6px 11px; font-size: 12.5px; }
+    .class-hero {
+      display: flex; justify-content: space-between; align-items: center; gap: 18px 24px; flex-wrap: wrap;
+      border: 1px solid var(--border); border-radius: 18px; padding: 22px 24px;
+      background: radial-gradient(ellipse 60% 140% at 0% 0%, rgba(0, 217, 255, 0.08), transparent 60%), linear-gradient(180deg, #141417, #111114);
+    }
+    .class-hero-main { display: flex; align-items: center; gap: 16px; min-width: 0; }
+    .class-hero .class-initial { width: 56px; height: 56px; border-radius: 15px; font-size: 22px; }
+    .class-hero h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.15; overflow-wrap: anywhere; }
+    .class-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; font-size: 13px; color: var(--text-muted); margin-top: 8px; }
+    .joining-chip { font-size: 11.5px; color: #fde68a; border: 1px solid rgba(245, 183, 72, 0.35); border-radius: 999px; padding: 2px 9px; }
+    .session-control { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+    .session-control small { font-size: 12.5px; color: var(--text-muted); text-align: right; max-width: 300px; }
+    .btn-live {
+      display: inline-flex; align-items: center; gap: 8px; background: var(--green); color: #052e16; border: 0; border-radius: 10px;
+      padding: 12px 20px; font-size: 14.5px; font-weight: 700; cursor: pointer; box-shadow: 0 10px 26px rgba(34, 197, 94, 0.25);
+    }
+    .btn-live:hover { filter: brightness(1.08); }
+    .btn-live[data-live="true"] { background: rgba(239, 68, 68, 0.12); color: #fecaca; border: 1px solid rgba(239, 68, 68, 0.5); box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.08); }
+    .btn-live:disabled { opacity: 0.6; cursor: not-allowed; }
+    .class-tabs {
+      display: flex; gap: 4px; padding: 4px; background: #0e0e11; border: 1px solid var(--border); border-radius: 12px;
+      width: fit-content; max-width: 100%; overflow-x: auto; scrollbar-width: none;
+    }
+    .class-tabs button {
+      display: inline-flex; align-items: center; gap: 8px; background: none; border: 0; border-radius: 9px; color: var(--text-muted);
+      font-size: 13.5px; font-weight: 500; padding: 8px 14px; cursor: pointer; white-space: nowrap; transition: background 0.15s ease, color 0.15s ease;
+    }
+    .class-tabs button .icon { width: 15px; height: 15px; }
+    .class-tabs button:hover { color: var(--text-main); }
+    .class-tabs button[aria-selected="true"] { background: #1d1d22; color: var(--text-main); box-shadow: inset 0 0 0 1px #2e2e34; }
+    .class-tabs button[aria-selected="true"] .icon { color: var(--cyan); }
+    .tab-count { font-size: 11px; color: var(--text-muted); background: #232328; border-radius: 999px; padding: 0 7px; }
+    .tab-count:empty { display: none; }
+
+    /* Live monitor */
+    .section-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+    .section-head h2 { font-size: 19px; font-weight: 650; letter-spacing: -0.3px; }
+    .section-head p { font-size: 13px; color: var(--text-muted); margin-top: 3px; }
+    .mode-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .mode-switch { display: inline-flex; gap: 3px; padding: 3px; background: #0e0e11; border: 1px solid var(--border); border-radius: 10px; }
+    .mode-switch button { background: transparent; border: 0; border-radius: 7px; padding: 6px 12px; font-size: 12.5px; font-weight: 500; color: var(--text-muted); cursor: pointer; }
+    .mode-switch button:hover { color: var(--text-main); }
+    .mode-switch button.active { background: #1d1d22; color: var(--text-main); box-shadow: inset 0 0 0 1px #2e2e34; }
+    #modeLive.active { color: var(--green); }
+    .sim-badge {
+      display: inline-flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 650; text-transform: uppercase;
+      letter-spacing: 0.6px; color: var(--text-muted); background: #121215; border: 1px solid var(--border); border-radius: 999px; padding: 5px 11px;
+    }
+    .sim-badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #55555e; }
+    .sim-badge[data-state="live"] { color: var(--green); border-color: rgba(34, 197, 94, 0.3); }
+    .sim-badge[data-state="live"]::before { background: var(--green); box-shadow: 0 0 6px rgba(34,197,94,0.6); }
+    .analytics-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr); gap: 20px; align-items: stretch; }
+    .chart-box { position: relative; height: 270px; }
+    .live-summary { display: flex; align-items: baseline; gap: 10px; margin-bottom: 16px; }
+    .live-summary strong { font-size: 40px; font-weight: 700; letter-spacing: -0.04em; color: var(--green); }
+    .live-summary span { font-size: 13px; color: var(--text-muted); }
+    .live-steps { list-style: none; counter-reset: step; display: flex; flex-direction: column; gap: 10px; font-size: 13px; color: var(--text-muted); line-height: 1.45; margin-bottom: 16px; }
+    .live-steps li { counter-increment: step; display: flex; gap: 10px; }
+    .live-steps li::before {
+      content: counter(step); flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 11.5px; font-weight: 700;
+      color: var(--cyan); border: 1px solid rgba(0, 217, 255, 0.35); background: rgba(0, 217, 255, 0.06);
+    }
+    .live-steps strong { color: var(--text-main); font-weight: 600; }
+    .sim-controls { display: flex; flex-direction: column; gap: 10px; }
+    .sim-controls .btn-primary, .sim-controls .btn-action { width: 100%; padding: 10px 16px; font-size: 13px; }
+    .sim-controls label { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; color: var(--text-muted); gap: 12px; }
+    .sim-controls select { background: #101013; border: 1px solid var(--border-strong); border-radius: 8px; padding: 6px 8px; font-size: 12.5px; }
+    .sim-source { font-size: 12px; color: var(--text-muted); line-height: 1.45; border-top: 1px solid var(--border); padding-top: 12px; margin-top: 4px; }
+    .sim-note { font-size: 11.5px; color: #6b6b74; line-height: 1.5; margin-top: auto; }
+
+    .table-scroll { max-height: 380px; overflow: auto; }
+    .data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 380px; }
+    .data-table th {
+      text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-muted); font-weight: 650;
+      padding: 0 12px 12px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: #121215; white-space: nowrap;
+    }
+    .data-table td { padding: 11px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    .data-table tbody tr:hover td { background: #141418; }
+    .data-table tr:last-child td { border-bottom: 0; }
+    .history-table { min-width: 640px; }
+    .history-table td { white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .mini-avatar {
+      display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; margin-right: 10px; vertical-align: middle;
+      font-size: 10.5px; font-weight: 700; color: #cffafe; background: linear-gradient(135deg, #155e75, #0e3a47);
+    }
+    .score-value { display: inline-block; width: 40px; font-variant-numeric: tabular-nums; font-weight: 600; }
+    .score-bar { display: inline-block; vertical-align: middle; width: 96px; height: 6px; border-radius: 4px; background: #1f1f24; overflow: hidden; }
+    .score-bar span { display: block; height: 100%; border-radius: 4px; background: var(--cyan); transition: width 0.4s ease; }
+    .score-bar span[data-state="Drifting"] { background: var(--amber); }
+    .score-bar span[data-state="Distracted"] { background: var(--red); }
+    .state-pill { font-size: 11.5px; font-weight: 600; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); white-space: nowrap; }
+    .state-pill[data-state="Focused"] { color: var(--green); background: rgba(34,197,94,0.08); border-color: rgba(34,197,94,0.25); }
+    .state-pill[data-state="Drifting"] { color: var(--amber); background: rgba(245,183,72,0.08); border-color: rgba(245,183,72,0.25); }
+    .state-pill[data-state="Distracted"] { color: #fca5a5; background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.3); }
+    .state-pill[data-state="Offline"] { color: var(--text-muted); background: transparent; }
+
+    .alert-feed { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+    .alert-feed li {
+      display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: start; padding: 11px 12px;
+      border: 1px solid rgba(239, 68, 68, 0.18); background: rgba(239, 68, 68, 0.04); border-radius: 11px;
+    }
+    .alert-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); margin-top: 6px; box-shadow: 0 0 6px rgba(239,68,68,0.5); }
+    .alert-feed strong { display: block; font-size: 13px; font-weight: 600; }
+    .alert-feed small { font-size: 12px; color: var(--text-muted); }
+    .alert-feed time { font-size: 11.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+    .panel-card .btn-action.full { width: 100%; margin-top: 14px; padding: 9px 12px; }
+
+    .heatmap-scroll { overflow-x: auto; }
+    .heatmap { min-width: 480px; display: grid; grid-template-columns: minmax(120px, 170px) repeat(20, minmax(10px, 1fr)); gap: 4px; align-items: center; }
+    .heat-label { font-size: 12.5px; color: var(--text-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 8px; }
+    .heat-cell { height: 20px; border-radius: 5px; background: #17171b; }
+    .heat-cell[data-state="Focused"] { background: rgba(0, 217, 255, var(--level)); }
+    .heat-cell[data-state="Drifting"] { background: rgba(245, 183, 72, var(--level)); }
+    .heat-cell[data-state="Distracted"] { background: rgba(239, 68, 68, var(--level)); }
+    .heat-legend { display: flex; gap: 18px; font-size: 12px; color: var(--text-muted); margin-top: 16px; flex-wrap: wrap; }
+    .heat-legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 7px; vertical-align: -1px; }
+    .heat-legend .lg-focused::before { background: var(--cyan); }
+    .heat-legend .lg-drifting::before { background: var(--amber); }
+    .heat-legend .lg-distracted::before { background: var(--red); }
+
+    /* Students */
+    .students-table td:last-child { text-align: right; }
+    .student-status { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-muted); }
+    .student-status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #3a3a42; }
+    .student-status[data-state="online"] { color: var(--text-main); }
+    .student-status[data-state="online"]::before { background: var(--green); box-shadow: 0 0 6px rgba(34,197,94,0.6); }
+    .student-status[data-state="session"] { color: #86efac; }
+    .student-status[data-state="session"]::before { background: var(--red); box-shadow: 0 0 6px rgba(239,68,68,0.6); }
+    .row-new td { animation: row-new 2.4s ease; }
+    @keyframes row-new { 0%, 40% { background: rgba(0, 217, 255, 0.12); } 100% { background: transparent; } }
+    .btn-remove {
+      background: transparent; color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px;
+      padding: 6px 11px; font-size: 12px; cursor: pointer;
+    }
+    .btn-remove:hover { background: rgba(239, 68, 68, 0.1); }
+
+    /* Settings */
+    .settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+    .settings-card { gap: 14px; }
+    .settings-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; margin-top: auto; }
+    .switch { display: flex; align-items: center; gap: 12px; font-size: 13.5px; color: var(--text-soft); cursor: pointer; }
+    .switch input {
+      appearance: none; -webkit-appearance: none; width: 38px; height: 22px; border-radius: 999px; background: #2a2a30; position: relative;
+      cursor: pointer; flex: none; transition: background 0.2s ease; border: 1px solid #34343b;
+    }
+    .switch input::after {
+      content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #d4d4d8;
+      transition: transform 0.2s ease;
+    }
+    .switch input:checked { background: rgba(34, 197, 94, 0.45); border-color: rgba(34, 197, 94, 0.6); }
+    .switch input:checked::after { transform: translateX(16px); background: #fff; }
+    .switch input:disabled { opacity: 0.5; cursor: not-allowed; }
+    .danger-card { border-color: rgba(239, 68, 68, 0.3); background: linear-gradient(180deg, rgba(239, 68, 68, 0.05), #111114); }
+
+    @media (prefers-reduced-motion: reduce) {
+      .stack, .row-new td { animation: none; }
+      .class-card, .switch input::after { transition: none; }
+    }
+    @media (max-width: 1100px) {
+      .stat-grid { grid-template-columns: repeat(2, 1fr); }
+      .analytics-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 760px) {
+      .portal-main { padding: 20px 16px 32px; }
+      .page-title, .class-hero h1 { font-size: 23px; }
+      .session-control { align-items: stretch; width: 100%; }
+      .session-control small { text-align: left; max-width: none; }
+      .class-hero { padding: 18px; }
+    }
+    @media (max-width: 520px) {
+      .stat-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+      .stat-card { padding: 14px; grid-template-columns: 1fr; }
+      .stat-card strong { font-size: 24px; }
+      .stat-card .chip-icon { display: none; }
+      .class-hero .class-initial { display: none; }
+      .settings-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+  <link rel="stylesheet" href="dashboard-layout.css?v=2">
+</head>
+<body data-required-role="teacher">
+  <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+    <symbol id="i-brain" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M12 5v13"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-live" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.9 19.1a10 10 0 0 1 0-14.2M19.1 4.9a10 10 0 0 1 0 14.2M7.8 16.2a6 6 0 0 1 0-8.4M16.2 7.8a6 6 0 0 1 0 8.4"/><circle cx="12" cy="12" r="2"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></symbol>
+    <symbol id="i-school" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m2 9 10-5 10 5-10 5Z"/><path d="M6 11v5c3 2.5 9 2.5 12 0v-5"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-flag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22V4M4 4h12l-2 4 2 4H4"/></symbol>
+    <symbol id="i-timer" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></symbol>
+    <symbol id="i-grid4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1Z"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 18l-6-6 6-6"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+    <symbol id="i-key" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.8-9.8M17 6l3 3M14 9l2 2"/></symbol>
+    <symbol id="i-door" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M6 21V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v17"/><path d="M14 12h.01"/></symbol>
+    <symbol id="i-pen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4Z"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 0 0 3.4 0"/></symbol>
+  </svg>
+
+  <aside id="sidebar" aria-label="Teacher navigation">
+    <div>
+      <a class="brand-box" href="index.html" aria-label="Neuro-Focus home">
+        <span class="brand-mark"><svg><use href="#i-brain"/></svg></span>
+        <span class="brand-text"><b>Neuro-Focus</b><small>Teacher dashboard</small></span>
+      </a>
+
+      <div class="nav-group">
+        <div class="nav-label">Teaching</div>
+        <button class="nav-item" type="button" data-nav="classes"><svg class="icon"><use href="#i-grid"/></svg>All classes</button>
+        <button class="nav-item" type="button" data-nav="new-class"><svg class="icon"><use href="#i-plus"/></svg>New class</button>
+      </div>
+
+      <div class="nav-group" id="classNav" hidden>
+        <div class="nav-label" id="classNavLabel">Class</div>
+        <button class="nav-item" type="button" data-nav="live"><svg class="icon"><use href="#i-live"/></svg>Live monitor <span class="nav-live" id="navLiveDot" hidden><span class="live-dot"></span></span></button>
+        <button class="nav-item" type="button" data-nav="students"><svg class="icon"><use href="#i-users"/></svg>Students <span class="nav-count" id="navStudentCount"></span></button>
+        <button class="nav-item" type="button" data-nav="history"><svg class="icon"><use href="#i-history"/></svg>History</button>
+        <button class="nav-item" type="button" data-nav="settings"><svg class="icon"><use href="#i-settings"/></svg>Settings</button>
+      </div>
+    </div>
+
+    <div class="user-card">
+      <span class="avatar" id="userInitials">T</span>
+      <div>
+        <b data-profile-name>Teacher</b>
+        <small>Teacher account</small>
+      </div>
+    </div>
+  </aside>
+
+  <main>
+    <header>
+      <div class="header-lead">
+        <button id="navToggle" class="nav-toggle" type="button" aria-label="Open navigation" aria-controls="sidebar" aria-expanded="false">☰</button>
+        <div class="breadcrumbs"><span>Teacher</span><span>/</span><b id="crumbCurrent">Classes</b></div>
+      </div>
+      <div class="header-actions">
+        <a class="btn-action" href="index.html"><svg class="icon"><use href="#i-home"/></svg><span class="label-long">Home</span></a>
+        <button class="btn-action" type="button" data-export-report="roster"><svg class="icon"><use href="#i-download"/></svg><span class="label-long">Export CSV</span><span class="label-short">CSV</span></button>
+        <button id="signOutButton" class="btn-action" type="button"><svg class="icon"><use href="#i-logout"/></svg><span class="label-long">Sign out</span></button>
+      </div>
+    </header>
+
+    <div class="portal-main">
+      <!-- ================= All classes ================= -->
+      <section id="classesView" class="stack" aria-labelledby="classesTitle">
+        <div class="page-head">
+          <div>
+            <div class="page-kicker" id="todayLabel">Today</div>
+            <h1 class="page-title" id="classesTitle">Your classes</h1>
+            <p class="page-sub">Create a class, share its join code, then open it to run a live session.</p>
+          </div>
+          <button class="btn-primary" type="button" data-nav="new-class"><svg class="icon"><use href="#i-plus"/></svg>New class</button>
+        </div>
+
+        <div class="stat-grid" aria-label="Teaching overview">
+          <article class="stat-card">
+            <span class="stat-label">Classes</span>
+            <span class="chip-icon"><svg><use href="#i-school"/></svg></span>
+            <strong id="sumClasses">—</strong>
+            <small>Active classes you teach</small>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">Students</span>
+            <span class="chip-icon green"><svg><use href="#i-users"/></svg></span>
+            <strong id="sumStudents">—</strong>
+            <small>Across all your classes</small>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">Online now</span>
+            <span class="chip-icon amber"><svg><use href="#i-eye"/></svg></span>
+            <strong id="sumOnline">0</strong>
+            <small>Students with their workspace open</small>
+          </article>
+          <article class="stat-card" id="sumLiveCard">
+            <span class="stat-label">Live session</span>
+            <span class="chip-icon red"><svg><use href="#i-live"/></svg></span>
+            <strong id="sumLive">Off</strong>
+            <small id="sumLiveSub">Open a class to start one</small>
+          </article>
+        </div>
+
+        <div class="section-label">All classes</div>
+        <div class="class-grid" id="classGrid">
+          <p class="empty-state">Loading classes…</p>
+        </div>
+      </section>
+
+      <!-- ================= One class ================= -->
+      <section id="classView" class="stack" hidden aria-labelledby="classTitle">
+        <button class="btn-action back-link" type="button" data-nav="classes"><svg class="icon"><use href="#i-back"/></svg>All classes</button>
+
+        <div class="class-hero">
+          <div class="class-hero-main">
+            <span class="class-initial" id="classInitial" aria-hidden="true">C</span>
+            <div style="min-width: 0;">
+              <h1 id="classTitle">Class</h1>
+              <div class="class-meta">
+                <button class="code-chip" type="button" id="classCode" title="Copy join code">NF-…</button>
+                <span id="classMetaText">0 students</span>
+                <span class="joining-chip" id="joiningChip" hidden>Joining closed</span>
+              </div>
+            </div>
+          </div>
+          <div class="session-control" id="sessionControl">
+            <button class="btn-live" type="button" id="sessionToggle">▶ Start live session</button>
+            <small id="sessionHint">Students share their attention only during a live session.</small>
+          </div>
+        </div>
+
+        <div class="class-tabs" role="tablist" aria-label="Class sections">
+          <button role="tab" type="button" data-tab="live" aria-selected="true"><svg class="icon"><use href="#i-live"/></svg>Live monitor</button>
+          <button role="tab" type="button" data-tab="students" aria-selected="false"><svg class="icon"><use href="#i-users"/></svg>Students <span class="tab-count" id="tabStudentCount"></span></button>
+          <button role="tab" type="button" data-tab="history" aria-selected="false"><svg class="icon"><use href="#i-history"/></svg>History</button>
+          <button role="tab" type="button" data-tab="settings" aria-selected="false"><svg class="icon"><use href="#i-settings"/></svg>Settings</button>
+        </div>
+
+        <!-- Live monitor (teacher-analytics.js) -->
+        <div class="tab-panel" id="tab-live" role="tabpanel">
+          <section id="overview" class="stack" aria-labelledby="overviewTitle">
+            <div class="section-head">
+              <div>
+                <h2 id="overviewTitle">Session analytics</h2>
+                <p id="analyticsSource">Real-time attention scores from students in this class.</p>
+              </div>
+              <div class="mode-row">
+                <div class="mode-switch" role="group" aria-label="Analytics data source">
+                  <button type="button" id="modeLive" class="active" aria-pressed="true">● Live classroom</button>
+                  <button type="button" id="modeSim" aria-pressed="false">Simulator</button>
+                </div>
+                <span class="sim-badge" id="simStatus">Idle</span>
+              </div>
+            </div>
+
+            <div class="stat-grid">
+              <article class="stat-card">
+                <span class="stat-label">Class average attention</span>
+                <span class="chip-icon"><svg><use href="#i-eye"/></svg></span>
+                <strong id="statAverage">—</strong>
+                <small id="statAverageTrend">Start a live session to see scores</small>
+              </article>
+              <article class="stat-card">
+                <span class="stat-label">Learners focused</span>
+                <span class="chip-icon green"><svg><use href="#i-users"/></svg></span>
+                <strong id="statFocused">—</strong>
+                <small id="statFocusedSub">No learners loaded</small>
+              </article>
+              <article class="stat-card">
+                <span class="stat-label">Distraction flags</span>
+                <span class="chip-icon red"><svg><use href="#i-flag"/></svg></span>
+                <strong id="statFlags">0</strong>
+                <small id="statFlagsSub">Distracted for 3+ consecutive readings</small>
+              </article>
+              <article class="stat-card">
+                <span class="stat-label">Session time</span>
+                <span class="chip-icon amber"><svg><use href="#i-timer"/></svg></span>
+                <strong id="statTime">00:00</strong>
+                <small id="statTimeSub">Live session time</small>
+              </article>
+            </div>
+
+            <div class="analytics-grid">
+              <div class="panel-card">
+                <div class="panel-head">
+                  <div>
+                    <div class="panel-title"><span class="chip-icon"><svg><use href="#i-chart"/></svg></span>Attention curve</div>
+                    <div class="panel-sub">Class average vs. lowest learner over the last 30 readings.</div>
+                  </div>
+                </div>
+                <div class="chart-box"><canvas id="attentionChart" aria-label="Class attention over time" role="img"></canvas></div>
+              </div>
+
+              <div class="panel-card" id="liveCard">
+                <div class="panel-head">
+                  <div>
+                    <div class="panel-title"><span class="chip-icon green"><svg><use href="#i-live"/></svg></span>Live classroom</div>
+                    <div class="panel-sub" id="liveClassName">Start a live session to watch this class.</div>
+                  </div>
+                </div>
+                <div class="live-summary">
+                  <strong id="liveTrackingCount">0</strong>
+                  <span id="liveTrackingLabel">students sharing live attention</span>
+                </div>
+                <ol class="live-steps">
+                  <li><span>Press <strong>Start live session</strong>. Students get a notification right away.</span></li>
+                  <li><span>They press <strong>Join session</strong>, which starts their attention tracker.</span></li>
+                  <li><span>Scores stream here every second, with no video. <strong>End session</strong> stops sharing.</span></li>
+                </ol>
+                <p class="sim-note">Only numbers computed on the student’s device are shared: score, focus state and session focus. Webcam video never leaves their computer.</p>
+              </div>
+
+              <div class="panel-card" id="simulatorCard" hidden>
+                <div class="panel-head">
+                  <div>
+                    <div class="panel-title"><span class="chip-icon amber"><svg><use href="#i-grid4"/></svg></span>Classroom simulator</div>
+                    <div class="panel-sub">Generate realistic attention telemetry for a demo session.</div>
+                  </div>
+                </div>
+                <div class="sim-controls">
+                  <button id="simToggle" class="btn-primary" type="button">Start simulation</button>
+                  <button id="simDistract" class="btn-action" type="button">⚡ Trigger a distraction</button>
+                  <button id="simReset" class="btn-action" type="button">↺ Reset session</button>
+                  <label>Reading interval
+                    <select id="simSpeed">
+                      <option value="1000">1 second</option>
+                      <option value="2000" selected>2 seconds</option>
+                      <option value="500">0.5 seconds (fast)</option>
+                    </select>
+                  </label>
+                  <p class="sim-source" id="simSource">Demo learners</p>
+                  <p class="sim-note">Simulated data for demonstrations. Switch to Live classroom to see real students.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="analytics-grid">
+              <div class="panel-card" id="live-students">
+                <div class="panel-head">
+                  <div>
+                    <div class="panel-title"><span class="chip-icon"><svg><use href="#i-users"/></svg></span>Live student attention</div>
+                    <div class="panel-sub">Lowest attention first, so struggling learners stand out.</div>
+                  </div>
+                </div>
+                <div class="table-scroll">
+                  <table class="data-table">
+                    <thead><tr><th>Learner</th><th>Attention</th><th>Status</th></tr></thead>
+                    <tbody id="liveStudentRows"></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="panel-card">
+                <div class="panel-head">
+                  <div>
+                    <div class="panel-title"><span class="chip-icon red"><svg><use href="#i-bell"/></svg></span>Distraction alerts</div>
+                    <div class="panel-sub">Automated flags raised by the attention model.</div>
+                  </div>
+                </div>
+                <ul class="alert-feed" id="alertFeed"></ul>
+                <button class="btn-action full" type="button" data-copy-prompt><svg class="icon"><use href="#i-copy"/></svg>Copy re-engagement prompt</button>
+              </div>
+            </div>
+
+            <div class="panel-card" id="heatmap">
+              <div class="panel-head">
+                <div>
+                  <div class="panel-title"><span class="chip-icon"><svg><use href="#i-grid4"/></svg></span>Engagement heatmap</div>
+                  <div class="panel-sub">Each cell is one reading per learner, oldest to newest.</div>
+                </div>
+              </div>
+              <div class="heatmap-scroll"><div class="heatmap" id="engagementHeatmap"></div></div>
+              <div class="heat-legend">
+                <span class="lg-focused">Focused (70%+)</span>
+                <span class="lg-drifting">Drifting (45–69%)</span>
+                <span class="lg-distracted">Distracted (&lt;45%)</span>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- Students (teacher-classes.js) -->
+        <div class="tab-panel" id="tab-students" role="tabpanel" hidden>
+          <div class="panel-card">
+            <div class="panel-head">
+              <div>
+                <div class="panel-title"><span class="chip-icon"><svg><use href="#i-users"/></svg></span>Students</div>
+                <div class="panel-sub" id="studentsStatus">Students appear here the moment they join, and the dots show who is online.</div>
+              </div>
+              <button class="btn-action" type="button" id="copyInvite"><svg class="icon"><use href="#i-copy"/></svg>Copy join code</button>
+            </div>
+            <div class="table-scroll" style="max-height: none;">
+              <table class="data-table students-table">
+                <thead><tr><th>Student</th><th>Status</th><th>Joined</th><th><span class="sr-only">Actions</span></th></tr></thead>
+                <tbody id="studentRows"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- History (teacher-analytics.js) -->
+        <div class="tab-panel" id="tab-history" role="tabpanel" hidden>
+          <div class="panel-card" id="session-history">
+            <div class="panel-head">
+              <div>
+                <div class="panel-title"><span class="chip-icon"><svg><use href="#i-history"/></svg></span>Session history</div>
+                <div class="panel-sub" id="sessionHistoryStatus" aria-live="polite">Select a class to see its saved sessions.</div>
+              </div>
+            </div>
+            <div class="table-scroll" style="max-height: none;">
+              <table class="data-table history-table">
+                <thead><tr><th>Learner</th><th>Started</th><th>Tracked</th><th>Focus</th><th>Avg score</th><th>Lapses</th><th>Status</th></tr></thead>
+                <tbody id="sessionHistoryRows"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Settings (teacher-classes.js) -->
+        <div class="tab-panel" id="tab-settings" role="tabpanel" hidden>
+          <div class="settings-grid">
+            <form class="panel-card settings-card" id="renameForm">
+              <div class="panel-title"><span class="chip-icon"><svg><use href="#i-pen"/></svg></span>Class name</div>
+              <input class="field-input" id="renameInput" type="text" minlength="2" maxlength="80" required autocomplete="off" aria-label="Class name">
+              <div class="settings-actions"><button class="btn-primary" type="submit">Save name</button></div>
+            </form>
+
+            <div class="panel-card settings-card">
+              <div class="panel-title"><span class="chip-icon green"><svg><use href="#i-door"/></svg></span>Joining</div>
+              <label class="switch">
+                <input type="checkbox" id="joiningToggle">
+                <span>Allow new students to join with the code</span>
+              </label>
+              <p class="panel-sub">Students already in the class can always get back in.</p>
+            </div>
+
+            <div class="panel-card settings-card">
+              <div class="panel-title"><span class="chip-icon"><svg><use href="#i-key"/></svg></span>Join code</div>
+              <p class="panel-sub">Make a new code if the old one was shared too widely. The old code stops working immediately.</p>
+              <div class="settings-actions">
+                <button class="btn-action" type="button" id="copyCodeSetting"><svg class="icon"><use href="#i-copy"/></svg>Copy code</button>
+                <button class="btn-action" type="button" id="regenerateCode">Make a new code</button>
+              </div>
+            </div>
+
+            <form class="panel-card settings-card" id="passwordForm">
+              <div class="panel-title"><span class="chip-icon amber"><svg><use href="#i-lock"/></svg></span>Join password <span class="panel-sub" id="passwordState" style="margin: 0;"></span></div>
+              <input class="field-input" id="passwordInput" type="password" minlength="6" maxlength="64" placeholder="New password (6+ characters)" autocomplete="new-password" aria-label="New join password">
+              <div class="settings-actions">
+                <button class="btn-action" type="button" id="removePassword">Remove password</button>
+                <button class="btn-primary" type="submit">Set password</button>
+              </div>
+            </form>
+
+            <div class="panel-card settings-card danger-card">
+              <div class="panel-title"><span class="chip-icon red"><svg><use href="#i-trash"/></svg></span>Delete class</div>
+              <p class="panel-sub">Removes the class, its join code and its students’ class notes. Saved attention sessions are kept but no longer linked to the class.</p>
+              <div class="settings-actions"><button class="nf-btn-danger" type="button" id="deleteClass">Delete this class</button></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- New class dialog -->
+    <dialog class="nf-dialog" id="newClassDialog" aria-labelledby="newClassTitle">
+      <form id="createClassForm" method="dialog">
+        <h2 id="newClassTitle">New class</h2>
+        <p>Students join with the code you get next. You can add a password now or later.</p>
+        <label class="nf-dialog-label">Class name
+          <input class="nf-dialog-input" id="className" type="text" minlength="2" maxlength="80" placeholder="e.g. Software Engineering – Section A" required autocomplete="off">
+        </label>
+        <label class="nf-dialog-label">Join password (optional)
+          <input class="nf-dialog-input" id="newClassPassword" type="password" minlength="6" maxlength="64" placeholder="At least 6 characters" autocomplete="new-password">
+        </label>
+        <p class="nf-dialog-message" id="createClassMessage" role="status" aria-live="polite"></p>
+        <div class="nf-dialog-actions">
+          <button class="btn-action" type="button" id="cancelNewClass">Cancel</button>
+          <button class="btn-primary" type="submit">Create class</button>
+        </div>
+      </form>
+    </dialog>
+  </main>
+
+  <script src="app.js?v=2"></script>
+  <script src="dashboard-nav.js?v=2"></script>
+  <script src="teacher-ui.js?v=1"></script>
+  <script type="module" src="auth-guard.js?v=2"></script>
+  <script type="module" src="teacher-classes.js?v=5"></script>
+  <script type="module" src="teacher-analytics.js?v=3"></script>
+</body>
+</html>

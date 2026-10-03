@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#09090b">
+  <title>Neuro-Focus | AI System for Attention Tracking & Adaptive Engagement</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    :root {
+      --bg: #09090b;
+      --card: #141417;
+      --card-hover: #19191d;
+      --border: #222226;
+      --text-main: #f4f4f5;
+      --text-muted: #82828c;
+      --green: #22c55e;
+      --cyan: #00d9ff;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text-main); min-height: 100vh; position: relative; overflow-x: hidden; line-height: 1.6; }
+
+    /* 3D Visual Canvas and Ambient Glow */
+    #bg { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 0; pointer-events: none; opacity: 0.6; }
+    .bg-motion {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none;
+      background: radial-gradient(circle at 80% 15%, rgba(0, 217, 255, 0.08), transparent 45%),
+                  radial-gradient(circle at 10% 80%, rgba(34, 197, 94, 0.04), transparent 50%);
+    }
+
+    /* Top Navigation Header */
+    header.topbar {
+      height: 60px; border-bottom: 1px solid var(--border); display: flex; align-items: center;
+      justify-content: space-between; padding: 0 36px; background: rgba(9, 9, 11, 0.8);
+      backdrop-filter: blur(14px); position: sticky; top: 0; z-index: 100;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text-main); font-weight: 600; font-size: 15px; }
+    .brand-mark { width: 30px; height: 30px; background: #1c1c20; border: 1px solid var(--border); border-radius: 8px; display: grid; place-items: center; font-weight: 700; color: #fff; }
+    .center-nav { display: flex; align-items: center; gap: 24px; }
+    .center-nav a { color: var(--text-muted); text-decoration: none; font-size: 13.5px; font-weight: 500; transition: color 0.15s ease; }
+    .center-nav a:hover, .center-nav a.active { color: var(--text-main); }
+    .nav-actions { display: flex; align-items: center; gap: 14px; }
+    .btn-link { color: var(--text-muted); text-decoration: none; font-size: 13.5px; font-weight: 500; }
+    .btn-link:hover { color: var(--text-main); }
+    .btn-solid {
+      background: var(--text-main); color: #000; text-decoration: none; font-size: 13px; font-weight: 600;
+      padding: 8px 16px; border-radius: 6px; display: inline-flex; align-items: center; gap: 6px;
+    }
+    .btn-solid:hover { opacity: 0.9; }
+
+    /* Main Container */
+    main { position: relative; z-index: 1; max-width: 1260px; margin: 0 auto; padding: 64px 36px 96px; display: flex; flex-direction: column; gap: 80px; }
+
+    /* Hero Section */
+    .hero-grid { display: grid; grid-template-columns: 1.25fr 0.9fr; gap: 40px; align-items: center; }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--text-muted);
+      background: rgba(20, 20, 23, 0.85); border: 1px solid var(--border); padding: 5px 12px;
+      border-radius: 20px; margin-bottom: 22px; text-transform: uppercase; letter-spacing: 0.6px; font-weight: 600;
+    }
+    .hero-badge span { width: 6px; height: 6px; background: var(--green); border-radius: 50%; box-shadow: 0 0 6px rgba(34,197,94,0.6); }
+    .hero-title { font-size: 50px; font-weight: 700; line-height: 1.1; letter-spacing: -1.4px; margin-bottom: 20px; }
+    .hero-title span { color: var(--text-muted); font-weight: 600; }
+    .hero-lead { font-size: 16.5px; color: var(--text-muted); line-height: 1.6; max-width: 530px; margin-bottom: 32px; }
+    .hero-actions { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; }
+    .btn-secondary {
+      background: rgba(20, 20, 23, 0.8); color: var(--text-main); border: 1px solid var(--border);
+      text-decoration: none; font-size: 13px; font-weight: 500; padding: 9px 18px; border-radius: 6px;
+      display: inline-flex; align-items: center; gap: 6px; backdrop-filter: blur(8px);
+    }
+    .btn-secondary:hover { background: var(--card-hover); border-color: #33333a; }
+    .hero-trust { font-size: 12.5px; color: var(--text-muted); display: flex; align-items: center; gap: 8px; }
+
+    /* Quick Launch Card */
+    .quick-card {
+      background: rgba(20, 20, 23, 0.7); backdrop-filter: blur(16px);
+      border: 1px solid var(--border); border-radius: 14px; padding: 28px;
+      display: flex; flex-direction: column; gap: 20px; box-shadow: 0 16px 36px rgba(0,0,0,0.4);
+    }
+    .card-kicker { font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; letter-spacing: 0.6px; }
+    .card-head h2 { font-size: 19px; font-weight: 600; margin-top: 3px; letter-spacing: -0.3px; }
+    .card-copy { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+    .action-row { display: flex; flex-direction: column; gap: 10px; }
+    .btn-provider {
+      background: rgba(25, 25, 29, 0.85); border: 1px solid var(--border); border-radius: 8px; padding: 13px 15px;
+      color: var(--text-main); display: flex; align-items: center; justify-content: space-between; cursor: pointer;
+      font-size: 13px; font-weight: 500; transition: background 0.15s ease, border-color 0.15s ease;
+    }
+    .btn-provider:hover { background: #222227; border-color: #383842; }
+    .provider-lead { display: flex; align-items: center; gap: 12px; }
+    .provider-icon { width: 32px; height: 32px; border-radius: 6px; display: grid; place-items: center; font-size: 12px; font-weight: 700; background: #27272a; }
+    .quick-foot { font-size: 12px; color: var(--text-muted); border-top: 1px solid var(--border); padding-top: 14px; display: flex; align-items: center; gap: 6px; }
+
+    /* Section Headers */
+    .section-head { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 1px solid var(--border); padding-bottom: 16px; margin-bottom: 24px; }
+    .section-head h2 { font-size: 22px; font-weight: 600; letter-spacing: -0.4px; }
+    .section-head p { font-size: 13px; color: var(--text-muted); }
+
+    /* Mission / Problem Grid */
+    .problem-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .content-box {
+      background: rgba(20, 20, 23, 0.7); backdrop-filter: blur(12px); border: 1px solid var(--border);
+      border-radius: 12px; padding: 28px; display: flex; flex-direction: column; gap: 14px;
+    }
+    .content-box h3 { font-size: 18px; font-weight: 600; letter-spacing: -0.2px; }
+    .content-box p { font-size: 13.5px; color: var(--text-muted); line-height: 1.65; }
+    .content-box ul { list-style: none; display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+    .content-box li { font-size: 13px; color: var(--text-main); display: flex; align-items: center; gap: 8px; }
+    .content-box li span { color: var(--cyan); }
+
+    /* Pipeline 4-Step Cards */
+    .pipeline-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    .pipeline-card {
+      background: rgba(20, 20, 23, 0.7); backdrop-filter: blur(12px); border: 1px solid var(--border);
+      border-radius: 12px; padding: 22px; display: flex; flex-direction: column; gap: 10px;
+    }
+    .pipeline-step { font-size: 11px; font-weight: 700; color: var(--cyan); text-transform: uppercase; letter-spacing: 0.6px; }
+    .pipeline-title { font-size: 15px; font-weight: 600; }
+    .pipeline-desc { font-size: 12.5px; color: var(--text-muted); line-height: 1.5; }
+
+    /* Gap Analysis Table */
+    .table-container {
+      background: rgba(20, 20, 23, 0.7); backdrop-filter: blur(12px); border: 1px solid var(--border);
+      border-radius: 12px; padding: 24px; overflow-x: auto;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 13.5px; text-align: left; }
+    th { padding: 12px 16px; color: var(--text-muted); font-weight: 500; border-bottom: 1px solid var(--border); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+    td { padding: 14px 16px; border-bottom: 1px solid var(--border); }
+    td.highlight { color: var(--cyan); font-weight: 500; }
+
+    /* Footer */
+    footer.page-footer {
+      border-top: 1px solid var(--border); padding: 32px 36px; display: flex;
+      justify-content: space-between; align-items: center; font-size: 13px; color: var(--text-muted);
+      background: var(--bg); position: relative; z-index: 1;
+    }
+
+    @media (max-width: 900px) {
+      .hero-grid, .problem-grid, .pipeline-grid { grid-template-columns: 1fr; }
+      .hero-title { font-size: 38px; }
+      .center-nav { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="bg-motion" aria-hidden="true"></div>
+  <canvas id="bg" aria-hidden="true"></canvas>
+
+  <header class="topbar">
+    <a class="brand" href="index.html">
+      <div class="brand-mark">N</div>
+      <span>Neuro-Focus</span>
+    </a>
+    <nav class="center-nav">
+      <a class="active" href="index.html">Overview</a>
+      <a href="#mission">Mission & Problem</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#gap-analysis">Gap Analysis</a>
+      <a href="student.html">Student Portal</a>
+      <a href="teacher.html">Teacher Dashboard</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn-link" href="login.html">Sign in</a>
+      <a class="btn-solid" href="student.html">Launch Workspace ↗</a>
+    </div>
+  </header>
+
+  <main>
+    <!-- Hero Section -->
+    <section class="hero-grid">
+      <div>
+        <div class="hero-badge">
+          <span></span> Project ID: FYP-F25-12 · Department of Software Engineering
+        </div>
+        <h1 class="hero-title">
+          Adaptive focus for<br><span>neurodivergent minds.</span>
+        </h1>
+        <p class="hero-lead">
+          Neuro-Focus is an AI-powered student monitoring system leveraging computer vision and recurrent neural networks (LSTM) to accurately track real-time cognitive focus in ADHD learners during online sessions.
+        </p>
+        <div class="hero-actions">
+          <a class="btn-solid" href="student.html">Open Student Workspace ↗</a>
+          <a class="btn-secondary" href="teacher.html">Teacher Dashboard ↗</a>
+        </div>
+        <div class="hero-trust">
+          <span>✳</span> Privacy-Preserving: Facial landmarks extracted locally without storing raw video feeds.
+        </div>
+      </div>
+
+      <aside class="quick-card">
+        <div class="card-head">
+          <span class="card-kicker">Session Launch</span>
+          <h2>Monitored Video Room</h2>
+        </div>
+        <p class="card-copy">
+          Launch your virtual learning session with integrated attention score telemetry.
+        </p>
+        <div class="action-row">
+          <button class="btn-provider" type="button" data-open="zoom">
+            <div class="provider-lead">
+              <div class="provider-icon">Z</div>
+              <div>
+                <div style="font-weight: 600;">Launch with Zoom</div>
+                <div style="font-size: 11px; color: var(--text-muted);">Monitored video stream</div>
+              </div>
+            </div>
+            <span>↗</span>
+          </button>
+          <button class="btn-provider" type="button" data-open="meet">
+            <div class="provider-lead">
+              <div class="provider-icon">M</div>
+              <div>
+                <div style="font-weight: 600;">Launch with Google Meet</div>
+                <div style="font-size: 11px; color: var(--text-muted);">Monitored video stream</div>
+              </div>
+            </div>
+            <span>↗</span>
+          </button>
+        </div>
+        <div class="quick-foot">
+          <span>⌑</span> Low-latency telemetry linked with teacher oversight.
+        </div>
+      </aside>
+    </section>
+
+    <!-- Mission & Problem Statement Section -->
+    <section id="mission">
+      <div class="section-head">
+        <div>
+          <span class="card-kicker">Project Purpose</span>
+          <h2>Problem Statement & Mission</h2>
+        </div>
+        <p>Section 1.1 – 1.3 SRS</p>
+      </div>
+
+      <div class="problem-grid">
+        <div class="content-box">
+          <h3>The ADHD Online Learning Challenge</h3>
+          <p>
+            Traditional e-learning platforms (e.g., Moodle, Google Classroom, Zoom) evaluate student engagement using naive metrics: login counts, clicks, and session durations. These parameters are fundamentally inadequate for representing genuine attention.
+          </p>
+          <p>
+            Neurodivergent students, particularly those with Attention Deficit Hyperactivity Disorder (ADHD), struggle significantly with sustained focus in virtual classrooms. In crowded online sessions, subtle distractions go unnoticed, leading to progressive academic disengagement.
+          </p>
+        </div>
+
+        <div class="content-box">
+          <h3>The Neuro-Focus Solution</h3>
+          <p>
+            Neuro-Focus creates a smart, inclusive digital learning ecosystem by replacing manual guesswork with objective AI-driven behavioral analytics:
+          </p>
+          <ul>
+            <li><span>✓</span> Continuous eye-gaze extraction and head-pose estimation via MediaPipe.</li>
+            <li><span>✓</span> Temporal behavioral classification using an LSTM recurrent neural network.</li>
+            <li><span>✓</span> Instantaneous attention score visualization on the Teacher Dashboard.</li>
+            <li><span>✓</span> Automated adaptive re-engagement prompts whenever focus lapses are flagged.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- AI Architecture & Pipeline -->
+    <section id="architecture">
+      <div class="section-head">
+        <div>
+          <span class="card-kicker">Core Architecture</span>
+          <h2>Real-Time AI Processing Pipeline</h2>
+        </div>
+        <p>Figure 2 & 5 System Design</p>
+      </div>
+
+      <div class="pipeline-grid">
+        <div class="pipeline-card">
+          <span class="pipeline-step">Step 01</span>
+          <div class="pipeline-title">Webcam Ingestion</div>
+          <p class="pipeline-desc">Client browser captures live frames locally via HTML5 MediaStream API at zero cloud storage footprint.</p>
+        </div>
+        <div class="pipeline-card">
+          <span class="pipeline-step">Step 02</span>
+          <div class="pipeline-title">Landmark Extraction</div>
+          <p class="pipeline-desc">MediaPipe Face Mesh isolates 478 3D landmarks to extract normalized eye gaze ratios and head orientation angles.</p>
+        </div>
+        <div class="pipeline-card">
+          <span class="pipeline-step">Step 03</span>
+          <div class="pipeline-title">LSTM Classification</div>
+          <p class="pipeline-desc">Recurrent neural network models temporal sequence patterns across sliding frame windows to predict cognitive states.</p>
+        </div>
+        <div class="pipeline-card">
+          <span class="pipeline-step">Step 04</span>
+          <div class="pipeline-title">Live Dashboard & Alerts</div>
+          <p class="pipeline-desc">Attention scores stream to the teacher interface, triggering real-time Chart.js updates and adaptive student nudges.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Gap Analysis Section -->
+    <section id="gap-analysis">
+      <div class="section-head">
+        <div>
+          <span class="card-kicker">Comparative Evaluation</span>
+          <h2>Gap Analysis with Existing Platforms</h2>
+        </div>
+        <p>Table 1 System Specifications</p>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Evaluation Parameter</th>
+              <th>Existing Solutions (Zoom / Moodle)</th>
+              <th>Neuro-Focus System</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Real-Time Attention Tracking</td>
+              <td>❌ Absent (Login & click counts only)</td>
+              <td class="highlight">✓ Continuous AI-based attention scoring</td>
+            </tr>
+            <tr>
+              <td>Behavioral Indicator Analysis</td>
+              <td>❌ None</td>
+              <td class="highlight">✓ Real-time eye-gaze and head-pose estimation</td>
+            </tr>
+            <tr>
+              <td>ADHD-Centric Support</td>
+              <td>❌ Generic structure for neurotypical learners</td>
+              <td class="highlight">✓ Built specifically for neurodivergent learners</td>
+            </tr>
+            <tr>
+              <td>Adaptive Re-engagement Prompts</td>
+              <td>❌ Manual teacher intervention only</td>
+              <td class="highlight">✓ Automated supportive micro-tasks and alerts</td>
+            </tr>
+            <tr>
+              <td>Real-time Teacher Oversight</td>
+              <td>❌ Delayed post-session attendance reports</td>
+              <td class="highlight">✓ Instant analytical dashboard with Chart.js curves</td>
+            </tr>
+            <tr>
+              <td>Student Data Privacy</td>
+              <td>⚠️ Often stores full session cloud recordings</td>
+              <td class="highlight">✓ Privacy-preserving: Only numerical metrics stored</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="page-footer">
+    <div>
+      <strong>Neuro-Focus</strong> · Final Year Project (FYP-F25-12)<br>
+      Department of Software Engineering, The University of Lahore
+    </div>
+    <div style="text-align: right;">
+      Developers: Muhammad Bilal Khalid (70142338) & Namaika Sabir (70144554)<br>
+      Project Advisor: Ma'am Sana Munir
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
