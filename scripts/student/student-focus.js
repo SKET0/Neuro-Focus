@@ -1,6 +1,8 @@
 // Student focus tools: live attention stats, focus timeline, ADHD-friendly focus
 // timer, gentle re-engagement nudges, and micro-goals. Reads the
-// "neurofocus:attention-update" events published by eye-analyzer.js.
+// "neurofocus:attention-update" events published by eye-analyzer.js. The timer state and
+// micro-goals are also shared with the Home view (student-dashboard.js).
+import { themeColor, withAlpha } from "../shared/appearance.js?v=1";
 
 const app = await window.neuroFocusReady;
 
@@ -15,12 +17,6 @@ if (app) {
     "Roll your shoulders back twice, then return to your task.",
     "Say your current goal out loud in five words or less."
   ];
-
-  // ---------- Greeting ----------
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-  const firstName = (app.profile.display_name || "there").split(/\s+/)[0];
-  $("#welcomeTitle").textContent = `${greeting}, ${firstName}`;
 
   // ---------- Toast (nudges + timer messages) ----------
   const toast = {
@@ -149,7 +145,29 @@ if (app) {
       : done === goals.length ? `All ${goals.length} steps done 🎉` : `${done} of ${goals.length} steps done`;
     $("#goalProgress").style.width = goals.length ? `${(done / goals.length) * 100}%` : "0%";
     $("#goalClearDone").disabled = !done;
+    window.dispatchEvent(new CustomEvent("neurofocus:goals-change", { detail: goalsApi.list() }));
   }
+
+  // Today's plan on the Home view lists, ticks off and adds the same steps.
+  const goalsApi = {
+    list: () => goals.map(({ id, text, done }) => ({ id, text, done })),
+    add(text) {
+      const clean = String(text || "").trim().slice(0, 120);
+      if (!clean) return false;
+      goals.push({ id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, text: clean, done: false });
+      saveGoals();
+      renderGoals();
+      return true;
+    },
+    setDone(id, done) {
+      const goal = goals.find((item) => item.id === id);
+      if (!goal) return;
+      goal.done = Boolean(done);
+      saveGoals();
+      renderGoals();
+    }
+  };
+  window.neuroFocusGoals = goalsApi;
 
   $("#goalForm").addEventListener("submit", (event) => {
     event.preventDefault();
@@ -196,6 +214,9 @@ if (app) {
       : timer.remaining < timer.total ? "Resume" : timer.phase === "focus" ? "Start focus" : "Start break";
     $("#timerRounds").textContent = String(timer.rounds);
     saveTimer();
+    // The header's focus pill and the Home view show the timer from any page.
+    window.neuroFocusTimerState = { phase: timer.phase, remaining: timer.remaining, total: timer.total, running: timer.running, rounds: timer.rounds };
+    window.dispatchEvent(new CustomEvent("neurofocus:timer-change", { detail: window.neuroFocusTimerState }));
   }
 
   function setPhase(phase) {
@@ -306,30 +327,47 @@ if (app) {
   };
 
   let chart = null;
+  // Chart colours come from the student's theme (styles/student.css) and follow theme changes.
+  function paintTimeline() {
+    if (!chart) return;
+    const accent = themeColor("--accent", "#00d9ff");
+    const muted = themeColor("--text-muted");
+    const [score, threshold] = chart.data.datasets;
+    score.borderColor = accent;
+    score.backgroundColor = withAlpha(accent, 0.1);
+    threshold.borderColor = themeColor("--border-hover", "#3a3a42");
+    chart.options.scales.y.ticks.color = muted;
+    chart.options.scales.x.ticks.color = muted;
+    chart.options.scales.y.grid.color = themeColor("--surface-hover", "#1c1c20");
+    chart.options.scales.x.border.color = themeColor("--border", "#222226");
+    chart.options.plugins.legend.labels.color = themeColor("--text-main", "#f4f4f5");
+    chart.update("none");
+  }
   if (window.Chart) {
-    const muted = "#82828c";
     chart = new window.Chart($("#focusTimeline"), {
       type: "line",
       data: {
         labels: timelineLabels,
         datasets: [
-          { label: "Attention score", data: timelineScores, borderColor: "#00d9ff", borderWidth: 2, tension: 0.35, pointRadius: 0, fill: true, backgroundColor: "rgba(0, 217, 255, 0.08)" },
-          { label: "Focus threshold", data: [], borderColor: "#3a3a42", borderWidth: 1, borderDash: [4, 4], pointRadius: 0, fill: false }
+          { label: "Attention score", data: timelineScores, borderWidth: 2, tension: 0.35, pointRadius: 0, fill: true },
+          { label: "Focus threshold", data: [], borderWidth: 1, borderDash: [4, 4], pointRadius: 0, fill: false }
         ]
       },
       options: {
         responsive: true, maintainAspectRatio: false, animation: false,
         interaction: { mode: "index", intersect: false },
         scales: {
-          y: { min: 0, max: 100, ticks: { color: muted, stepSize: 25, callback: (v) => `${v}%` }, grid: { color: "#1c1c20" }, border: { display: false } },
-          x: { ticks: { color: muted, maxTicksLimit: 6 }, grid: { display: false }, border: { color: "#222226" } }
+          y: { min: 0, max: 100, ticks: { stepSize: 25, callback: (v) => `${v}%` }, grid: {}, border: { display: false } },
+          x: { ticks: { maxTicksLimit: 6 }, grid: { display: false }, border: {} }
         },
         plugins: {
-          legend: { labels: { color: "#f4f4f5", boxWidth: 10, boxHeight: 10, usePointStyle: true } },
+          legend: { labels: { boxWidth: 10, boxHeight: 10, usePointStyle: true } },
           tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${Math.round(ctx.parsed.y)}%` } }
         }
       }
     });
+    paintTimeline();
+    window.addEventListener("neurofocus:appearance-change", paintTimeline);
   } else {
     $("#timelineEmpty").textContent = "Chart library could not load. Check your internet connection and refresh.";
   }

@@ -5,7 +5,8 @@
 // Live updates use private Supabase Realtime class channels (class-live.js).
 import {
   openClassChannel, onlineStudentIds, confirmAction, notify, copyText, missingDatabaseUpdates, showSetupBanner, isMissingSql
-} from "../shared/class-live.js?v=8";
+} from "../shared/class-live.js?v=9";
+import { paintAvatar, avatarUrls } from "../shared/avatars.js?v=1";
 
 const app = await window.neuroFocusReady;
 
@@ -96,11 +97,11 @@ if (app) {
   async function loadRoster() {
     const classId = selectedId;
     if (!classId) return;
-    const { data, error } = await supabase
-      .from("class_members")
-      .select("student_id, joined_at, profiles(display_name)")
-      .eq("class_id", classId)
-      .order("joined_at", { ascending: true });
+    // Students' avatars come with the student profiles database update; before it, names only.
+    const members = (fields) => supabase.from("class_members").select(`student_id, joined_at, profiles(${fields})`)
+      .eq("class_id", classId).order("joined_at", { ascending: true });
+    let { data, error } = await members("display_name, avatar_preset, avatar_path");
+    if (error && (error.code === "42703" || /avatar_/.test(error.message || ""))) ({ data, error } = await members("display_name"));
     if (classId !== selectedId) return;
     if (error) {
       $("#studentsStatus").textContent = "Couldn’t load students. Refresh to try again.";
@@ -108,7 +109,8 @@ if (app) {
     }
     const previous = new Set(roster.map((member) => member.id));
     roster = (data || []).map((member) => ({
-      id: member.student_id, name: member.profiles?.display_name || "Student", joinedAt: member.joined_at
+      id: member.student_id, name: member.profiles?.display_name || "Student", joinedAt: member.joined_at,
+      avatarPreset: member.profiles?.avatar_preset || null, avatarPath: member.profiles?.avatar_path || null
     }));
     if (rosterLoadedFor === classId) roster.forEach((member) => { if (!previous.has(member.id)) newIds.add(member.id); });
     rosterLoadedFor = classId;
@@ -117,6 +119,21 @@ if (app) {
     renderStudents();
     renderClassHeader();
     void inviteNewMembers();
+    void loadRosterPictures(classId);
+  }
+
+  // Uploaded pictures are private: storage hands this teacher short-lived links only for
+  // students in their classes. Until they arrive (or if they can't), built-in avatars or initials show.
+  async function loadRosterPictures(classId) {
+    const paths = roster.map((member) => member.avatarPath).filter(Boolean);
+    if (!paths.length) return;
+    const urls = await avatarUrls(supabase, paths);
+    if (classId !== selectedId) return;
+    roster.forEach((member) => { member.avatarUrl = urls.get(member.avatarPath) || null; });
+    document.querySelectorAll("#studentRows tr[data-student-id]").forEach((row) => {
+      const member = roster.find((item) => item.id === row.dataset.studentId);
+      if (member?.avatarUrl) paintAvatar(row.querySelector(".mini-avatar"), { name: member.name, preset: member.avatarPreset, url: member.avatarUrl });
+    });
   }
 
   // ---------- Saved live sessions ----------
@@ -223,7 +240,7 @@ if (app) {
       channels.set(item.id, entry);
       void openClassChannel(supabase, item.id, {
         presenceKey: app.user.id,
-        broadcasts: ["attention", "member-joined", "member-left"],
+        broadcasts: ["attention", "member-joined", "member-left", "member-updated"],
         onSync: (state) => {
           const before = online.get(item.id) || new Set();
           const now = onlineStudentIds(state);
@@ -314,6 +331,11 @@ if (app) {
       notify({ title: `${payload.name || "A student"} left ${item?.name || "your class"}` });
       sharing.get(classId)?.delete(payload.studentId);
       scheduleRefresh();
+      return;
+    }
+    // A student changed their display name or picture: reload the list (names come from the database).
+    if (event === "member-updated") {
+      if (classId === selectedId) scheduleRefresh();
       return;
     }
     if (event === "member-joined") {
@@ -567,7 +589,7 @@ if (app) {
       const name = document.createElement("td");
       const avatar = document.createElement("span");
       avatar.className = "mini-avatar";
-      avatar.textContent = member.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase();
+      paintAvatar(avatar, { name: member.name, preset: member.avatarPreset, url: member.avatarUrl });
       const nameText = document.createElement("span");
       nameText.className = "student-name";
       const joined = document.createElement("small");

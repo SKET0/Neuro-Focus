@@ -1,6 +1,7 @@
 // Home page: when a user is already signed in, swap the sign-in / sign-up
 // calls to action for links back to their dashboard and a sign-out option.
 import { getSupabase } from "../services/supabase-client.js";
+import { clearAppearanceCache } from "../shared/appearance.js?v=1";
 
 const hook = (name) => document.querySelector(`[data-session="${name}"]`);
 
@@ -35,6 +36,7 @@ if (!forwardingReset) try {
 
       const signOut = async (event) => {
         event.preventDefault();
+        clearAppearanceCache(); // the next person on this browser starts from the default look
         await supabase.auth.signOut();
         window.location.reload();
       };

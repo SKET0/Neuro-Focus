@@ -26,6 +26,14 @@ await db.exec(`
   grant usage on sequence realtime.messages_id_seq to authenticated;
   create function realtime.topic() returns text language sql stable as $$ select current_setting('realtime.topic', true) $$;
   grant execute on function realtime.topic() to authenticated;
+  -- Supabase Storage stand-in (profile pictures)
+  create schema storage;
+  grant usage on schema storage to anon, authenticated;
+  create table storage.buckets (id text primary key, name text not null, public boolean default false, file_size_limit bigint, allowed_mime_types text[]);
+  create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text references storage.buckets(id), name text not null, owner uuid default auth.uid(), unique (bucket_id, name));
+  alter table storage.objects enable row level security;
+  grant select, insert, update, delete on storage.objects to authenticated;
+  grant select on storage.buckets to anon, authenticated;
   -- pgcrypto stand-in (only used for join passwords)
   create function extensions.gen_salt(text, integer default 0) returns text language sql as $$ select 'salt' $$;
   create function extensions.crypt(p text, s text) returns text language sql as $$ select split_part(s, '$', 1) || '$' || md5(p || split_part(s, '$', 1)) $$;
@@ -77,7 +85,8 @@ ok("other teacher can't see Biology students", !ids(await rows(T2, "select id fr
 ok("student sees only classes they're in", JSON.stringify(ids(await rows(S1, "select id from public.classes"))) === JSON.stringify([C1.id]));
 ok("student sees only their own membership row", (await rows(S1, "select student_id from public.class_members")).every((r) => r.student_id === S1));
 ok("join passwords are unreadable", !(await tryQ(T2, "select * from public.class_access")).ok);
-ok("student can't make themselves a teacher", (await tryQ(S1, "update public.profiles set role = 'teacher' where id = $1", [S1])).affected === 0);
+const roleHack = await tryQ(S1, "update public.profiles set role = 'teacher' where id = $1", [S1]);
+ok("student can't make themselves a teacher", !roleHack.ok || roleHack.affected === 0);
 ok("student can't add themselves to a class directly", !(await tryQ(S1, "insert into public.class_members (class_id, student_id) values ($1, $2)", [C2.id, S1])).ok);
 ok("student can't remove a classmate", (await tryQ(S1, "delete from public.class_members where student_id = $1", [S2])).affected === 0);
 ok("other teacher can't remove Biology students", (await tryQ(T2, "delete from public.class_members where class_id = $1", [C1.id])).affected === 0);
@@ -157,6 +166,53 @@ const send = (uid, classId, ext) => channel(uid, classId, `insert into realtime.
 ok("student can send scores in their class", !(await send(S1, C1.id, "broadcast")).error);
 ok("student can't send into another class", Boolean((await send(S1, C2.id, "broadcast")).error));
 ok("teacher announces with presence", !(await send(T1, C1.id, "presence")).error);
+
+console.log("\n— Student profiles —");
+const profileOf = async (uid) => (await db.query("select display_name, role, avatar_preset, avatar_path, theme, accent from public.profiles where id = $1", [uid])).rows[0];
+const saveProfile = (uid, name, preset, path, theme = "default", accent = "default") =>
+  tryQ(uid, "select public.update_my_profile($1, $2, $3, $4, $5) as r", [name, preset, path, theme, accent]);
+const renamed = await saveProfile(S1, "  Sam   Rivera ", "rocket", null, "light", "purple");
+ok("student saves name, avatar and appearance", renamed.ok && renamed.rows[0].r.display_name === "Sam Rivera", renamed.error || "");
+const saved = await profileOf(S1);
+ok("saved values persist; role is still student", saved.role === "student" && saved.avatar_preset === "rocket" && saved.theme === "light" && saved.accent === "purple");
+ok("teacher's class list shows the new name", (await rows(T1, "select display_name from public.profiles where id = $1", [S1]))[0]?.display_name === "Sam Rivera");
+ok("empty name is refused", !(await saveProfile(S1, "   ", null, null)).ok);
+ok("41-character name is refused", !(await saveProfile(S1, "x".repeat(41), null, null)).ok);
+ok("unknown theme / accent / avatar are refused",
+  !(await saveProfile(S1, "Sam", null, null, "neon")).ok && !(await saveProfile(S1, "Sam", null, null, "dark", "pink")).ok && !(await saveProfile(S1, "Sam", "dragon", null)).ok);
+ok("a failed save leaves the profile unchanged", JSON.stringify(await profileOf(S1)) === JSON.stringify(saved));
+ok("profiles can't be edited directly", !(await tryQ(S1, "update public.profiles set display_name = 'x' where id = $1", [S1])).ok);
+ok("a student's appearance doesn't touch the teacher's", (await profileOf(T1)).theme === "default" && (await profileOf(T1)).accent === "default");
+ok("signed-out visitors can't update profiles", !(await saveProfile(null, "Ghost", null, null)).ok);
+
+console.log("\n— Profile pictures —");
+ok("avatars bucket is private", (await db.query("select public from storage.buckets where id = 'avatars'")).rows[0]?.public === false);
+const putPicture = (uid, name) => tryQ(uid, "insert into storage.objects (bucket_id, name) values ('avatars', $1) returning name", [name]);
+const s1Pic = `${S1}/pic-1.webp`;
+ok("student uploads into their own folder", (await putPicture(S1, s1Pic)).ok);
+ok("can't upload into someone else's folder", !(await putPicture(S2, `${S1}/sneaky.webp`)).ok);
+ok("can't upload outside a user folder", !(await putPicture(S1, "public/pic.webp")).ok);
+ok("saving an uploaded picture works and clears the built-in avatar", (await saveProfile(S1, "Sam Rivera", "rocket", s1Pic)).ok && (await profileOf(S1)).avatar_path === s1Pic && (await profileOf(S1)).avatar_preset === null);
+ok("can't point a profile at someone else's picture", !(await saveProfile(S2, "Student Two", null, s1Pic)).ok);
+ok("picture paths must be plain file names", !(await saveProfile(S1, "Sam Rivera", null, `${S1}/../${S2}/x.webp`)).ok && !(await saveProfile(S1, "Sam Rivera", null, `${S1}/pic.gif`)).ok);
+const canSee = async (uid) => (await rows(uid, "select name from storage.objects where bucket_id = 'avatars'")).some((r) => r.name === s1Pic);
+ok("owner can view their picture", await canSee(S1));
+ok("their class teacher can view it", await canSee(T1));
+ok("classmates, other teachers and other students can't", !(await canSee(S2)) && !(await canSee(T2)) && !(await canSee(S3)));
+ok("signed-out visitors can't", !(await tryQ(null, "select name from storage.objects")).ok || !(await canSee(null)));
+ok("teacher can't delete it; classmate can't either",
+  (await tryQ(T1, "delete from storage.objects where name = $1", [s1Pic])).affected === 0 && (await tryQ(S2, "delete from storage.objects where name = $1", [s1Pic])).affected === 0);
+ok("classmate can't replace it", (await tryQ(S2, "update storage.objects set name = $2 where name = $1", [s1Pic, `${S2}/taken.webp`])).affected === 0);
+ok("owner can't move a picture into someone else's folder", !(await tryQ(S1, "update storage.objects set name = $2 where name = $1", [s1Pic, `${S2}/gift.webp`])).ok);
+ok("removing the picture from the profile works", (await saveProfile(S1, "Sam Rivera", null, null)).ok && (await profileOf(S1)).avatar_path === null);
+ok("owner deletes their old picture", (await tryQ(S1, "delete from storage.objects where name = $1", [s1Pic])).affected === 1);
+
+console.log("\n— Teacher names on class cards —");
+const teachersFor = async (uid) => (await rows(uid, "select class_id, teacher_name from public.my_class_teachers()")).map((r) => `${r.class_id === C1.id ? "Biology" : "History"}:${r.teacher_name}`).sort();
+ok("student sees their class's teacher name", JSON.stringify(await teachersFor(S1)) === JSON.stringify(["Biology:Teacher One"]));
+ok("another student sees only their own classes' teachers", JSON.stringify(await teachersFor(S3)) === JSON.stringify(["History:Teacher Two"]));
+ok("students still can't read teacher profile rows", (await rows(S1, "select 1 from public.profiles where id = $1", [T1])).length === 0);
+ok("signed-out visitors can't list teachers", !(await tryQ(null, "select * from public.my_class_teachers()")).ok);
 
 console.log(failures ? `\n${failures} CHECK(S) FAILED` : "\nALL CHECKS PASSED");
 process.exitCode = failures ? 1 : 0;

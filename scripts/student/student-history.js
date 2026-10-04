@@ -2,6 +2,8 @@
 // session list, all for the chosen range (7 days, 30 days or all time). Reads the student's
 // saved attention_sessions, and a session's attention_samples when it is opened.
 // Saving happens in student-focus.js, which fires "neurofocus:history-saved" afterwards.
+// Shown in the My progress view; colours follow the student's theme.
+import { themeColor, withAlpha } from "../shared/appearance.js?v=1";
 
 const app = await window.neuroFocusReady;
 
@@ -76,10 +78,10 @@ if (app) {
   }
 
   const LEVELS = [
-    { min: 80, key: "great", label: "Great focus", color: "#22c55e" },
-    { min: 60, key: "good", label: "Good focus", color: "#00d9ff" },
-    { min: 40, key: "mixed", label: "Up and down", color: "#f5b748" },
-    { min: 0, key: "tough", label: "Hard to focus", color: "#ef4444" }
+    { min: 80, key: "great", label: "Great focus", color: "var(--green)" },
+    { min: 60, key: "good", label: "Good focus", color: "var(--info)" },
+    { min: 40, key: "mixed", label: "Up and down", color: "var(--amber)" },
+    { min: 0, key: "tough", label: "Hard to focus", color: "var(--red)" }
   ];
   const levelFor = (pct) => LEVELS.find((level) => pct >= level.min);
 
@@ -194,14 +196,15 @@ if (app) {
       chart.update();
       return;
     }
-    const muted = "#82828c";
+    const muted = themeColor("--text-muted");
+    const accent = themeColor("--accent", "#00d9ff");
     chart = new window.Chart(canvas, {
       type: "bar",
       data: {
         labels: list.map((b) => b.label),
         datasets: [{
           label: "Minutes focused", data,
-          backgroundColor: "rgba(0, 217, 255, 0.78)", hoverBackgroundColor: "#00d9ff",
+          backgroundColor: withAlpha(accent, 0.78), hoverBackgroundColor: accent,
           maxBarThickness: 24, borderRadius: { topLeft: 4, topRight: 4 }, borderSkipped: false
         }]
       },
@@ -209,16 +212,16 @@ if (app) {
         responsive: true, maintainAspectRatio: false,
         scales: {
           y: {
-            beginAtZero: true, suggestedMax: 10, grid: { color: "#1c1c20" }, border: { display: false },
+            beginAtZero: true, suggestedMax: 10, grid: { color: themeColor("--surface-hover", "#1c1c20") }, border: { display: false },
             ticks: { color: muted, stepSize, maxTicksLimit: 6, callback: (v) => (v ? duration(v * 60) : "0") }
           },
-          x: { grid: { display: false }, border: { color: "#222226" }, ticks: { color: muted, maxRotation: 0, autoSkipPadding: 12 } }
+          x: { grid: { display: false }, border: { color: themeColor("--border", "#222226") }, ticks: { color: muted, maxRotation: 0, autoSkipPadding: 12 } }
         },
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: "#17171b", borderColor: "#2e2e34", borderWidth: 1, padding: 10, displayColors: false,
-            titleColor: "#f4f4f5", bodyColor: "#b4b4bc",
+            backgroundColor: themeColor("--surface-raised", "#17171b"), borderColor: themeColor("--border-strong", "#2e2e34"), borderWidth: 1, padding: 10, displayColors: false,
+            titleColor: themeColor("--text-main", "#f4f4f5"), bodyColor: themeColor("--text-soft", "#b4b4bc"),
             callbacks: {
               title: (items) => chart.$buckets[items[0].dataIndex].title,
               label: (item) => {
@@ -460,9 +463,9 @@ if (app) {
     $("#historyCount").textContent = current.length ? `${plural(current.length, "session")} ${info.phrase}` : "";
     if (!current.length) {
       const empty = el("div", "empty-state");
-      const link = el("a", "", "Go to dashboard");
-      link.href = "#dashboard";
-      empty.append(`${sessions.length ? `No sessions ${info.phrase}.` : "No saved sessions yet."} Start attention tracking on the dashboard and your session shows up here when you stop. `, link);
+      const link = el("a", "", "Open Focus session");
+      link.href = "#focus-session";
+      empty.append(`${sessions.length ? `No sessions ${info.phrase}.` : "No saved sessions yet."} Start attention tracking in Focus session and your session shows up here when you stop. `, link);
       days.replaceChildren(empty);
       $("#historyMore").hidden = true;
       return;
@@ -535,8 +538,15 @@ if (app) {
     renderList(between(sessions, info.start), info);
   });
   // The chart is drawn while its view may be hidden; size it once the view is shown.
-  window.addEventListener("hashchange", () => {
-    if (window.location.hash === "#history") window.requestAnimationFrame(() => chart?.resize());
+  window.addEventListener("neurofocus:viewchange", (event) => {
+    if (event.detail?.name === "progress") window.requestAnimationFrame(() => chart?.resize());
+  });
+  // A new theme or accent: redraw the chart in the new colours.
+  window.addEventListener("neurofocus:appearance-change", () => {
+    if (!chart) return;
+    chart.destroy();
+    chart = null;
+    render();
   });
   window.addEventListener("neurofocus:history-saved", () => { void load(); });
 

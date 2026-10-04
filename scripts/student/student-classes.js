@@ -3,7 +3,7 @@
 // attention numbers (never video) stream to that teacher over the private class channel.
 import {
   openClassChannel, teacherStatus, confirmAction, notify, showMessage, missingDatabaseUpdates, showSetupBanner, isMissingSql
-} from "../shared/class-live.js?v=8";
+} from "../shared/class-live.js?v=9";
 
 const app = await window.neuroFocusReady;
 
@@ -33,6 +33,9 @@ if (app) {
   const invitePings = new Map();   // classId -> last "please join" ping seen from the teacher
   const myAttendance = new Map();  // classId -> { attended, counted } over finished sessions
   let joinedSessionId = null;      // session the student pressed "Join session" for
+  const teacherNames = new Map();  // classId -> the teacher's display name (my_class_teachers)
+  let teacherNamesFor = "";
+  let teacherNamesAt = 0;
   let checkIn = { sessionId: null, timer: null, status: "" };
   const CHECK_IN_MS = 30000;
   const shareToggle = $("#shareToggle");
@@ -124,6 +127,22 @@ if (app) {
     window.dispatchEvent(new CustomEvent("neurofocus:classlist", { detail: window.neuroFocusClasses }));
     watchChannels();
     selectClass(currentId);
+    void loadTeacherNames();
+  }
+
+  // Teacher names for the class cards, refreshed when the class list changes or every few minutes.
+  // Before the student profiles database update this function doesn't exist: cards leave the name out.
+  async function loadTeacherNames() {
+    const key = classes.map((item) => item.id).sort().join(",");
+    if (!key || (key === teacherNamesFor && Date.now() - teacherNamesAt < 180000)) return;
+    teacherNamesFor = key;
+    teacherNamesAt = Date.now();
+    const { data, error } = await supabase.rpc("my_class_teachers");
+    if (error) return;
+    teacherNames.clear();
+    (data || []).forEach((row) => teacherNames.set(row.class_id, row.teacher_name));
+    renderCards();
+    publishStatus();
   }
 
   // The student's own attendance per class (finished sessions only).
@@ -141,6 +160,7 @@ if (app) {
       myAttendance.set(row.class_id, stats);
     });
     renderCards();
+    publishStatus();
   }
 
   function selectClass(id) {
@@ -357,9 +377,8 @@ if (app) {
     }
     window.dispatchEvent(new CustomEvent("neurofocus:start-camera"));
     render(); // checks in for attendance even if the camera is slow to start
-    // Show the dashboard view (student-ui.js) with the tracker in sight.
-    window.location.hash = "dashboard";
-    window.setTimeout(() => document.querySelector("#focus-session")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+    // Show the Focus session view (student-ui.js) with the tracker in sight.
+    window.neuroFocusNavigate?.("focus-session");
   }
 
   function leaveSession() {
@@ -411,6 +430,35 @@ if (app) {
     renderCards();
     renderBanner();
     updateShareStatus();
+    publishStatus();
+  }
+
+  // The Home view (student-dashboard.js) shows classes, teachers and live sessions from this snapshot.
+  function publishStatus({ error = false } = {}) {
+    const detail = {
+      loaded: true,
+      error,
+      currentId,
+      tracking,
+      classes: classes.map((item) => {
+        const status = teacher.get(item.id);
+        const stats = myAttendance.get(item.id);
+        return {
+          id: item.id,
+          name: item.name,
+          teacherName: teacherNames.get(item.id) || "",
+          live: Boolean(status?.live),
+          since: status?.live ? status.since || null : null,
+          online: Boolean(status?.online),
+          removed: removedFromSession(item.id),
+          blocked: blockedClasses.has(item.id),
+          inSession: Boolean(status?.live) && sharingClassId === item.id && tracking,
+          attendance: stats?.counted ? { attended: stats.attended, counted: stats.counted } : null
+        };
+      })
+    };
+    window.neuroFocusClassStatus = detail;
+    window.dispatchEvent(new CustomEvent("neurofocus:class-status", { detail }));
   }
 
   function liveDot() {
@@ -466,6 +514,9 @@ if (app) {
       if (item.id === currentId) card.setAttribute("aria-current", "true");
       const title = document.createElement("h3");
       title.textContent = item.name;
+      const teacherLine = document.createElement("div");
+      teacherLine.className = "my-class-teacher";
+      teacherLine.textContent = teacherNames.get(item.id) ? `Teacher: ${teacherNames.get(item.id)}` : "";
       const code = document.createElement("span");
       code.className = "code";
       code.textContent = item.join_code;
@@ -513,7 +564,7 @@ if (app) {
       leave.addEventListener("click", () => leaveClass(item));
       actions.append(leave);
 
-      card.append(title, code, state, attendanceLine, actions);
+      card.append(title, ...(teacherLine.textContent ? [teacherLine] : []), code, state, attendanceLine, actions);
       grid.append(card);
     });
   }
@@ -701,6 +752,17 @@ if (app) {
     render();
   });
 
+  // A new display name or picture (student-profile.js): tell each class's teacher so their lists refresh.
+  window.addEventListener("neurofocus:profile-updated", () => {
+    channels.forEach((entry) => {
+      if (!entry.ready || !entry.channel) return;
+      void entry.channel.send({ type: "broadcast", event: "member-updated", payload: { studentId: app.user.id, name: app.profile.display_name } });
+    });
+  });
+
+  // Actions for the Home view (student-dashboard.js), with the same behaviour as the buttons here.
+  window.neuroFocusClassActions = { joinSession, selectClass, openJoinDialog, leaveSession };
+
   const recheckSetup = () => missingDatabaseUpdates(supabase).then((missing) => showSetupBanner(missing)).catch(() => {});
 
   // Removals, renames and new classes made elsewhere show up when the tab regains focus.
@@ -723,5 +785,6 @@ if (app) {
       className: "empty-state",
       textContent: "Couldn’t load your classes. Make sure the class database setup has been run, then refresh."
     }));
+    publishStatus({ error: true });
   }
 }

@@ -3,7 +3,7 @@
 // Marks are taken automatically by the database (see 20261005000000_sessions_attendance.sql).
 // It also publishes "neurofocus:attendance" so the master list (teacher-classes.js) can show
 // each student's attendance and who has joined the live session.
-import { confirmAction, notify, isMissingSql } from "../shared/class-live.js?v=8";
+import { confirmAction, notify, isMissingSql } from "../shared/class-live.js?v=9";
 
 const app = await window.neuroFocusReady;
 

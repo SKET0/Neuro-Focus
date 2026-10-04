@@ -130,6 +130,21 @@ if (app) {
     status("#tutorMessage", "Chat cleared. Ask NeuroBuddy anything.");
   });
 
+  // The Home view's "What are we learning today?" box (student-dashboard.js): a typed question is
+  // sent straight away; a shortcut fills in the start of a question for the student to finish.
+  window.addEventListener("neurofocus:buddy-prompt", (event) => {
+    const { text = "", send = false } = event.detail || {};
+    const input = document.querySelector("#tutorPrompt");
+    if (!input) return;
+    input.value = text;
+    if (send && text.trim() && !input.disabled) {
+      tutorForm.requestSubmit();
+      return;
+    }
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+  });
+
   window.addEventListener("neurofocus:classchange", (event) => applyClass(event.detail));
   applyClass(currentClass);
 }

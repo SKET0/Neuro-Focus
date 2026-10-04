@@ -1,589 +1,43 @@
 <!DOCTYPE html>
-<html lang="en" class="auth-check-pending">
+<html lang="en" class="auth-check-pending" data-theme="default" data-accent="default">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#09090b">
   <title>Neuro-Focus | Student Workspace</title>
+  <script>
+    // Apply the signed-in student's saved theme before the page paints, so it doesn't flash the
+    // wrong colours. The cache is only used if it belongs to the account signed in on this browser
+    // (otherwise it is cleared). auth-guard.js then applies the values saved on the account.
+    (function () {
+      try {
+        var cached = JSON.parse(localStorage.getItem("neuroFocusAppearance") || "null");
+        if (!cached) return;
+        var userId = null;
+        for (var i = 0; i < localStorage.length; i++) {
+          var key = localStorage.key(i);
+          if (/^sb-.+-auth-token$/.test(key)) {
+            var auth = JSON.parse(localStorage.getItem(key) || "null");
+            userId = auth && auth.user && auth.user.id;
+            break;
+          }
+        }
+        if (!userId || userId !== cached.userId) {
+          localStorage.removeItem("neuroFocusAppearance");
+          return;
+        }
+        var theme = ["light", "dark"].indexOf(cached.theme) >= 0 ? cached.theme : "default";
+        var accent = ["blue", "purple", "green", "orange"].indexOf(cached.accent) >= 0 ? cached.accent : "default";
+        document.documentElement.setAttribute("data-theme", theme);
+        document.documentElement.setAttribute("data-accent", accent);
+        var bar = { default: "#09090b", light: "#f4f5f8", dark: "#0f141a" }[theme];
+        document.querySelector('meta[name="theme-color"]').setAttribute("content", bar);
+      } catch (error) { /* storage unavailable: the default look is used */ }
+    })();
+  </script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-  <style>
-    :root {
-      --bg: #09090b;
-      --sidebar: #0c0c0f;
-      --card: #131316;
-      --card-2: #101013;
-      --border: #222226;
-      --border-strong: #2e2e34;
-      --text-main: #f4f4f5;
-      --text-soft: #b4b4bc;
-      --text-muted: #82828c;
-      --green: #22c55e;
-      --red: #ef4444;
-      --amber: #f5b748;
-      --cyan: #00d9ff;
-    }
-
-    /* Hidden until auth-guard.js confirms a signed-in student */
-    .auth-check-pending body { visibility: hidden; }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background: var(--bg); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; -webkit-font-smoothing: antialiased; }
-    [hidden] { display: none !important; }
-    button, input, select, textarea { font: inherit; color: inherit; }
-    button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
-    .icon { width: 17px; height: 17px; flex: none; }
-
-    /* ---------- Sidebar ---------- */
-    aside {
-      width: 248px; flex-shrink: 0; background: var(--sidebar); border-right: 1px solid var(--border);
-      display: flex; flex-direction: column; justify-content: space-between; padding: 16px 12px; overflow-y: auto;
-    }
-    .brand-box { display: flex; align-items: center; gap: 10px; padding: 6px 10px 18px; border-bottom: 1px solid var(--border); }
-    .brand-mark {
-      width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; flex: none;
-      background: linear-gradient(145deg, #13232b, #0c0c0f); border: 1px solid #1f3a44; color: var(--cyan);
-      box-shadow: 0 0 18px rgba(0, 217, 255, 0.16);
-    }
-    .brand-mark svg { width: 18px; height: 18px; }
-    .brand-text b { display: block; font-size: 14px; font-weight: 650; letter-spacing: -0.2px; }
-    .brand-text small { font-size: 11.5px; color: var(--text-muted); }
-    .nav-group { margin-top: 18px; display: flex; flex-direction: column; gap: 2px; }
-    .nav-label { display: flex; align-items: center; justify-content: space-between; font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; padding: 0 10px 6px; letter-spacing: 0.6px; }
-    .nav-add {
-      width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--border-strong); background: transparent;
-      color: var(--text-soft); display: grid; place-items: center; cursor: pointer; font-size: 15px; line-height: 1;
-    }
-    .nav-add:hover { background: #1c1c20; color: var(--text-main); }
-    .nav-item {
-      display: flex; align-items: center; gap: 11px; width: 100%; padding: 8px 10px; border-radius: 8px; border: 0; background: none;
-      font-size: 13.5px; font-weight: 500; color: var(--text-muted); text-decoration: none; text-align: left; cursor: pointer;
-      transition: background 0.15s ease, color 0.15s ease;
-    }
-    .nav-item:hover { background: #17171b; color: var(--text-main); }
-    .nav-item[aria-current] { background: #1c1c21; color: var(--text-main); box-shadow: inset 2px 0 0 var(--cyan); }
-    .nav-item[aria-current] .icon { color: var(--cyan); }
-    .sidebar-classes { display: flex; flex-direction: column; gap: 2px; }
-    .sidebar-classes .nav-item span.name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .class-initial {
-      width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; flex: none; font-size: 11px; font-weight: 700;
-      color: var(--cyan); background: rgba(0, 217, 255, 0.09); border: 1px solid rgba(0, 217, 255, 0.22);
-    }
-    .sidebar-empty { font-size: 12.5px; color: var(--text-muted); padding: 2px 10px 6px; }
-    .user-card {
-      display: flex; align-items: center; gap: 10px; padding: 10px; margin-top: 16px; border: 1px solid var(--border);
-      border-radius: 12px; background: #111114;
-    }
-    .avatar {
-      width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; flex: none; font-size: 12.5px; font-weight: 700;
-      color: #052e16; background: linear-gradient(135deg, #5eead4, #22c55e);
-    }
-    .user-card b { display: block; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .user-card small { font-size: 11.5px; color: var(--text-muted); }
-    .user-card > div { min-width: 0; }
-
-    /* ---------- Main + header ---------- */
-    main { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow-y: auto; background: var(--bg); scroll-behavior: smooth; }
-    header {
-      height: 60px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 28px;
-      position: sticky; top: 0; z-index: 20; background: rgba(9, 9, 11, 0.82); backdrop-filter: blur(14px); border-bottom: 1px solid var(--border);
-    }
-    .breadcrumbs { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); font-weight: 500; white-space: nowrap; }
-    .breadcrumbs b { color: var(--text-main); font-weight: 600; }
-    .header-actions { display: flex; align-items: center; gap: 8px; }
-
-    .btn-action {
-      display: inline-flex; align-items: center; justify-content: center; gap: 7px; background: #18181c; color: var(--text-main);
-      border: 1px solid var(--border-strong); border-radius: 8px; font-size: 12.5px; font-weight: 500; padding: 7px 12px;
-      cursor: pointer; text-decoration: none; white-space: nowrap; transition: background 0.15s ease, border-color 0.15s ease;
-    }
-    .btn-action:hover { background: #222227; border-color: #3a3a42; }
-    .btn-action:disabled { opacity: 0.5; cursor: not-allowed; }
-    .btn-action .icon { width: 15px; height: 15px; }
-    .btn-primary {
-      display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: var(--text-main); color: #09090b; border: 0;
-      border-radius: 9px; padding: 10px 16px; font-size: 13.5px; font-weight: 600; cursor: pointer; white-space: nowrap;
-      box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 8px 22px rgba(0, 217, 255, 0.10); transition: background 0.15s ease, box-shadow 0.15s ease;
-    }
-    .btn-primary:hover { background: #fff; box-shadow: 0 0 0 1px rgba(255,255,255,0.18), 0 10px 26px rgba(0, 217, 255, 0.18); }
-    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-    .btn-primary .icon { width: 16px; height: 16px; }
-    .btn-ghost { background: rgba(20, 20, 23, 0.7); border: 1px solid var(--border-strong); color: var(--text-main); }
-    .btn-join {
-      display: inline-flex; align-items: center; gap: 8px; background: var(--green); color: #052e16; border: 0; border-radius: 9px;
-      padding: 10px 16px; font-size: 13.5px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 22px rgba(34, 197, 94, 0.22);
-    }
-    .btn-join:hover { filter: brightness(1.08); }
-
-    .portal-main { padding: 28px; max-width: 1440px; margin: 0 auto; width: 100%; }
-    .view { display: flex; flex-direction: column; gap: 20px; animation: view-in 0.25s ease; }
-    @keyframes view-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-    .portal-main section[id] { scroll-margin-top: 76px; }
-
-    /* Page heading */
-    .page-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
-    .page-kicker { font-size: 12px; color: var(--text-muted); font-weight: 600; letter-spacing: 0.4px; }
-    .welcome-title, .page-title { font-size: 28px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.15; margin-top: 2px; }
-    .page-sub { font-size: 14px; color: var(--text-muted); margin-top: 4px; }
-    .page-actions { display: flex; gap: 10px; flex-wrap: wrap; }
-
-    /* ---------- Cards ---------- */
-    .panel-card {
-      background: linear-gradient(180deg, #141417, #111114); border: 1px solid var(--border); border-radius: 16px;
-      padding: 22px; display: flex; flex-direction: column; min-width: 0;
-    }
-    .panel-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 18px; }
-    .panel-title { display: flex; align-items: center; gap: 10px; font-size: 15.5px; font-weight: 650; letter-spacing: -0.2px; }
-    .panel-title .chip-icon { width: 30px; height: 30px; }
-    .panel-sub { font-size: 12.5px; color: var(--text-muted); margin-top: 4px; line-height: 1.5; }
-    .panel-sub[data-state="error"], .form-message[data-state="error"] { color: #fca5a5; }
-    .chip-icon {
-      width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; flex: none;
-      color: var(--cyan); background: rgba(0, 217, 255, 0.08); border: 1px solid rgba(0, 217, 255, 0.2);
-    }
-    .chip-icon svg { width: 17px; height: 17px; }
-    .chip-icon.green { color: var(--green); background: rgba(34, 197, 94, 0.08); border-color: rgba(34, 197, 94, 0.22); }
-    .chip-icon.amber { color: var(--amber); background: rgba(245, 183, 72, 0.08); border-color: rgba(245, 183, 72, 0.22); }
-    .chip-icon.red { color: #f87171; background: rgba(239, 68, 68, 0.08); border-color: rgba(239, 68, 68, 0.22); }
-    .field-select {
-      background: #101013; color: var(--text-main); border: 1px solid var(--border-strong); border-radius: 8px;
-      padding: 7px 10px; font-size: 12.5px;
-    }
-    .field-input {
-      width: 100%; background: #0e0e11; border: 1px solid var(--border-strong); border-radius: 9px;
-      padding: 10px 12px; color: var(--text-main); font-size: 13.5px; outline: none; transition: border-color 0.15s ease, box-shadow 0.15s ease;
-    }
-    .field-input:focus { border-color: rgba(0, 217, 255, 0.45); box-shadow: 0 0 0 3px rgba(0, 217, 255, 0.08); }
-    .field-input:disabled { opacity: 0.55; }
-    textarea.field-input { resize: vertical; min-height: 120px; line-height: 1.55; }
-    .empty-state {
-      list-style: none; font-size: 13px; color: var(--text-muted); background: #0e0e11; border: 1px dashed var(--border-strong);
-      border-radius: 12px; padding: 18px; text-align: center; line-height: 1.5;
-    }
-
-    /* Class banner (student-classes.js) */
-    .class-banner {
-      display: flex; justify-content: space-between; align-items: center; gap: 14px 20px; flex-wrap: wrap;
-      border: 1px solid var(--border); border-radius: 16px; padding: 18px 20px; position: relative; overflow: hidden;
-      background: linear-gradient(100deg, rgba(0, 217, 255, 0.06), #121215 45%);
-    }
-    .class-banner[data-state="live"] { border-color: rgba(239, 68, 68, 0.35); background: linear-gradient(100deg, rgba(239, 68, 68, 0.12), #121215 50%); }
-    .class-banner[data-state="sharing"] { border-color: rgba(34, 197, 94, 0.35); background: linear-gradient(100deg, rgba(34, 197, 94, 0.12), #121215 50%); }
-    .class-banner[data-state="error"] { border-color: rgba(245, 183, 72, 0.35); }
-    .class-banner-text { min-width: 0; }
-    .class-banner-kicker { display: flex; align-items: center; gap: 8px; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px; color: var(--text-muted); }
-    .class-banner[data-state="live"] .class-banner-kicker { color: #fca5a5; }
-    .class-banner[data-state="sharing"] .class-banner-kicker { color: #86efac; }
-    .class-banner-title { font-size: 19px; font-weight: 650; letter-spacing: -0.3px; margin-top: 4px; overflow-wrap: anywhere; }
-    .class-banner-sub { font-size: 13.5px; color: var(--text-soft); margin-top: 3px; line-height: 1.45; }
-    .class-banner-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-
-    /* KPI cards */
-    .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
-    .stat-card {
-      background: linear-gradient(180deg, #141417, #111114); border: 1px solid var(--border); border-radius: 16px; padding: 18px 20px;
-      display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto auto; column-gap: 12px;
-    }
-    .stat-label { font-size: 12.5px; color: var(--text-muted); font-weight: 500; }
-    .stat-card .chip-icon { grid-column: 2; grid-row: 1 / span 2; }
-    .stat-card strong { font-size: 30px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.15; margin-top: 6px; font-variant-numeric: tabular-nums; }
-    .stat-card small { grid-column: 1 / -1; font-size: 12px; color: var(--text-muted); margin-top: 4px; }
-    .stat-card small[data-state="Focused"] { color: var(--green); }
-    .stat-card small[data-state="Distracted"] { color: #fca5a5; }
-    .stat-card small[data-state="Away"] { color: var(--amber); }
-
-    /* Dashboard layout */
-    .dash-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr); gap: 20px; align-items: start; }
-    .dash-col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
-
-    /* Attention tracker */
-    .video-viewport {
-      width: 100%; aspect-ratio: 16 / 9; max-height: 420px; background: radial-gradient(ellipse at 50% 40%, #11161a, #09090b);
-      border: 1px solid var(--border); border-radius: 14px; position: relative; overflow: hidden; margin-bottom: 14px;
-    }
-    #analyzerVideo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
-    .video-placeholder {
-      position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
-      padding: 20px; text-align: center; color: var(--text-muted); font-size: 13.5px; line-height: 1.5;
-    }
-    .video-placeholder .chip-icon { width: 52px; height: 52px; border-radius: 16px; margin-bottom: 4px; }
-    .video-placeholder .chip-icon svg { width: 24px; height: 24px; }
-    .video-placeholder b { color: var(--text-main); font-size: 15px; }
-    .live-kpi-chip {
-      position: absolute; top: 12px; right: 12px; z-index: 1; display: flex; align-items: center; gap: 7px;
-      background: rgba(9, 9, 11, 0.78); backdrop-filter: blur(8px); border: 1px solid var(--border-strong);
-      padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--green);
-    }
-    .live-kpi-chip span { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px rgba(34, 197, 94, 0.7); }
-    .privacy-chip {
-      position: absolute; left: 12px; bottom: 12px; z-index: 1; display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-soft);
-      background: rgba(9, 9, 11, 0.7); backdrop-filter: blur(8px); border: 1px solid var(--border); padding: 5px 10px; border-radius: 999px;
-    }
-    .privacy-chip svg { width: 13px; height: 13px; color: var(--green); }
-    .status-readout {
-      display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 11px 14px; margin-bottom: 14px;
-      background: #0e0e11; border: 1px solid var(--border); border-radius: 11px; font-size: 13px;
-    }
-    .status-readout span { color: var(--text-muted); }
-    .status-readout strong { text-align: right; font-weight: 600; }
-    .camera-actions { display: flex; gap: 10px; }
-    .btn-camera, .btn-stop { flex: 1; padding: 11px 16px; border-radius: 10px; font-size: 14px; font-weight: 650; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
-    .btn-camera { background: var(--text-main); color: #09090b; border: 0; box-shadow: 0 8px 22px rgba(0, 217, 255, 0.12); }
-    .btn-camera:hover { background: #fff; }
-    .btn-camera:disabled { opacity: 0.6; cursor: progress; }
-    .btn-stop { background: rgba(239, 68, 68, 0.08); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.35); }
-    .btn-stop:hover { background: rgba(239, 68, 68, 0.14); }
-
-    /* Switch toggles (real checkboxes keep their ids) */
-    .toggle-row { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
-    .switch { display: inline-flex; align-items: center; gap: 9px; font-size: 13px; color: var(--text-soft); cursor: pointer; user-select: none; }
-    .switch input {
-      appearance: none; -webkit-appearance: none; width: 34px; height: 20px; border-radius: 999px; background: #2a2a30; position: relative;
-      cursor: pointer; flex: none; transition: background 0.2s ease; border: 1px solid #34343b;
-    }
-    .switch input::after {
-      content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #d4d4d8;
-      transition: transform 0.2s ease, background 0.2s ease;
-    }
-    .switch input:checked { background: rgba(0, 217, 255, 0.35); border-color: rgba(0, 217, 255, 0.55); }
-    .switch input:checked::after { transform: translateX(14px); background: #fff; }
-    .share-status { margin-top: 12px; font-size: 12.5px; color: var(--text-muted); line-height: 1.45; display: flex; gap: 8px; align-items: baseline; }
-    .share-status::before { content: ""; flex: none; width: 7px; height: 7px; border-radius: 50%; background: #3a3a42; transform: translateY(-1px); }
-    .share-status[data-state="live"] { color: #86efac; }
-    .share-status[data-state="live"]::before { background: var(--green); box-shadow: 0 0 6px rgba(34, 197, 94, 0.6); }
-
-    /* Focus timer */
-    .timer-body { display: flex; justify-content: center; padding: 2px 0 10px; }
-    .timer-ring { position: relative; width: 196px; height: 196px; }
-    .timer-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); filter: drop-shadow(0 0 14px rgba(0, 217, 255, 0.25)); }
-    .timer-ring circle { fill: none; stroke-width: 7; }
-    .ring-track { stroke: #1f1f24; }
-    #timerRing { stroke: var(--cyan); stroke-linecap: round; stroke-dasharray: 326.73; transition: stroke-dashoffset 0.9s linear; }
-    [data-phase="break"] #timerRing { stroke: var(--green); }
-    [data-phase="break"] .timer-ring svg { filter: drop-shadow(0 0 14px rgba(34, 197, 94, 0.25)); }
-    .timer-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
-    #timerDisplay { font-size: 40px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -1px; }
-    #timerPhase { font-size: 11.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; font-weight: 650; }
-    [data-phase="break"] #timerPhase { color: var(--green); }
-    .timer-meta { font-size: 12.5px; color: var(--text-muted); text-align: center; margin-bottom: 14px; }
-    .timer-actions { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; }
-
-    /* Timeline */
-    .chart-box { position: relative; height: 240px; }
-    .chart-empty {
-      position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 16px;
-      color: var(--text-muted); font-size: 13px; background: #0e0e11; border: 1px dashed var(--border-strong); border-radius: 12px;
-    }
-
-    /* Micro-goals */
-    .inline-form { display: flex; gap: 8px; }
-    .progress { height: 6px; background: #1f1f24; border-radius: 4px; overflow: hidden; margin-top: 14px; }
-    .progress span { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #00b8d9, var(--green)); transition: width 0.3s ease; }
-    .goal-summary { font-size: 12.5px; color: var(--text-muted); margin: 8px 0 10px; }
-    .goal-list { list-style: none; display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; }
-    .goal-item { display: flex; align-items: center; gap: 8px; padding: 9px 11px; background: #0e0e11; border: 1px solid var(--border); border-radius: 10px; font-size: 13.5px; }
-    .goal-item label { flex: 1; display: flex; gap: 10px; align-items: center; cursor: pointer; min-width: 0; }
-    .goal-item label span { overflow-wrap: anywhere; }
-    .goal-item input[type="checkbox"] { accent-color: var(--green); width: 16px; height: 16px; flex: none; cursor: pointer; }
-    .goal-item[data-done="true"] label span { text-decoration: line-through; color: var(--text-muted); }
-    .goal-delete { background: none; border: 0; color: var(--text-muted); cursor: pointer; font-size: 17px; line-height: 1; padding: 2px 6px; border-radius: 6px; }
-    .goal-delete:hover { color: #fca5a5; background: #1c1c20; }
-    .card-foot { display: flex; justify-content: flex-end; margin-top: 12px; }
-
-    /* NeuroBuddy */
-    .buddy-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 20px; align-items: start; }
-    .panel-tools { display: flex; gap: 6px; align-items: center; flex: none; }
-    .prompt-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
-    .chip {
-      display: inline-flex; align-items: center; gap: 7px; background: #0e0e11; border: 1px solid var(--border-strong); color: var(--text-soft);
-      border-radius: 999px; padding: 6px 12px; font-size: 12.5px; cursor: pointer; transition: border-color 0.15s ease, color 0.15s ease;
-    }
-    .chip:hover { border-color: rgba(0, 217, 255, 0.45); color: var(--text-main); }
-    .chip svg { width: 14px; height: 14px; color: var(--cyan); }
-    .chat-box {
-      height: max(360px, calc(100vh - 380px)); background: #0c0c0e; border: 1px solid var(--border); border-radius: 14px;
-      padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; margin-bottom: 14px;
-    }
-    .chat-bubble { padding: 11px 15px; border-radius: 14px; font-size: 13.5px; max-width: 80%; line-height: 1.55; white-space: pre-wrap; }
-    .assistant-bubble { background: #17171b; border: 1px solid var(--border); align-self: flex-start; border-bottom-left-radius: 4px; }
-    .assistant-error-bubble { color: #fca5a5; border-color: rgba(239, 68, 68, 0.3); }
-    .student-bubble { background: linear-gradient(135deg, #0c6f86, #0a4f61); align-self: flex-end; color: #fff; border-bottom-right-radius: 4px; }
-    .tutor-form-row { display: flex; gap: 10px; }
-    .tutor-form-row .field-input { padding: 12px 14px; }
-    .tips-card ul { list-style: none; display: grid; gap: 14px; }
-    .tips-card li { display: flex; gap: 12px; font-size: 13px; color: var(--text-soft); line-height: 1.5; }
-    .tips-card li b { display: block; color: var(--text-main); font-weight: 600; margin-bottom: 2px; }
-    .tips-card .chip-icon { width: 30px; height: 30px; }
-
-    /* Formatted text: notes editor + NeuroBuddy replies (markdown.js) */
-    .rich { line-height: 1.6; overflow-wrap: anywhere; }
-    .rich > :first-child { margin-top: 0; }
-    .rich > :last-child { margin-bottom: 0; }
-    .rich h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; line-height: 1.3; margin: 20px 0 8px; color: var(--text-main); }
-    .rich h3 { font-size: 15px; font-weight: 650; line-height: 1.35; margin: 16px 0 6px; color: var(--text-main); }
-    .rich p { margin: 0 0 8px; }
-    .rich ul, .rich ol { margin: 0 0 10px; padding-left: 22px; }
-    .rich li { margin: 3px 0; padding-left: 2px; }
-    .rich li > ul, .rich li > ol { margin: 4px 0 4px; }
-    .rich li::marker { color: var(--cyan); }
-    .rich ol > li::marker { font-weight: 650; font-size: 0.92em; }
-    .rich strong, .rich b { color: #fff; font-weight: 650; }
-    .rich code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; background: #1c1c21; border: 1px solid var(--border); border-radius: 5px; padding: 1px 5px; }
-    .rich pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; background: #0c0c0e; border: 1px solid var(--border); border-radius: 10px; padding: 12px; overflow-x: auto; margin: 0 0 10px; white-space: pre; }
-    .rich blockquote { margin: 0 0 10px; padding: 6px 12px; border-left: 3px solid var(--cyan); background: rgba(0, 217, 255, 0.04); border-radius: 0 8px 8px 0; color: var(--text-soft); }
-    .rich blockquote p { margin: 2px 0; }
-    .rich hr { border: 0; border-top: 1px solid var(--border); margin: 14px 0; }
-    .chat-bubble.rich { white-space: normal; }
-    .chat-bubble.rich h2 { font-size: 15px; margin: 12px 0 4px; }
-    .chat-bubble.rich h3 { font-size: 14px; margin: 10px 0 4px; }
-    .chat-bubble.is-pending { color: var(--text-muted); }
-
-    /* Notes (student-notes.js) */
-    .notes-layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 20px; align-items: start; }
-    .notes-sidebar { position: sticky; top: 80px; padding: 14px; gap: 10px; }
-    .search-field { position: relative; display: flex; align-items: center; }
-    .search-field .icon { position: absolute; left: 11px; width: 15px; height: 15px; color: var(--text-muted); pointer-events: none; }
-    .search-field input {
-      width: 100%; background: #0e0e11; border: 1px solid var(--border-strong); border-radius: 9px; padding: 9px 12px 9px 34px;
-      font-size: 13px; outline: none; transition: border-color 0.15s ease, box-shadow 0.15s ease;
-    }
-    .search-field input:focus { border-color: rgba(0, 217, 255, 0.45); box-shadow: 0 0 0 3px rgba(0, 217, 255, 0.08); }
-    .notes-sidebar .field-select { width: 100%; }
-    .note-list { list-style: none; display: flex; flex-direction: column; gap: 2px; max-height: calc(100vh - 300px); min-height: 120px; overflow-y: auto; margin: 4px -6px 0; padding: 0 6px; }
-    .note-item {
-      width: 100%; display: flex; flex-direction: column; gap: 3px; text-align: left; padding: 10px 11px; border: 0; border-radius: 10px;
-      background: none; cursor: pointer; transition: background 0.15s ease;
-    }
-    .note-item:hover { background: #17171b; }
-    .note-item[aria-current="true"] { background: #1c1c21; box-shadow: inset 2px 0 0 var(--cyan); }
-    .note-item b { font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .note-snippet { font-size: 12.5px; color: var(--text-muted); line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .note-item-meta { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: #6b6b75; margin-top: 2px; min-width: 0; }
-    .note-item-meta .class-tag { font-size: 11px; padding: 0 7px; max-width: 150px; }
-
-    .note-panel { min-height: 520px; }
-    .note-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 8px; padding: 48px 20px; color: var(--text-muted); font-size: 13.5px; }
-    .note-empty .chip-icon { width: 52px; height: 52px; border-radius: 16px; margin-bottom: 6px; }
-    .note-empty .chip-icon svg { width: 24px; height: 24px; }
-    .note-empty b { color: var(--text-main); font-size: 16px; }
-    .note-empty p { max-width: 420px; line-height: 1.55; }
-    .note-empty strong { color: var(--text-soft); }
-    .note-empty-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
-    .note-editor-wrap { display: flex; flex-direction: column; min-width: 0; }
-    .note-head { display: flex; align-items: center; gap: 12px; }
-    .note-title { flex: 1; min-width: 0; background: none; border: 0; outline: none; font-size: 24px; font-weight: 700; letter-spacing: -0.03em; padding: 2px 0; }
-    .note-title::placeholder { color: #4a4a52; }
-    .note-title:disabled { color: var(--text-soft); }
-    .notes-state { font-size: 12px; color: var(--text-muted); white-space: nowrap; padding: 4px 10px; border: 1px solid var(--border); border-radius: 999px; }
-    .notes-state[data-state="error"] { color: #fca5a5; border-color: rgba(239, 68, 68, 0.35); }
-    .note-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; margin: 10px 0 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
-    .note-class { display: inline-flex; align-items: center; gap: 6px; padding: 4px 4px 4px 10px; border: 1px solid var(--border-strong); border-radius: 8px; background: #101013; color: var(--text-muted); }
-    .note-class .icon { width: 14px; height: 14px; }
-    .note-class select { background: transparent; border: 0; color: var(--text-main); font-size: 12.5px; padding: 2px 4px; outline: none; max-width: 200px; cursor: pointer; }
-    .note-class select option { background: #141417; }
-    .note-info { font-size: 12.5px; color: var(--text-muted); }
-    .note-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; }
-    .icon-btn {
-      width: 32px; height: 32px; display: grid; place-items: center; border-radius: 8px; border: 1px solid var(--border-strong);
-      background: #18181c; color: var(--text-soft); cursor: pointer; transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-    }
-    .icon-btn:hover { background: #222227; color: var(--text-main); }
-    .icon-btn.danger:hover { color: #fca5a5; border-color: rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.08); }
-    .icon-btn .icon { width: 15px; height: 15px; }
-    .icon-btn:disabled, .note-toolbar button:disabled { opacity: 0.45; cursor: not-allowed; }
-    .note-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; padding: 4px; margin-bottom: 14px; background: #0e0e11; border: 1px solid var(--border); border-radius: 10px; }
-    .note-toolbar button {
-      min-width: 32px; height: 30px; padding: 0 8px; display: grid; place-items: center; border: 0; border-radius: 7px; background: none;
-      color: var(--text-soft); font-size: 13px; font-weight: 650; cursor: pointer; transition: background 0.15s ease, color 0.15s ease;
-    }
-    .note-toolbar button:hover { background: #1c1c21; color: var(--text-main); }
-    .note-toolbar button[aria-pressed="true"] { background: rgba(0, 217, 255, 0.12); color: var(--cyan); }
-    .note-toolbar .icon { width: 16px; height: 16px; }
-    .toolbar-sep { width: 1px; height: 18px; background: var(--border-strong); margin: 0 4px; }
-    .toolbar-tip { margin-left: auto; padding: 0 8px; font-size: 12px; color: #6b6b75; }
-    .note-writing { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--cyan); margin-bottom: 12px; }
-    .writing-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 10px rgba(0, 217, 255, 0.7); animation: writing-pulse 1.2s ease-in-out infinite; }
-    @keyframes writing-pulse { 50% { opacity: 0.3; transform: scale(0.75); } }
-    .note-editor { position: relative; min-height: 360px; outline: none; font-size: 15px; color: #e4e4e7; padding: 2px 2px 24px; caret-color: var(--cyan); }
-    .note-editor.is-empty::before { content: attr(data-placeholder); position: absolute; top: 2px; left: 2px; color: #55555e; pointer-events: none; }
-    .note-editor[contenteditable="false"] { cursor: default; }
-    .notes-message:empty { display: none; }
-    .notes-message { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
-
-    /* Organize + quiz dialogs */
-    .nf-dialog-wide { width: min(600px, calc(100vw - 32px)); }
-    .organize-input { resize: vertical; min-height: 180px; line-height: 1.55; font-family: inherit; }
-    .organize-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
-    .organize-row .nf-dialog-label { flex: 1; max-width: 300px; }
-    .char-count { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; padding-bottom: 9px; }
-    .quiz-body { padding: 22px; display: flex; flex-direction: column; gap: 14px; }
-    .quiz-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
-    .quiz-head h2 { overflow-wrap: anywhere; }
-    .nf-dialog p.quiz-sub { font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }
-    .quiz-progress { height: 6px; background: #1f1f24; border-radius: 4px; overflow: hidden; }
-    .quiz-progress span { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #00b8d9, var(--green)); border-radius: 4px; transition: width 0.3s ease; }
-    .quiz-card { min-height: 190px; display: flex; flex-direction: column; justify-content: center; gap: 14px; padding: 22px; border-radius: 14px; background: #0e0e11; border: 1px solid var(--border); }
-    .quiz-label { font-size: 11px; font-weight: 700; letter-spacing: 0.7px; text-transform: uppercase; color: var(--cyan); }
-    .nf-dialog p.quiz-q { font-size: 18px; font-weight: 650; line-height: 1.4; color: var(--text-main); letter-spacing: -0.2px; }
-    .quiz-answer { padding-top: 14px; border-top: 1px dashed var(--border-strong); display: flex; flex-direction: column; gap: 6px; }
-    .quiz-answer .quiz-label { color: var(--green); }
-    .nf-dialog .quiz-answer p { font-size: 15px; color: var(--text-main); }
-    .quiz-loading { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; color: var(--text-muted); font-size: 13.5px; }
-    .quiz-score { font-size: 40px; font-weight: 750; letter-spacing: -0.04em; line-height: 1; text-align: center; }
-    .quiz-score small { display: block; font-size: 13px; font-weight: 500; color: var(--text-muted); letter-spacing: 0; margin-top: 8px; }
-    .quiz-review { list-style: none; display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
-    .quiz-review li { padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: #111114; }
-    .quiz-review b { display: block; color: var(--text-main); font-weight: 600; margin-bottom: 2px; }
-    .quiz-review span { color: var(--text-soft); }
-    .quiz-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
-    .quiz-actions .btn-join, .quiz-actions .btn-primary { min-width: 140px; justify-content: center; }
-
-    /* History (student-history.js) */
-    .range-switch { display: inline-flex; gap: 3px; padding: 3px; background: #0e0e11; border: 1px solid var(--border); border-radius: 10px; }
-    .range-switch button {
-      background: transparent; border: 0; border-radius: 7px; padding: 6px 12px; font-size: 12.5px; font-weight: 500; color: var(--text-muted);
-      cursor: pointer; white-space: nowrap; transition: background 0.15s ease, color 0.15s ease;
-    }
-    .range-switch button:hover { color: var(--text-main); }
-    .range-switch button[aria-pressed="true"] { background: #1c1c21; color: var(--text-main); box-shadow: inset 0 0 0 1px var(--border-strong); }
-    .stat-card small .delta { font-weight: 600; }
-    .stat-card small .delta.up { color: var(--green); }
-    .stat-card small .delta.down { color: #fca5a5; }
-    .history-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(300px, 1fr); gap: 20px; align-items: stretch; }
-
-    .insight-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
-    .insight { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; background: #0e0e11; border: 1px solid var(--border); border-radius: 12px; }
-    .insight .chip-icon { width: 30px; height: 30px; border-radius: 9px; }
-    .insight .chip-icon svg { width: 15px; height: 15px; }
-    .insight b { display: block; font-size: 13.5px; font-weight: 650; line-height: 1.4; }
-    .insight p { font-size: 12.5px; color: var(--text-muted); line-height: 1.5; margin-top: 2px; }
-    .unlock-meter { height: 6px; background: #1f1f24; border-radius: 4px; overflow: hidden; margin-top: 10px; }
-    .unlock-meter span { display: block; height: 100%; background: linear-gradient(90deg, #00b8d9, var(--green)); border-radius: 4px; }
-
-    .session-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; font-size: 12px; color: var(--text-muted); margin: -6px 0 14px; }
-    .session-legend span { display: inline-flex; align-items: center; gap: 6px; }
-    .session-legend i { width: 10px; height: 10px; border-radius: 3px; }
-    .session-legend .legend-tip { margin-left: auto; }
-    .focused { background: var(--green); }
-    .distracted { background: var(--amber); }
-    .away { background: #4a4a52; }
-    .history-days { display: flex; flex-direction: column; gap: 18px; }
-    .day-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 0 4px 8px; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
-    .day-head b { font-size: 13.5px; font-weight: 650; }
-    .day-head span { font-size: 12.5px; color: var(--text-muted); }
-    .session-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
-    .session-item { border: 1px solid transparent; border-radius: 12px; transition: background 0.15s ease, border-color 0.15s ease; }
-    .session-item:hover, .session-item[data-open="true"] { background: #111114; border-color: var(--border); }
-    .session-row {
-      width: 100%; display: grid; grid-template-columns: 44px minmax(0, 1fr) auto 18px; align-items: center; gap: 14px;
-      padding: 10px 12px; background: none; border: 0; border-radius: 12px; text-align: left; cursor: pointer;
-    }
-    .focus-ring { position: relative; width: 44px; height: 44px; }
-    .focus-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
-    .focus-ring circle { fill: none; stroke-width: 4; }
-    .focus-ring .track { stroke: #222228; }
-    .focus-ring .fill { stroke-linecap: round; }
-    .focus-ring b { position: absolute; inset: 0; display: grid; place-items: center; font-size: 11.5px; font-weight: 700; }
-    .session-main { min-width: 0; }
-    .session-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 14px; font-weight: 600; }
-    .class-tag { font-size: 11.5px; font-weight: 600; color: var(--text-soft); background: #18181c; border: 1px solid var(--border-strong); border-radius: 999px; padding: 1px 8px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .session-main > span { display: block; }
-    .session-main > .session-title { display: flex; }
-    .session-meta { font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }
-    .history-days .empty-state a { color: var(--cyan); }
-    .verdict { font-size: 11.5px; font-weight: 650; border-radius: 999px; padding: 3px 10px; border: 1px solid; white-space: nowrap; }
-    .verdict[data-level="great"] { color: #86efac; border-color: rgba(34, 197, 94, 0.3); background: rgba(34, 197, 94, 0.08); }
-    .verdict[data-level="good"] { color: #67e8f9; border-color: rgba(0, 217, 255, 0.3); background: rgba(0, 217, 255, 0.07); }
-    .verdict[data-level="mixed"] { color: #fcd34d; border-color: rgba(245, 183, 72, 0.3); background: rgba(245, 183, 72, 0.08); }
-    .verdict[data-level="tough"] { color: #fca5a5; border-color: rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.08); }
-    .chevron { width: 16px; height: 16px; color: var(--text-muted); transition: transform 0.2s ease; }
-    .session-item[data-open="true"] .chevron { transform: rotate(90deg); }
-    .session-detail { padding: 4px 14px 14px 70px; display: flex; flex-direction: column; gap: 10px; }
-    .session-facts { display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 12.5px; color: var(--text-soft); }
-    .session-facts b { color: var(--text-main); font-weight: 600; }
-    .focus-strip { display: flex; height: 14px; gap: 2px; border-radius: 4px; overflow: hidden; }
-    .focus-strip span { min-width: 2px; border-radius: 2px; }
-    .strip-axis { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
-    .strip-note { font-size: 12.5px; color: var(--text-muted); }
-    .history-more { align-self: center; margin-top: 16px; }
-
-    /* Classes (student-classes.js) */
-    .my-class-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
-    .my-class-card {
-      background: #0f0f12; border: 1px solid var(--border); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 10px;
-      transition: border-color 0.15s ease;
-    }
-    .my-class-card:hover { border-color: #33333b; }
-    .my-class-card[aria-current="true"] { border-color: rgba(0, 217, 255, 0.45); box-shadow: 0 0 0 1px rgba(0, 217, 255, 0.12), 0 10px 30px rgba(0, 217, 255, 0.06); }
-    .my-class-card h3 { font-size: 16px; font-weight: 650; overflow-wrap: anywhere; }
-    .my-class-card .code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; color: var(--cyan); }
-    .my-class-status { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--text-muted); }
-    .my-class-status[data-live="true"] { color: #fca5a5; }
-    .my-class-attendance { font-size: 12px; color: var(--text-muted); }
-    .my-class-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; padding-top: 4px; }
-    .my-class-actions .btn-action, .my-class-actions .btn-join { padding: 7px 11px; font-size: 12.5px; }
-    .btn-leave { background: transparent; color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 7px 11px; font-size: 12.5px; cursor: pointer; margin-left: auto; }
-    .btn-leave:hover { background: rgba(239, 68, 68, 0.1); }
-
-    /* Nudge / timer toast (student-focus.js) */
-    .focus-toast {
-      position: fixed; right: 24px; bottom: 24px; z-index: 50; width: min(380px, calc(100vw - 32px));
-      background: rgba(23, 23, 27, 0.92); backdrop-filter: blur(12px); border: 1px solid var(--border-strong); border-left: 3px solid var(--cyan);
-      border-radius: 14px; padding: 16px; display: flex; gap: 12px; box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55); animation: toast-in 0.25s ease;
-    }
-    .focus-toast[data-kind="nudge"] { border-left-color: var(--amber); }
-    .focus-toast[data-kind="praise"] { border-left-color: var(--green); }
-    .toast-icon { font-size: 22px; line-height: 1.2; }
-    .toast-body strong { display: block; font-size: 14px; margin-bottom: 4px; }
-    .toast-body p { font-size: 13px; color: var(--text-soft); line-height: 1.5; }
-    .toast-actions { display: flex; gap: 8px; margin-top: 12px; }
-    .toast-actions:empty { display: none; }
-    @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-
-    @media (prefers-reduced-motion: reduce) {
-      main { scroll-behavior: auto; }
-      .view, .focus-toast { animation: none; }
-      #timerRing, .progress span, .switch input::after, .quiz-progress span { transition: none; }
-      .writing-dot { animation: none; }
-    }
-
-    @media (max-width: 1280px) {
-      .dash-grid { grid-template-columns: minmax(0, 1fr) 320px; }
-    }
-    @media (max-width: 1100px) {
-      .stat-grid { grid-template-columns: repeat(2, 1fr); }
-      .dash-grid, .buddy-grid, .history-grid, .notes-layout { grid-template-columns: 1fr; }
-      .notes-sidebar { position: static; }
-      .note-list { max-height: 260px; }
-    }
-    @media (max-width: 760px) {
-      .toolbar-tip { display: none; }
-      .note-title { font-size: 20px; }
-      .note-actions { margin-left: 0; width: 100%; }
-      .note-actions .btn-action { flex: 1; }
-      .note-editor { min-height: 260px; }
-      .portal-main { padding: 20px 16px 32px; }
-      .welcome-title, .page-title { font-size: 24px; }
-    }
-    @media (max-width: 520px) {
-      .stat-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
-      .stat-card { padding: 14px; grid-template-columns: 1fr; }
-      .stat-card strong { font-size: 24px; }
-      .stat-card .chip-icon { display: none; }
-      .timer-actions { grid-template-columns: 1fr 1fr; }
-      .timer-actions .btn-primary { grid-column: 1 / -1; }
-      .page-actions { width: 100%; }
-      .page-actions > * { flex: 1; }
-      .chat-bubble { max-width: 92%; }
-      .range-switch { width: 100%; }
-      .range-switch button { flex: 1; }
-      .session-row { grid-template-columns: 40px minmax(0, 1fr) 16px; gap: 12px; padding: 10px 8px; }
-      .session-row .verdict { display: none; }
-      .focus-ring { width: 40px; height: 40px; }
-      .session-detail { padding: 2px 10px 12px; }
-      .session-legend .legend-tip { display: none; }
-    }
-  </style>
-  <link rel="stylesheet" href="../styles/dashboard-layout.css?v=2">
+  <link rel="stylesheet" href="../styles/student.css?v=1">
+  <link rel="stylesheet" href="../styles/dashboard-layout.css?v=3">
 </head>
 <body data-required-role="student">
   <svg width="0" height="0" style="position: absolute" aria-hidden="true">
@@ -619,21 +73,28 @@
     <symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
     <symbol id="i-help" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 4.9.7c0 1.7-2.4 2.3-2.4 3.8M12 17h.01"/></symbol>
     <symbol id="i-rocket" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15c-1.5 1.5-2 5-2 5s3.5-.5 5-2M14 4c4-1 6-1 6-1s0 2-1 6l-6 6-5-5Z"/><path d="M9 10 6 9l-2 2 5 1M14 15l1 3-2 2-1-5"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16Z"/><path d="m13.5 6.5 4 4"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></symbol>
+    <symbol id="i-palette" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.3A4.7 4.7 0 0 0 21 9.7C21 6 17 3 12 3Z"/><circle cx="7.5" cy="10.5" r="1"/><circle cx="10.5" cy="7" r="1"/><circle cx="15" cy="7.5" r="1"/></symbol>
+    <symbol id="i-chevron-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></symbol>
   </svg>
 
   <aside id="sidebar" aria-label="Student navigation">
     <div>
-      <a class="brand-box" href="../index.html" aria-label="Neuro-Focus home">
+      <a class="brand-box" href="../index.html" aria-label="Neuro-Focus home page">
         <span class="brand-mark"><svg><use href="#i-brain"/></svg></span>
         <span class="brand-text"><b>Neuro-Focus</b><small>Student workspace</small></span>
       </a>
 
       <nav class="nav-group" aria-label="Workspace">
         <div class="nav-label">Workspace</div>
-        <a class="nav-item" href="#dashboard" data-view-link="dashboard"><svg class="icon"><use href="#i-grid"/></svg>Dashboard</a>
+        <a class="nav-item" href="#dashboard" data-view-link="dashboard"><svg class="icon"><use href="#i-home"/></svg>Home</a>
+        <a class="nav-item" href="#focus" data-view-link="focus"><svg class="icon"><use href="#i-timer"/></svg>Focus session</a>
         <a class="nav-item" href="#buddy" data-view-link="buddy"><svg class="icon"><use href="#i-chat"/></svg>NeuroBuddy</a>
         <a class="nav-item" href="#notes" data-view-link="notes"><svg class="icon"><use href="#i-note"/></svg>Class notes</a>
-        <a class="nav-item" href="#history" data-view-link="history"><svg class="icon"><use href="#i-history"/></svg>Focus history</a>
+        <a class="nav-item" href="#progress" data-view-link="progress"><svg class="icon"><use href="#i-chart"/></svg>My progress</a>
         <a class="nav-item" href="#classes" data-view-link="classes"><svg class="icon"><use href="#i-school"/></svg>Classes</a>
       </nav>
 
@@ -649,40 +110,205 @@
       </div>
     </div>
 
-    <div class="user-card">
-      <span class="avatar" id="userInitials">S</span>
+    <a class="user-card" href="#profile" data-view-link="profile">
+      <span class="nf-avatar" data-profile-avatar></span>
       <div>
         <b data-profile-name>Student</b>
-        <small>Student account</small>
+        <small>My profile</small>
       </div>
-    </div>
+    </a>
   </aside>
 
   <main>
     <header>
       <div class="header-lead">
         <button id="navToggle" class="nav-toggle" type="button" aria-label="Open navigation" aria-controls="sidebar" aria-expanded="false">☰</button>
-        <div class="breadcrumbs"><span>Workspace</span><span>/</span><b id="pageCrumb">Dashboard</b></div>
+        <div class="breadcrumbs"><span>Workspace</span><span>/</span><b id="pageCrumb">Home</b></div>
       </div>
       <div class="header-actions">
-        <a class="btn-action" href="../index.html"><svg class="icon"><use href="#i-home"/></svg><span class="label-long">Home</span></a>
+        <!-- Timer and tracking at a glance, from every page (student-dashboard.js) -->
+        <a class="focus-pill" id="focusPill" href="#focus" data-state="idle">
+          <span class="focus-pill-dot" aria-hidden="true"></span>
+          <svg class="icon" aria-hidden="true"><use href="#i-timer"/></svg>
+          <span id="focusPillText">Focus</span>
+        </a>
         <button class="btn-action" type="button" data-export-report="session"><svg class="icon"><use href="#i-download"/></svg><span class="label-long">Export session</span><span class="label-short">Export</span></button>
-        <button id="signOutButton" class="btn-action" type="button"><svg class="icon"><use href="#i-logout"/></svg><span class="label-long">Sign out</span></button>
+        <!-- Account menu (student-profile.js) -->
+        <div class="account-menu">
+          <button id="accountButton" class="account-button" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="accountMenu">
+            <span class="nf-avatar sm" data-profile-avatar></span>
+            <span class="sr-only">Account menu for <span data-profile-name>Student</span></span>
+            <svg class="icon" aria-hidden="true"><use href="#i-chevron-down"/></svg>
+          </button>
+          <div class="account-dropdown" id="accountMenu" role="menu" aria-labelledby="accountButton" hidden>
+            <div class="account-head" role="presentation">
+              <span class="nf-avatar" data-profile-avatar></span>
+              <div><b data-profile-name>Student</b><small id="accountMenuEmail"></small></div>
+            </div>
+            <a role="menuitem" href="#profile"><svg class="icon" aria-hidden="true"><use href="#i-user"/></svg>My profile</a>
+            <a role="menuitem" href="#profile-appearance"><svg class="icon" aria-hidden="true"><use href="#i-palette"/></svg>Theme and accent</a>
+            <a role="menuitem" href="#progress"><svg class="icon" aria-hidden="true"><use href="#i-chart"/></svg>My progress</a>
+            <a role="menuitem" href="../index.html"><svg class="icon" aria-hidden="true"><use href="#i-brain"/></svg>Neuro-Focus home page</a>
+            <div role="separator"></div>
+            <button role="menuitem" id="signOutButton" type="button"><svg class="icon" aria-hidden="true"><use href="#i-logout"/></svg>Sign out</button>
+          </div>
+        </div>
       </div>
     </header>
 
     <div class="portal-main">
-      <!-- ================= Dashboard ================= -->
+      <!-- ================= Home (student-dashboard.js) ================= -->
       <section class="view" id="view-dashboard" data-view="dashboard" aria-labelledby="welcomeTitle">
+        <section class="home-hero" aria-labelledby="welcomeTitle">
+          <div class="home-hero-art" aria-hidden="true">
+            <svg viewBox="0 0 560 320" fill="none">
+              <g stroke="currentColor" stroke-opacity="0.22" stroke-width="1.2">
+                <path d="M30 250 150 170 262 214 360 104 470 146 548 70"/>
+                <path d="M150 170 214 74 360 104 420 30"/>
+                <path d="M262 214 334 292 470 146 528 250"/>
+                <path d="M214 74 306 22"/>
+                <path d="M90 300 150 170"/>
+              </g>
+              <g fill="currentColor">
+                <circle cx="150" cy="170" r="4" fill-opacity="0.55"/>
+                <circle cx="262" cy="214" r="3" fill-opacity="0.45"/>
+                <circle cx="360" cy="104" r="5" fill-opacity="0.6"/>
+                <circle cx="470" cy="146" r="4" fill-opacity="0.5"/>
+                <circle cx="214" cy="74" r="3" fill-opacity="0.4"/>
+                <circle cx="334" cy="292" r="3" fill-opacity="0.35"/>
+                <circle cx="548" cy="70" r="3" fill-opacity="0.4"/>
+                <circle cx="420" cy="30" r="2.5" fill-opacity="0.35"/>
+              </g>
+            </svg>
+          </div>
+          <div class="home-hero-inner">
+            <div class="home-hero-hello">
+              <a class="hero-avatar" href="#profile" title="Open My profile">
+                <span class="nf-avatar xl" data-profile-avatar></span>
+                <span class="hero-avatar-edit" aria-hidden="true"><svg class="icon"><use href="#i-pencil"/></svg></span>
+                <span class="sr-only">Open My profile</span>
+              </a>
+              <div class="hero-copy">
+                <p class="eyebrow-pill"><span class="tag">Today</span><span id="todayLabel">Today</span></p>
+                <h1 class="welcome-title" id="welcomeTitle">Welcome to your study space</h1>
+                <p class="hero-lead" id="heroLead">Here’s what you can do next.</p>
+                <div class="hero-links">
+                  <a class="text-link" href="#profile"><svg class="icon" aria-hidden="true"><use href="#i-user"/></svg>My profile</a>
+                  <a class="text-link" href="#progress"><svg class="icon" aria-hidden="true"><use href="#i-chart"/></svg>My progress</a>
+                </div>
+              </div>
+            </div>
+
+            <!-- The one main action: join a live class, continue studying, or start a focus session -->
+            <section class="next-card" id="nextAction" data-kind="loading" aria-labelledby="nextTitle" aria-live="polite" aria-busy="true">
+              <span class="next-icon" id="nextIcon" aria-hidden="true"><svg><use href="#i-spark"/></svg></span>
+              <div class="next-kicker" id="nextKicker">Up next</div>
+              <h2 class="next-title" id="nextTitle">Getting your study space ready…</h2>
+              <p class="next-sub" id="nextSub"></p>
+              <div class="next-buttons" id="nextButtons"><span class="next-skeleton"></span><span class="next-skeleton short"></span></div>
+            </section>
+          </div>
+        </section>
+
+        <div class="home-grid">
+          <div class="home-col">
+            <section class="panel-card home-card" id="today-plan" aria-labelledby="planTitle">
+              <div class="panel-head">
+                <div>
+                  <h2 class="panel-title" id="planTitle"><span class="chip-icon"><svg><use href="#i-calendar"/></svg></span>Today’s plan</h2>
+                  <p class="panel-sub">Live classes as they happen and the steps you set yourself.</p>
+                </div>
+              </div>
+              <ul class="plan-list" id="planList" aria-live="polite"><li class="empty-state">Loading…</li></ul>
+              <form class="inline-form plan-add" id="planAddForm">
+                <input id="planAddInput" class="field-input" type="text" maxlength="120" placeholder="Add a small step, like “Read pages 12–14”" aria-label="Add a step to today’s plan" autocomplete="off">
+                <button class="btn-action" type="submit"><svg class="icon"><use href="#i-plus"/></svg>Add</button>
+              </form>
+              <p class="plan-note">No class timetable or deadlines are connected to Neuro-Focus, so nothing here is guessed: live sessions appear when your teacher starts them, and steps are the ones you add (saved on this device).</p>
+            </section>
+
+            <section class="panel-card home-card" id="home-classes" aria-labelledby="homeClassesTitle">
+              <div class="panel-head">
+                <div>
+                  <h2 class="panel-title" id="homeClassesTitle"><span class="chip-icon"><svg><use href="#i-school"/></svg></span>Your classes</h2>
+                  <p class="panel-sub">Pick a class to work in, or join when your teacher goes live.</p>
+                </div>
+                <button class="btn-action" type="button" data-action="join-class"><svg class="icon"><use href="#i-plus"/></svg>Join a class</button>
+              </div>
+              <div class="home-class-grid" id="homeClassGrid"><p class="empty-state">Loading your classes…</p></div>
+            </section>
+          </div>
+
+          <div class="home-col">
+            <section class="panel-card home-card buddy-entry" aria-labelledby="buddyEntryTitle">
+              <div class="buddy-entry-head">
+                <span class="buddy-face" aria-hidden="true"><svg><use href="#i-chat"/></svg></span>
+                <div>
+                  <p class="page-kicker">NeuroBuddy</p>
+                  <h2 class="buddy-entry-title" id="buddyEntryTitle">What are we learning today?</h2>
+                </div>
+              </div>
+              <form id="buddyEntryForm" class="tutor-form-row">
+                <input id="buddyEntryInput" class="field-input" type="text" placeholder="Ask about anything you’re studying…" aria-labelledby="buddyEntryTitle" autocomplete="off">
+                <button class="btn-primary" type="submit">Ask</button>
+              </form>
+              <div class="prompt-chips" role="group" aria-label="Ways NeuroBuddy can help">
+                <button class="chip" type="button" data-buddy-starter="Explain this topic simply, with one everyday example: "><svg><use href="#i-spark"/></svg>Explain a topic</button>
+                <button class="chip" type="button" data-buddy-starter="I'm stuck getting started. Break this task into tiny first steps: "><svg><use href="#i-rocket"/></svg>Help me start</button>
+                <button class="chip" type="button" data-buddy-starter="Help me plan this assignment as a short list of steps in a sensible order: "><svg><use href="#i-list"/></svg>Plan an assignment</button>
+              </div>
+            </section>
+
+            <section class="panel-card home-card" id="continue-card" aria-labelledby="continueTitle">
+              <div class="panel-head">
+                <div>
+                  <h2 class="panel-title" id="continueTitle"><span class="chip-icon green"><svg><use href="#i-history"/></svg></span>Continue where you left off</h2>
+                  <p class="panel-sub">Your latest notes, chats and sessions.</p>
+                </div>
+              </div>
+              <ul class="continue-list" id="continueList"><li class="empty-state">Loading…</li></ul>
+            </section>
+
+            <section class="panel-card home-card" aria-labelledby="focusToolsTitle">
+              <div class="panel-head">
+                <div>
+                  <h2 class="panel-title" id="focusToolsTitle"><span class="chip-icon amber"><svg><use href="#i-target"/></svg></span>Focus tools</h2>
+                  <p class="panel-sub">Your camera only turns on when you start tracking.</p>
+                </div>
+              </div>
+              <div class="tool-rows">
+                <a class="tool-row" href="#focus-timer">
+                  <span class="chip-icon"><svg><use href="#i-timer"/></svg></span>
+                  <span><b>Focus timer</b><small id="toolTimer">Ready when you are</small></span>
+                  <svg class="chevron" aria-hidden="true"><use href="#i-chevron"/></svg>
+                </a>
+                <a class="tool-row" href="#focus-session">
+                  <span class="chip-icon green"><svg><use href="#i-eye"/></svg></span>
+                  <span><b>Attention tracking</b><small id="toolTracking">Camera off</small></span>
+                  <svg class="chevron" aria-hidden="true"><use href="#i-chevron"/></svg>
+                </a>
+                <a class="tool-row" href="#progress">
+                  <span class="chip-icon amber"><svg><use href="#i-chart"/></svg></span>
+                  <span><b>My progress</b><small>Attention scores, charts and saved sessions</small></span>
+                  <svg class="chevron" aria-hidden="true"><use href="#i-chevron"/></svg>
+                </a>
+              </div>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= Focus session ================= -->
+      <section class="view" id="view-focus" data-view="focus" hidden aria-labelledby="focusPageTitle">
         <div class="page-head">
           <div>
-            <div class="page-kicker" id="todayLabel">Today</div>
-            <h1 class="welcome-title" id="welcomeTitle">Student workspace</h1>
-            <p class="page-sub">Track your focus, work in short blocks, and get help whenever you need it.</p>
+            <div class="page-kicker">Timer and attention tracking</div>
+            <h1 class="page-title" id="focusPageTitle">Focus session</h1>
+            <p class="page-sub">Work in short blocks with breaks. Your camera only turns on when you start tracking, and video never leaves this device.</p>
           </div>
           <div class="page-actions">
             <button class="btn-action" type="button" data-action="join-class"><svg class="icon"><use href="#i-plus"/></svg>Join a class</button>
-            <button class="btn-primary" type="button" id="quickStart"><svg class="icon"><use href="#i-play"/></svg><span>Start focus session</span></button>
+            <button class="btn-primary" type="button" id="quickStart" data-start-focus><svg class="icon"><use href="#i-play"/></svg><span>Start focus session</span></button>
           </div>
         </div>
 
@@ -695,34 +321,6 @@
           </div>
           <div class="class-banner-actions" id="bannerActions"></div>
         </section>
-
-        <!-- Live focus stats (student-focus.js) -->
-        <div class="stat-grid" aria-label="Live focus statistics">
-          <article class="stat-card">
-            <span class="stat-label">Live attention</span>
-            <span class="chip-icon"><svg><use href="#i-eye"/></svg></span>
-            <strong id="statLiveScore">—</strong>
-            <small id="statLiveState">Start tracking to begin</small>
-          </article>
-          <article class="stat-card">
-            <span class="stat-label">Session focus</span>
-            <span class="chip-icon green"><svg><use href="#i-target"/></svg></span>
-            <strong id="statSessionFocus">—</strong>
-            <small id="statTracked">0:00 tracked</small>
-          </article>
-          <article class="stat-card">
-            <span class="stat-label">Focus streak</span>
-            <span class="chip-icon amber"><svg><use href="#i-flame"/></svg></span>
-            <strong id="statStreak">0:00</strong>
-            <small id="statBestStreak">Best this session: 0:00</small>
-          </article>
-          <article class="stat-card">
-            <span class="stat-label">Attention lapses</span>
-            <span class="chip-icon red"><svg><use href="#i-flag"/></svg></span>
-            <strong id="statLapses">0</strong>
-            <small id="statNudges">0 nudges shown</small>
-          </article>
-        </div>
 
         <div class="dash-grid">
           <div class="dash-col">
@@ -762,20 +360,7 @@
                 <label class="switch"><input type="checkbox" id="shareToggle" checked> Share with my teacher</label>
               </div>
               <p class="share-status" id="shareStatus" aria-live="polite">Checking your class…</p>
-            </section>
-
-            <!-- Focus timeline (student-focus.js) -->
-            <section class="panel-card" id="focus-timeline" aria-labelledby="timelineTitle">
-              <div class="panel-head">
-                <div>
-                  <div class="panel-title" id="timelineTitle"><span class="chip-icon"><svg><use href="#i-chart"/></svg></span>Focus timeline</div>
-                  <div class="panel-sub">Your attention each second over the last 2 minutes. Above 70% counts as focused.</div>
-                </div>
-              </div>
-              <div class="chart-box">
-                <canvas id="focusTimeline" role="img" aria-label="Your attention score over time"></canvas>
-                <div class="chart-empty" id="timelineEmpty">Start attention tracking to see your focus timeline.</div>
-              </div>
+              <p class="tracker-progress-link">Live scores, lapses and your focus timeline are in <a class="text-link" href="#progress">My progress</a>.</p>
             </section>
           </div>
 
@@ -963,20 +548,76 @@
         </div>
       </section>
 
-      <!-- ================= Focus history ================= -->
-      <section class="view" id="view-history" data-view="history" hidden aria-labelledby="historyPageTitle">
+      <!-- ================= My progress (student-focus.js + student-history.js) ================= -->
+      <section class="view" id="view-progress" data-view="progress" hidden aria-labelledby="progressPageTitle">
         <div class="page-head">
           <div>
             <div class="page-kicker">Saved to your account</div>
-            <h1 class="page-title" id="historyPageTitle">Focus history</h1>
-            <p class="page-sub">See how your focus is changing and what helps you focus best.</p>
+            <h1 class="page-title" id="progressPageTitle">My progress</h1>
+            <p class="page-sub">Your attention scores, focus timeline and saved sessions, and what helps you focus best.</p>
           </div>
           <div class="page-actions">
-            <div class="range-switch" role="group" aria-label="Time range">
-              <button type="button" data-range="7" aria-pressed="true">7 days</button>
-              <button type="button" data-range="30" aria-pressed="false">30 days</button>
-              <button type="button" data-range="all" aria-pressed="false">All time</button>
+            <a class="btn-action" href="#focus"><svg class="icon"><use href="#i-timer"/></svg>Open focus session</a>
+          </div>
+        </div>
+
+        <div class="section-heading">
+          <div>
+            <h2>This session</h2>
+            <p>Live numbers while attention tracking is on.</p>
+          </div>
+        </div>
+        <!-- Live focus stats (student-focus.js) -->
+        <div class="stat-grid" aria-label="Live focus statistics">
+          <article class="stat-card">
+            <span class="stat-label">Live attention</span>
+            <span class="chip-icon"><svg><use href="#i-eye"/></svg></span>
+            <strong id="statLiveScore">—</strong>
+            <small id="statLiveState">Start tracking to begin</small>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">Session focus</span>
+            <span class="chip-icon green"><svg><use href="#i-target"/></svg></span>
+            <strong id="statSessionFocus">—</strong>
+            <small id="statTracked">0:00 tracked</small>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">Focus streak</span>
+            <span class="chip-icon amber"><svg><use href="#i-flame"/></svg></span>
+            <strong id="statStreak">0:00</strong>
+            <small id="statBestStreak">Best this session: 0:00</small>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">Attention lapses</span>
+            <span class="chip-icon red"><svg><use href="#i-flag"/></svg></span>
+            <strong id="statLapses">0</strong>
+            <small id="statNudges">0 nudges shown</small>
+          </article>
+        </div>
+
+        <!-- Focus timeline (student-focus.js) -->
+        <section class="panel-card" id="focus-timeline" aria-labelledby="timelineTitle">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title" id="timelineTitle"><span class="chip-icon"><svg><use href="#i-chart"/></svg></span>Focus timeline</div>
+              <div class="panel-sub">Your attention each second over the last 2 minutes. Above 70% counts as focused.</div>
             </div>
+          </div>
+          <div class="chart-box">
+            <canvas id="focusTimeline" role="img" aria-label="Your attention score over time"></canvas>
+            <div class="chart-empty" id="timelineEmpty">Start attention tracking to see your focus timeline.</div>
+          </div>
+        </section>
+
+        <div class="section-heading" id="history">
+          <div>
+            <h2>Your history</h2>
+            <p>Every session you track is saved here.</p>
+          </div>
+          <div class="range-switch" role="group" aria-label="Time range">
+            <button type="button" data-range="7" aria-pressed="true">7 days</button>
+            <button type="button" data-range="30" aria-pressed="false">30 days</button>
+            <button type="button" data-range="all" aria-pressed="false">All time</button>
           </div>
         </div>
 
@@ -1072,6 +713,143 @@
           </div>
         </section>
       </section>
+
+      <!-- ================= My profile (student-profile.js) ================= -->
+      <section class="view" id="view-profile" data-view="profile" hidden aria-labelledby="profilePageTitle">
+        <div class="page-head">
+          <div>
+            <div class="page-kicker">Your account</div>
+            <h1 class="page-title" id="profilePageTitle">My profile</h1>
+            <p class="page-sub">Choose how you appear and how Neuro-Focus looks. Changes are saved to your account, so they follow you to any device.</p>
+          </div>
+        </div>
+
+        <form id="profileForm" novalidate>
+          <div class="profile-grid">
+            <section class="panel-card" aria-labelledby="identityTitle">
+              <div class="panel-head">
+                <div>
+                  <h2 class="panel-title" id="identityTitle"><span class="chip-icon"><svg><use href="#i-user"/></svg></span>Picture and name</h2>
+                  <p class="panel-sub">Your teachers see your name and picture in their class lists.</p>
+                </div>
+              </div>
+
+              <div class="identity-row">
+                <div class="identity-preview">
+                  <span class="nf-avatar xxl" id="profileAvatarPreview"></span>
+                  <span class="identity-caption" id="avatarCaption">Your initials</span>
+                </div>
+                <div class="identity-fields">
+                  <label class="field-label" for="displayNameInput">Display name</label>
+                  <input id="displayNameInput" class="field-input" type="text" autocomplete="nickname" spellcheck="false" required aria-describedby="displayNameHelp displayNameError">
+                  <div class="field-foot">
+                    <span class="field-help" id="displayNameHelp">Shown in your greeting and on your teachers’ class lists.</span>
+                    <span class="char-count" id="displayNameCount" aria-hidden="true">0 / 40</span>
+                  </div>
+                  <p class="field-error" id="displayNameError" aria-live="polite"></p>
+                </div>
+              </div>
+
+              <fieldset class="avatar-picker">
+                <legend class="field-label">Built-in avatars</legend>
+                <div class="avatar-options" id="avatarOptions"></div>
+              </fieldset>
+
+              <div class="upload-box">
+                <div class="upload-actions">
+                  <input type="file" id="avatarFile" class="sr-only" accept="image/jpeg,image/png,image/webp" tabindex="-1" aria-hidden="true">
+                  <button type="button" class="btn-action" id="avatarUploadButton"><svg class="icon"><use href="#i-upload"/></svg><span id="avatarUploadLabel">Upload a picture</span></button>
+                  <button type="button" class="btn-action btn-danger-soft" id="avatarRemoveButton" hidden><svg class="icon"><use href="#i-trash"/></svg>Remove picture</button>
+                </div>
+                <p class="field-help">JPG, PNG or WebP up to 5 MB. Only you and your teachers can see an uploaded picture.</p>
+                <div class="crop-panel" id="cropPanel" hidden>
+                  <div class="crop-stage" id="cropStage" tabindex="0" role="group" aria-roledescription="picture cropper" aria-label="Picture position. Drag the picture, or use the arrow keys to move it and + or − to zoom." aria-describedby="cropHelp">
+                    <canvas id="cropCanvas" width="440" height="440"></canvas>
+                    <span class="crop-ring" aria-hidden="true"></span>
+                  </div>
+                  <div class="crop-controls">
+                    <label class="field-label" for="cropZoom">Zoom</label>
+                    <input type="range" id="cropZoom" min="1" max="4" step="0.01" value="1">
+                    <p class="field-help" id="cropHelp">The square is what gets saved; the circle shows how it appears. Your picture is only uploaded when you press Save changes.</p>
+                    <div class="crop-buttons">
+                      <button type="button" class="btn-action" id="cropReset">Reset position</button>
+                      <button type="button" class="btn-action" id="cropDiscard">Don’t use this picture</button>
+                    </div>
+                  </div>
+                </div>
+                <p class="field-error" id="avatarError" aria-live="polite"></p>
+              </div>
+
+              <dl class="account-facts">
+                <div><dt>Login email</dt><dd id="factEmail">—</dd></div>
+                <div><dt>Account ID</dt><dd><code id="factAccountId">—</code></dd></div>
+                <div><dt>Role</dt><dd id="factRole">Student</dd></div>
+              </dl>
+              <p class="field-help account-note">Your login email, account ID and role are separate from your profile and can’t be changed here.</p>
+            </section>
+
+            <section class="panel-card" id="profile-appearance" aria-labelledby="appearanceTitle">
+              <div class="panel-head">
+                <div>
+                  <h2 class="panel-title" id="appearanceTitle"><span class="chip-icon"><svg><use href="#i-palette"/></svg></span>Theme and accent</h2>
+                  <p class="panel-sub">Pick one to preview it on the whole page. It’s only kept when you save.</p>
+                </div>
+              </div>
+
+              <fieldset>
+                <legend class="field-label">Theme</legend>
+                <div class="theme-options">
+                  <label class="theme-option">
+                    <input type="radio" name="theme" value="default">
+                    <span class="theme-swatch" data-swatch="default" aria-hidden="true"><i></i><i></i><i></i></span>
+                    <span class="theme-text"><span class="theme-name">Neuro-Focus</span><span class="theme-desc">The original dark look with a cyan glow</span></span>
+                  </label>
+                  <label class="theme-option">
+                    <input type="radio" name="theme" value="light">
+                    <span class="theme-swatch" data-swatch="light" aria-hidden="true"><i></i><i></i><i></i></span>
+                    <span class="theme-text"><span class="theme-name">Light</span><span class="theme-desc">Bright and easy to read in daylight</span></span>
+                  </label>
+                  <label class="theme-option">
+                    <input type="radio" name="theme" value="dark">
+                    <span class="theme-swatch" data-swatch="dark" aria-hidden="true"><i></i><i></i><i></i></span>
+                    <span class="theme-text"><span class="theme-name">Calm dark</span><span class="theme-desc">Soft slate tones with gentler contrast</span></span>
+                  </label>
+                </div>
+              </fieldset>
+
+              <fieldset class="accent-picker">
+                <legend class="field-label">Accent colour</legend>
+                <div class="accent-options">
+                  <label class="accent-option"><input type="radio" name="accent" value="default"><span class="accent-dot" data-accent="default" aria-hidden="true"></span>Theme colour</label>
+                  <label class="accent-option"><input type="radio" name="accent" value="blue"><span class="accent-dot" data-accent="blue" aria-hidden="true"></span>Blue</label>
+                  <label class="accent-option"><input type="radio" name="accent" value="purple"><span class="accent-dot" data-accent="purple" aria-hidden="true"></span>Purple</label>
+                  <label class="accent-option"><input type="radio" name="accent" value="green"><span class="accent-dot" data-accent="green" aria-hidden="true"></span>Green</label>
+                  <label class="accent-option"><input type="radio" name="accent" value="orange"><span class="accent-dot" data-accent="orange" aria-hidden="true"></span>Orange</label>
+                </div>
+              </fieldset>
+
+              <div class="appearance-sample" aria-hidden="true">
+                <div class="sample-head"><span class="chip-icon"><svg><use href="#i-spark"/></svg></span><b>Preview</b></div>
+                <p class="sample-text">This is how text, <a>links</a>, buttons and status labels look. Status colours stay the same with every accent.</p>
+                <div class="sample-row">
+                  <span class="btn-primary">Save note</span>
+                  <span class="btn-action">Cancel</span>
+                  <span class="status-chip ok">Focused</span>
+                  <span class="status-chip warn">Looked away</span>
+                  <span class="status-chip live">Live</span>
+                </div>
+                <div class="sample-chart"><i style="height: 40%"></i><i style="height: 65%"></i><i style="height: 30%"></i><i style="height: 85%"></i><i style="height: 55%"></i><i style="height: 75%"></i><i style="height: 45%"></i></div>
+              </div>
+            </section>
+          </div>
+
+          <div class="profile-actions">
+            <p class="profile-status" id="profileStatus" role="status" aria-live="polite">Loading your profile…</p>
+            <button type="button" class="btn-action" id="profileCancel">Cancel</button>
+            <button type="submit" class="btn-primary" id="profileSave">Save changes</button>
+          </div>
+        </form>
+      </section>
     </div>
   </main>
 
@@ -1143,15 +921,17 @@
   </div>
 
   <script src="../scripts/shared/app.js?v=3"></script>
-  <script src="../scripts/shared/dashboard-nav.js?v=2"></script>
-  <script src="../scripts/student/student-ui.js?v=1"></script>
+  <script src="../scripts/shared/dashboard-nav.js?v=3"></script>
+  <script src="../scripts/student/student-ui.js?v=2"></script>
   <!-- auth-guard.js must load first: the other modules wait on window.neuroFocusReady -->
-  <script type="module" src="../scripts/auth/auth-guard.js?v=2"></script>
+  <script type="module" src="../scripts/auth/auth-guard.js?v=3"></script>
   <script type="module" src="../scripts/tracking/eye-analyzer.js?v=3"></script>
-  <script type="module" src="../scripts/student/learning-assistant.js?v=3"></script>
-  <script type="module" src="../scripts/student/student-notes.js?v=4"></script>
-  <script type="module" src="../scripts/student/student-classes.js?v=10"></script>
-  <script type="module" src="../scripts/student/student-focus.js?v=6"></script>
-  <script type="module" src="../scripts/student/student-history.js?v=1"></script>
+  <script type="module" src="../scripts/student/learning-assistant.js?v=4"></script>
+  <script type="module" src="../scripts/student/student-notes.js?v=5"></script>
+  <script type="module" src="../scripts/student/student-classes.js?v=11"></script>
+  <script type="module" src="../scripts/student/student-focus.js?v=7"></script>
+  <script type="module" src="../scripts/student/student-history.js?v=2"></script>
+  <script type="module" src="../scripts/student/student-profile.js?v=1"></script>
+  <script type="module" src="../scripts/student/student-dashboard.js?v=1"></script>
 </body>
 </html>

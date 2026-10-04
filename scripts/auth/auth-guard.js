@@ -1,4 +1,5 @@
 import { getSupabase } from "../services/supabase-client.js";
+import { applyAppearance, cacheAppearance, clearAppearanceCache } from "../shared/appearance.js?v=1";
 
 const requiredRole = document.body.dataset.requiredRole;
 
@@ -71,15 +72,20 @@ window.neuroFocusReady = (async () => {
 
     // Strict authentication enforcement: logged-out visitors MUST sign in
     if (!session) {
+      clearAppearanceCache();
       window.location.replace("login.html");
       return null;
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("id, display_name, role")
-      .eq("id", session.user.id)
-      .maybeSingle();
+    // Profile settings (picture, theme, accent) come from the student profiles database update;
+    // before it is run, only the name and role are loaded and everything else uses defaults.
+    const loadProfile = (fields) => supabase.from("profiles").select(fields).eq("id", session.user.id).maybeSingle();
+    let profileSetupMissing = false;
+    let { data: profile, error: profileError } = await loadProfile("id, display_name, role, avatar_preset, avatar_path, theme, accent");
+    if (profileError && (profileError.code === "42703" || /avatar_|theme|accent/.test(profileError.message || ""))) {
+      profileSetupMissing = true;
+      ({ data: profile, error: profileError } = await loadProfile("id, display_name, role"));
+    }
 
     if (profileError || !profile) {
       showSetupMessage("Your profile could not be loaded. Please sign in again.");
@@ -93,7 +99,13 @@ window.neuroFocusReady = (async () => {
       return null;
     }
 
-    window.neuroFocus = { supabase, session, user: session.user, profile };
+    // A student's saved look applies to student pages only; teacher pages always keep the default.
+    if (requiredRole === "student") {
+      applyAppearance(profile);
+      cacheAppearance(session.user.id, profile);
+    }
+
+    window.neuroFocus = { supabase, session, user: session.user, profile, profileSetupMissing };
     document.querySelectorAll("[data-profile-name]").forEach((el) => { el.textContent = profile.display_name; });
     document.documentElement.classList.remove("auth-check-pending");
 
@@ -103,13 +115,18 @@ window.neuroFocusReady = (async () => {
     signOut?.addEventListener("click", async () => {
       signingOut = true;
       signOut.disabled = true;
+      clearAppearanceCache();
       await supabase.auth.signOut();
       window.location.replace("login.html");
     });
 
     supabase.auth.onAuthStateChange((event, nextSession) => {
       if (signingOut || event === "INITIAL_SESSION") return;
-      if (!nextSession || nextSession.user.id !== session.user.id) showAccountChangedNotice();
+      if (!nextSession || nextSession.user.id !== session.user.id) {
+        // This page belongs to the previous account: stop showing its appearance.
+        if (requiredRole === "student") applyAppearance({});
+        showAccountChangedNotice();
+      }
     });
 
     return window.neuroFocus;

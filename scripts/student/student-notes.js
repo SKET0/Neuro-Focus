@@ -4,7 +4,7 @@
 // and quiz the student on a note with flashcards.
 import { streamAssistant } from "../services/assistant-api.js?v=1";
 import { renderMarkdown, toMarkdown, markdownToPlain, markdownToHtml } from "../shared/markdown.js?v=1";
-import { confirmAction } from "../shared/class-live.js?v=8";
+import { confirmAction } from "../shared/class-live.js?v=9";
 
 const app = await window.neuroFocusReady;
 
@@ -622,6 +622,31 @@ if (app) {
     renderList();
   });
 
+  // ---------- Opened from the Home view (student-dashboard.js) ----------
+  // "Continue where you left off" opens one saved note; a class card shows that class's notes.
+  let notesLoaded = false;
+  let pendingOpenId = null;
+  function openById(id) {
+    if (!id) return;
+    if (!notesLoaded) { pendingOpenId = id; return; }
+    const note = notes.find((item) => item.id === id);
+    if (!note) {
+      message("That note isn’t available any more.", true);
+      return;
+    }
+    if (!visibleNotes().includes(note)) {
+      els.search.value = "";
+      setFilter("all", { remember: true });
+    }
+    openNote(note.key, { scroll: true });
+  }
+  window.addEventListener("neurofocus:open-note", (event) => openById(event.detail?.id));
+  window.addEventListener("neurofocus:notes-filter", (event) => {
+    els.search.value = "";
+    setFilter(event.detail?.classId || "all", { remember: true });
+    renderList();
+  });
+
   // ---------- Load ----------
   async function load() {
     setFilter(filter);
@@ -638,9 +663,11 @@ if (app) {
       return;
     }
     notes = data.map((row) => ({ ...row, key: row.id, writing: false }));
+    notesLoaded = true;
     let lastId = null;
     try { lastId = localStorage.getItem(lastNoteKey); } catch { /* storage unavailable */ }
-    if (lastId && notes.some((note) => note.id === lastId)) openNote(lastId);
+    if (pendingOpenId) openById(pendingOpenId);
+    else if (lastId && notes.some((note) => note.id === lastId)) openNote(lastId);
     else renderList();
   }
   void load();

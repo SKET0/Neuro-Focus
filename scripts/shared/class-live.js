@@ -200,7 +200,8 @@ export const MIGRATIONS = {
   history: "supabase/migrations/20261002000000_attention_history_and_private_live.sql",
   classes: "supabase/migrations/20261003000000_class_management.sql",
   attendance: "supabase/migrations/20261005000000_sessions_attendance.sql",
-  workflow: "supabase/migrations/20261006000000_live_workflow_hardening.sql"
+  workflow: "supabase/migrations/20261006000000_live_workflow_hardening.sql",
+  profiles: "supabase/migrations/20261007000000_student_profiles.sql"
 };
 
 // PostgREST error codes for a table or function that doesn't exist yet.
@@ -216,6 +217,8 @@ export async function missingDatabaseUpdates(supabase) {
   if (isMissingSql(sessions.error)) missing.push(MIGRATIONS.attendance);
   const linked = await supabase.from("attention_sessions").select("class_session_id").limit(1);
   if (!missing.includes(MIGRATIONS.attendance) && linked.error && (linked.error.code === "42703" || /class_session_id/.test(linked.error.message || ""))) missing.push(MIGRATIONS.workflow);
+  const profiles = await supabase.from("profiles").select("theme").limit(1);
+  if (profiles.error && (profiles.error.code === "42703" || /theme/.test(profiles.error.message || ""))) missing.push(MIGRATIONS.profiles);
   return missing;
 }
 

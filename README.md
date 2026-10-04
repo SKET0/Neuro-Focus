@@ -165,6 +165,23 @@ Run `supabase/migrations/20261006000000_live_workflow_hardening.sql` once in the
 - **Shared attention history is tied to the live session it came from.** The database only lets a student save class-linked history while that class has an open live session they haven't been removed from. Everything else stays personal, so teachers only ever see attention recorded during their own live sessions.
 - **Sessions can't be left open forever.** The teacher's dashboard checks in every minute while live. If it was closed without pressing **End**, the session is ended at the dashboard's last activity the next time the teacher opens Neuro-Focus, and students who never joined are marked absent.
 
+## Student profiles update (Home dashboard, My profile, themes)
+
+Run `supabase/migrations/20261007000000_student_profiles.sql` once in **Supabase Dashboard → SQL Editor** (paste the whole file, click **Run**). It is safe to run again. It doesn't change any existing data.
+
+- **Profile settings:** adds a picture or built-in avatar, a theme (`default`, `light`, `dark`) and an accent colour (`default`, `blue`, `purple`, `green`, `orange`) to `profiles`. Students change their own profile only through `update_my_profile()`, which checks every value (display names: 1–40 characters) and can never change the role. Profiles can't be edited directly.
+- **Private `avatars` storage bucket** (2 MB per file; JPG, PNG or WebP). Each person can only upload, replace or delete pictures in their own folder. A picture can be viewed by its owner and by the teachers of classes the owner is in, through links that expire after an hour. It is never public.
+- **`my_class_teachers()`:** lets students see their teacher's name on class cards without being able to read the teacher's profile.
+
+Check it worked: **Storage** should now list a private bucket named `avatars`. Until this update is run, the student pages still work with the default look and initials, and My profile explains that saving needs the update.
+
+What students get:
+- **Home** is the page they land on after signing in: a welcome with their picture and name, one main action (join a live class → continue a recent note → start a focus session), today's plan (live sessions and their own steps only; no timetable is connected, so nothing is guessed), class cards with teachers and live status, a NeuroBuddy box, and links back to recent notes, chats and sessions. The camera never starts until they press a button.
+- **Focus session** holds the attention tracker, timer and steps; **My progress** holds the live scores, timeline and saved history.
+- **My profile** (avatar, account menu or sidebar card): display name, built-in avatars or an uploaded picture with a square crop, and theme/accent with a live preview. **Save changes** stores everything on the account; **Cancel** goes back to what is saved.
+
+The chosen theme is also remembered in the browser for that account only, so pages open in the right colours straight away. It is cleared on sign-out and ignored if a different account signs in. Teacher pages always keep the default look.
+
 ## The full class workflow
 
 1. **Teacher creates a class** (`create_class`) and shares the join code.
@@ -182,6 +199,8 @@ Enforced by the database (Row Level Security), not just by the pages:
 | Data | Student | Their teacher | Classmates / other teachers |
 |---|---|---|---|
 | Profile name | Own only | Students in their classes | No |
+| Profile picture, theme | Own (only they can change them) | Pictures of students in their classes | No |
+| Teacher's name | Of their own classes' teachers | — | No |
 | Class membership | Own rows | Their classes | No |
 | Attendance | Own rows | Their classes | No |
 | Attention history and samples | All of their own | Only what was shared during that teacher's live sessions | No |
