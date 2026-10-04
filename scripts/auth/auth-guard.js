@@ -1,4 +1,4 @@
-import { getSupabase } from "./supabase-client.js";
+import { getSupabase } from "../services/supabase-client.js";
 
 const requiredRole = document.body.dataset.requiredRole;
 
@@ -27,7 +27,7 @@ function showSetupMessage(message) {
 function showAccountChangedNotice() {
   if (document.querySelector("#accountChangedNotice")) return;
   const otherHost = window.location.hostname === "127.0.0.1" ? "localhost" : "127.0.0.1";
-  const otherUrl = `${window.location.protocol}//${otherHost}:${window.location.port || "8000"}/login.html`;
+  const otherUrl = `${window.location.protocol}//${otherHost}:${window.location.port || "8000"}/pages/login.html`;
   const overlay = document.createElement("div");
   overlay.id = "accountChangedNotice";
   overlay.setAttribute("role", "alertdialog");
@@ -50,7 +50,7 @@ function showAccountChangedNotice() {
   link.target = "_blank";
   link.rel = "noopener";
   link.style.color = "#00d9ff";
-  link.textContent = otherUrl.replace("/login.html", "");
+  link.textContent = otherUrl.replace("/pages/login.html", "");
   tip.append(link, " or in a private window.");
   const reload = document.createElement("button");
   reload.type = "button";

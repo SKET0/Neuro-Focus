@@ -5,7 +5,7 @@
 // Live updates use private Supabase Realtime class channels (class-live.js).
 import {
   openClassChannel, onlineStudentIds, confirmAction, notify, copyText, missingDatabaseUpdates, showSetupBanner, isMissingSql
-} from "./class-live.js?v=8";
+} from "../shared/class-live.js?v=8";
 
 const app = await window.neuroFocusReady;
 

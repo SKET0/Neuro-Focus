@@ -41,7 +41,7 @@ body.home-page {
   background:
     linear-gradient(90deg, rgba(0, 5, 8, 0.92) 0%, rgba(0, 10, 14, 0.66) 34%, rgba(0, 5, 8, 0.28) 64%, rgba(0, 3, 5, 0.74) 100%),
     radial-gradient(circle at 63% 45%, rgba(0, 244, 255, 0.18), transparent 18rem),
-    url("assets/hologram-bg.jpg") center / cover fixed no-repeat,
+    url("../assets/images/hologram-bg.jpg") center / cover fixed no-repeat,
     linear-gradient(135deg, #01070a 0%, #041822 45%, #000306 100%);
   overflow-x: hidden;
 }
@@ -115,7 +115,7 @@ button {
   pointer-events: none;
   background:
     linear-gradient(90deg, rgba(0, 5, 8, 0.7) 0%, rgba(0, 7, 10, 0.34) 42%, rgba(0, 3, 5, 0.58) 100%),
-    url("assets/hologram-bg.jpg") center / cover no-repeat;
+    url("../assets/images/hologram-bg.jpg") center / cover no-repeat;
   transform-origin: 58% 48%;
   animation: brainDrift 10s ease-in-out infinite alternate;
 }
@@ -1332,7 +1332,7 @@ body.student-dashboard {
   background: linear-gradient(90deg, rgba(11,16,32,.91) 0%, rgba(11,16,32,.75) 42%, rgba(11,16,32,.36) 72%, rgba(11,16,32,.84) 100%), radial-gradient(ellipse at 68% 45%, rgba(124,108,233,.17), transparent 35rem);
 }
 .home-page .bg-motion {
-  background: linear-gradient(90deg, rgba(11,16,32,.45), rgba(11,16,32,.24)), url("assets/hologram-bg.jpg") center / cover no-repeat;
+  background: linear-gradient(90deg, rgba(11,16,32,.45), rgba(11,16,32,.24)), url("../assets/images/hologram-bg.jpg") center / cover no-repeat;
   animation: none;
   filter: hue-rotate(82deg) saturate(.66) brightness(.58);
 }

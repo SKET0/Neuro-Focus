@@ -5,7 +5,7 @@ A student-centered classroom prototype built with static HTML/CSS/JavaScript, Su
 ## Local setup
 
 1. Create a Supabase project.
-2. In **Project Settings → API**, copy the project URL and the publishable key (or legacy anon key) into `supabase-client.js`.
+2. In **Project Settings → API**, copy the project URL and the publishable key (or legacy anon key) into `scripts/services/supabase-client.js`.
    - These browser credentials are public by design. Never put a `service_role` key in browser code.
 3. Apply `supabase/migrations/20261001000000_learning_classes.sql` in the Supabase SQL Editor, or install the Supabase CLI and run:
 
@@ -15,19 +15,44 @@ A student-centered classroom prototype built with static HTML/CSS/JavaScript, Su
    supabase db push
    ```
 4. In **Authentication → URL Configuration**, set **Site URL** to `http://localhost:8000` and add `http://localhost:8000/**` and `http://127.0.0.1:8000/**` to **Redirect URLs** (plus `http://localhost:8001/**` etc. if you run extra test ports). Email confirmation, password reset and Google sign-in links only return to addresses on this list.
-5. Serve this folder over HTTP with the included dev server, which turns off browser caching so your edits always show up:
+5. From the project folder, start the included dev server. It serves the project root and turns off browser caching so your edits always show up:
 
    ```sh
-   python3 serve.py
+   python3 tools/serve.py
    ```
 
-   Then open `http://localhost:8000`. Do not use `file://`; ES modules and camera access require localhost or HTTPS.
+   Then open `http://localhost:8000`. Do not use `file://`; ES modules and camera access require localhost or HTTPS. To run several test accounts side by side, add ports: `python3 tools/serve.py 8000 8001 8002`.
+
+## Project layout
+
+```
+index.html                 Home page (project root)
+login.html, student.html,  Small redirects to pages/, so old links and emailed
+teacher.html               sign-in / reset links keep working
+pages/                     login.html, student.html, teacher.html (+ an old teacher landing backup)
+styles/                    Shared stylesheets (each page also has its own inline styles)
+scripts/
+  auth/                    Login page (auth.js) and dashboard sign-in guard (auth-guard.js)
+  home/                    Home page behaviour
+  student/                 Student dashboard: classes, focus, history, notes, NeuroBuddy chat
+  teacher/                 Teacher dashboard: classes, attendance, live analytics
+  tracking/                On-device attention tracker (MediaPipe)
+  services/                Supabase client and the NeuroBuddy (Edge Function) API
+  shared/                  Used by more than one page: live channels, Markdown, dashboard nav, 3D background
+assets/images/             Images
+assets/models/             3D models
+backend/                   Optional Python prediction service (not used by the web app yet)
+tools/                     Local dev server
+database/                  Reference MySQL schema
+supabase/                  Supabase config, Edge Functions and SQL migrations
+tests/                     Database access-rule tests
+```
 
 ## Sign-in options: Google and password reset
 
 The login page has **Continue with Google**, **Forgot password?** and a confirm-password box on sign-up.
 
-**Password reset** works once the Redirect URLs above are set. Supabase emails a link that opens `login.html?mode=reset`, where the person chooses a new password. Supabase's built-in email sender only sends a few emails per hour, so before real use add your own sender in **Authentication → Emails → SMTP Settings**.
+**Password reset** works once the Redirect URLs above are set. Supabase emails a link that opens `pages/login.html?mode=reset`, where the person chooses a new password. Supabase's built-in email sender only sends a few emails per hour, so before real use add your own sender in **Authentication → Emails → SMTP Settings**.
 
 **Continue with Google** needs a one-time setup (until then the button explains that it isn't turned on):
 

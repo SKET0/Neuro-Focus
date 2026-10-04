@@ -3,7 +3,7 @@
 // attention numbers (never video) stream to that teacher over the private class channel.
 import {
   openClassChannel, teacherStatus, confirmAction, notify, showMessage, missingDatabaseUpdates, showSetupBanner, isMissingSql
-} from "./class-live.js?v=8";
+} from "../shared/class-live.js?v=8";
 
 const app = await window.neuroFocusReady;
 

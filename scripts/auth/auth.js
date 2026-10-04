@@ -1,7 +1,7 @@
 // Login page: sign in, create account (with password confirmation), continue with Google,
 // "forgot password" emails, and choosing a new password from the emailed link.
 // Modes: login | signup | forgot | reset. Elements show per mode with data-modes="…".
-import { getSupabase, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./supabase-client.js";
+import { getSupabase, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "../services/supabase-client.js";
 
 const form = document.querySelector("#authForm");
 if (form) {
