@@ -132,6 +132,10 @@ if (form) {
     if (/already registered|already exists/i.test(text)) return "There’s already an account with that email. Sign in instead, or reset your password.";
     if (/should be different/i.test(text)) return "Choose a password that’s different from your old one.";
     if (/expired|invalid.*(link|token)|otp/i.test(text)) return "That link is invalid or has expired. Request a new one.";
+    // Errors from coming back from Google.
+    if (/exchange external code/i.test(text)) return "Google sign-in couldn’t finish. The Google Client ID or Client Secret saved in Supabase doesn’t match Google Cloud (see README → Sign-in options). You can sign in with email meanwhile.";
+    if (/access_denied|denied|cancel/i.test(text)) return "Google sign-in was cancelled. Try again, or sign in with email.";
+    if (/provider is not enabled|unsupported provider/i.test(text)) return "Google sign-in isn’t turned on for this project yet.";
     return text || "Something went wrong. Please try again.";
   }
 
@@ -282,9 +286,11 @@ if (form) {
   paint();
 
   // Errors from Google or an emailed link come back in the address (e.g. an expired link).
-  const urlError = hashParams.get("error_description") || params.get("error_description");
+  // Supabase sometimes encodes the description twice ("code%3A 4%2F0A…"), so decode once more.
+  const decode = (text) => { try { return decodeURIComponent(text.replace(/\+/g, " ")); } catch { return text; } };
+  const urlError = decode(hashParams.get("error_description") || params.get("error_description") || hashParams.get("error") || params.get("error") || "");
   if (urlError) {
-    showMessage(friendly(urlError.replace(/\+/g, " ")), "error");
+    showMessage(friendly(urlError), "error");
     window.history.replaceState(null, "", `login.html${params.get("mode") === "reset" ? "?mode=reset" : ""}`);
   }
 
