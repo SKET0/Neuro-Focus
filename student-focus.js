@@ -466,9 +466,10 @@ if (app) {
   // saved every 10 seconds together with the session summary. Numbers only, never video.
   const SAMPLE_MS = 5000;
   const SAVE_EVERY_MS = 10000;
-  // A saved session belongs to a class only while the student shares with that class's live session
-  // (student-classes.js); otherwise it is personal history that teachers can't see.
-  const saved = { sessionId: null, creating: null, classId: null, pending: [], window: null, scoreSum: 0, scoreCount: 0, off: false, timer: null, trackedBase: 0, lapseBase: 0 };
+  // A saved session belongs to a class (and that class's live session) only while the student
+  // shares with it (student-classes.js); otherwise it is personal history that teachers can't see.
+  // The database refuses class-linked history outside an open live session.
+  const saved = { sessionId: null, creating: null, classId: null, classSessionId: null, pending: [], window: null, scoreSum: 0, scoreCount: 0, off: false, timer: null, trackedBase: 0, lapseBase: 0 };
   const historyStatus = $("#historyStatus");
   const setHistoryStatus = (text, isError = false) => {
     historyStatus.textContent = text;
@@ -481,7 +482,21 @@ if (app) {
     window.clearInterval(saved.timer);
     Object.assign(saved, { sessionId: null, pending: [], window: null, scoreSum: 0, scoreCount: 0, off: false, trackedBase: trackedMs, lapseBase: lapses });
     saved.classId = window.neuroFocusSharingClassId || null;
-    saved.creating = app.supabase.from("attention_sessions").insert({ class_id: saved.classId }).select("id").single()
+    saved.classSessionId = saved.classId ? window.neuroFocusSharingSessionId || null : null;
+    const insert = (row) => app.supabase.from("attention_sessions").insert(row).select("id").single();
+    saved.creating = insert({ class_id: saved.classId, class_session_id: saved.classSessionId })
+      .then(async (result) => {
+        // Before the live-workflow database update there is no class_session_id column.
+        if (result.error && /class_session_id/.test(result.error.message || "")) result = await insert({ class_id: saved.classId });
+        // Not allowed to share (the session just ended, or the teacher removed this student):
+        // keep the history, but as personal history.
+        if (result.error && saved.classId && (result.error.code === "42501" || /row-level security/i.test(result.error.message || ""))) {
+          saved.classId = null;
+          saved.classSessionId = null;
+          result = await insert({ class_id: null });
+        }
+        return result;
+      })
       .then(({ data, error }) => {
         if (error) throw error;
         saved.sessionId = data.id;
@@ -550,10 +565,13 @@ if (app) {
   // Joining or leaving a live session mid-tracking closes this saved session and starts a new one.
   window.addEventListener("neurofocus:sharing-change", async (event) => {
     const next = event.detail?.classId || null;
-    if (!saved.creating || saved.off || next === saved.classId) return;
+    const nextSession = event.detail?.sessionId || null;
+    if (!saved.creating || saved.off || (next === saved.classId && nextSession === saved.classSessionId)) return;
     window.clearInterval(saved.timer);
     await saveProgress(true);
     startSavedSession();
+    // The finished part (e.g. a live session that just ended) shows in Focus history right away.
+    window.dispatchEvent(new CustomEvent("neurofocus:history-saved"));
   });
   window.addEventListener("neurofocus:attention-update", (event) => recordSample(Date.now(), event.detail));
   window.addEventListener("neurofocus:tracking-stopped", async () => {

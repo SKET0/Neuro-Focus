@@ -3,7 +3,7 @@
 // Marks are taken automatically by the database (see 20261005000000_sessions_attendance.sql).
 // It also publishes "neurofocus:attendance" so the master list (teacher-classes.js) can show
 // each student's attendance and who has joined the live session.
-import { confirmAction, notify, isMissingSql } from "./class-live.js?v=6";
+import { confirmAction, notify, isMissingSql } from "./class-live.js?v=8";
 
 const app = await window.neuroFocusReady;
 
@@ -20,6 +20,7 @@ if (app) {
   let liveSession = window.neuroFocusLiveSession || null;
   let sessions = [];            // newest first
   let rows = [];                // all attendance rows for the class
+  let focus = new Map();        // "sessionId:studentId" -> { tracked, focused } seconds shared in that session
   let missing = false;
   let loadedFor = "";
   let shown = SESSIONS_SHOWN;
@@ -63,10 +64,22 @@ if (app) {
           .select("session_id, student_id, student_name, status, joined_at, last_seen_at, attended_seconds, removed_at, marked_by_teacher")
           .eq("class_id", target).order("session_id").order("student_id"))
       ]);
+      // Attention each student shared during each live session (needs the live-workflow SQL).
+      const linked = await supabase.from("attention_sessions")
+        .select("class_session_id, student_id, tracked_seconds, focus_percent")
+        .eq("class_id", target).not("class_session_id", "is", null).limit(5000);
       if (token !== loadToken || target !== classId) return;
       missing = false;
       sessions = sessionData;
       rows = rowData;
+      focus = new Map();
+      (linked.error ? [] : linked.data).forEach((row) => {
+        const key = `${row.class_session_id}:${row.student_id}`;
+        const entry = focus.get(key) || { tracked: 0, focused: 0 };
+        entry.tracked += row.tracked_seconds || 0;
+        entry.focused += ((row.tracked_seconds || 0) * (row.focus_percent ?? 0)) / 100;
+        focus.set(key, entry);
+      });
     } catch (error) {
       if (token !== loadToken) return;
       missing = isMissingSql(error);
@@ -281,13 +294,13 @@ if (app) {
     const table = el("table", "data-table att-table");
     const head = el("thead");
     const headRow = el("tr");
-    ["Student", "Mark", "Joined", "Time in session", ""].forEach((label) => headRow.append(el("th", "", label)));
+    ["Student", "Mark", "Joined", "Time in session", "Focus", ""].forEach((label) => headRow.append(el("th", "", label)));
     head.append(headRow);
     const body = el("tbody");
     if (!sessionRows.length) {
       const row = el("tr");
       const cell = el("td", "empty-state", "No one was on the master list for this session.");
-      cell.colSpan = 5;
+      cell.colSpan = 6;
       row.append(cell);
       body.append(row);
     }
@@ -313,7 +326,11 @@ if (app) {
       if (row.marked_by_teacher) markCell.append(el("span", "edited-tag", "edited"));
       const notes = el("td", "muted");
       if (row.removed_at) notes.textContent = `Removed from session ${time(row.removed_at)}`;
-      tr.append(name, markCell, el("td", "", row.joined_at ? time(row.joined_at) : "—"), el("td", "", minutes(row.attended_seconds)), notes);
+      const shared = focus.get(`${session.id}:${row.student_id}`);
+      const focusText = shared?.tracked >= 5 ? `${Math.round((shared.focused / shared.tracked) * 100)}% of ${minutes(shared.tracked)}` : "—";
+      const focusCell = el("td", shared?.tracked >= 5 ? "" : "muted", focusText);
+      focusCell.title = shared?.tracked >= 5 ? "Share of tracked time spent looking at the screen" : "No attention was shared in this session";
+      tr.append(name, markCell, el("td", "", row.joined_at ? time(row.joined_at) : "—"), el("td", "", minutes(row.attended_seconds)), focusCell, notes);
       body.append(tr);
     });
     table.append(head, body);

@@ -7,9 +7,6 @@ if (video) {
   const shiftedOutput = document.querySelector("#shiftedPercent");
   const placeholder = document.querySelector("#cameraPlaceholder");
 
-  // Communication channel shared with the teacher dashboard
-  const attentionChannel = new BroadcastChannel("neurofocus_telemetry");
-
   const visionVersion = "0.10.14";
   const visionBase = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${visionVersion}`;
   const modelUrl = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
@@ -26,13 +23,14 @@ if (video) {
   const SEQUENCE_WINDOW_SIZE = 15;
   const defaultStartLabel = "Start attention tracking";
 
+  // Readings stay on this page (stats, nudges, saved history). They reach a teacher only through
+  // student-classes.js, during a live session the student has joined.
   function publish(payload) {
-    // 1. Custom event for listeners on this page (stats, nudges, session log)
     window.dispatchEvent(new CustomEvent("neurofocus:attention-update", { detail: payload }));
-    // 2. Broadcast to other open tabs in this browser
-    attentionChannel.postMessage(payload);
   }
 
+  // Share of readings this session where the student was looking at the screen.
+  // Time with no face in view counts as not focused.
   const cumulative = () => (sampleCount ? Math.max(0, Math.round(((sampleCount - awayCount) / sampleCount) * 100)) : 100);
 
   function showError(text) {
@@ -61,6 +59,8 @@ if (video) {
       const result = landmarker.detectForVideo(video, performance.now());
       const face = result.faceLandmarks?.[0];
       if (!face || face.length < 478) {
+        sampleCount += 1;
+        awayCount += 1;
         status.textContent = "Subject out of frame";
         message.textContent = "Face the webcam directly. Real-time landmark tracking paused.";
         publish({ timestamp: Date.now(), score: 0, attentionScore: 0, cumulativeFocus: cumulative(), state: "Away", gazeRatio: null });

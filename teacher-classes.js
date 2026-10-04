@@ -5,7 +5,7 @@
 // Live updates use private Supabase Realtime class channels (class-live.js).
 import {
   openClassChannel, onlineStudentIds, confirmAction, notify, copyText, missingDatabaseUpdates, showSetupBanner, isMissingSql
-} from "./class-live.js?v=6";
+} from "./class-live.js?v=8";
 
 const app = await window.neuroFocusReady;
 
@@ -38,6 +38,7 @@ if (app) {
   let invites = new Map();         // studentId -> time of the last "please join" ping
   let attendance = { classId: "", current: new Map(), byStudent: new Map() }; // from teacher-attendance.js
   let lastInviteKey = "";
+  let lastJoinRefresh = 0;
   let presenceWarned = false;
   let channelWarned = false;
 
@@ -121,6 +122,40 @@ if (app) {
   // ---------- Saved live sessions ----------
   // The open session in the database is the source of truth (it works across devices);
   // before the attendance SQL is run, the live state is kept on this device only.
+  // Sessions whose dashboard was closed for 15+ minutes (e.g. "End" was never pressed) are
+  // ended at their last activity so attendance is finalized. Needs the live-workflow SQL.
+  async function closeStaleSessions() {
+    const { data, error } = await supabase.rpc("close_stale_sessions", { p_minutes: 15 });
+    if (error || !Array.isArray(data) || !data.length) return;
+    data.forEach((row) => {
+      const item = classes.find((entry) => entry.id === row.class_id);
+      notify({
+        title: "A live session was ended for you",
+        text: `${item?.name || "A class"}: the session from ${clock(row.started_at)} ended at ${clock(row.ended_at)}, when this dashboard was last open. Attendance is saved.`,
+        kind: "info",
+        timeoutMs: 20000,
+        actions: item ? [{ label: "View attendance", onClick: () => openClass(item.id, "attendance") }] : []
+      });
+    });
+    refreshAttendance();
+  }
+
+  // While live, tell the database the dashboard is still here (see closeStaleSessions).
+  async function keepSessionAlive() {
+    if (!live?.sessionId || !hasSessions) return;
+    const { data, error } = await supabase.rpc("keep_session_alive", { p_session_id: live.sessionId });
+    if (error) return; // older database without this function, or offline: try again next time
+    if (data === false) {
+      // Ended somewhere else (another device, or closed after a long absence).
+      await loadOpenSession();
+      renderClassHeader();
+      renderClassGrid();
+      refreshAttendance();
+    }
+  }
+  window.setInterval(() => { void keepSessionAlive(); }, 60000);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") void keepSessionAlive(); });
+
   async function loadOpenSession() {
     const { data, error } = await supabase.from("class_sessions")
       .select("id, class_id, started_at").is("ended_at", null)
@@ -261,6 +296,12 @@ if (app) {
   function handleBroadcast(classId, event, payload) {
     if (event === "attention") {
       if (!payload.studentId || live?.classId !== classId || sessionRemovedIds.has(payload.studentId)) return;
+      // Scores from someone not yet marked as joined: they just checked in, so refresh attendance now.
+      if (payload.state !== "Stopped" && attendance.classId === classId && !attendance.current.get(payload.studentId)?.joined_at
+        && Date.now() - lastJoinRefresh > 3000) {
+        lastJoinRefresh = Date.now();
+        window.setTimeout(refreshAttendance, 1200);
+      }
       const map = sharing.get(classId) || new Map();
       sharing.set(classId, map);
       if (payload.state === "Stopped") map.delete(payload.studentId);
@@ -1005,7 +1046,9 @@ if (app) {
   void recheckSetup();
   try {
     await loadClasses();
+    await closeStaleSessions();
     await loadOpenSession();
+    void keepSessionAlive();
     let start = "";
     try { start = localStorage.getItem(selectedKey) || ""; } catch { /* storage unavailable */ }
     if (live && classes.some((item) => item.id === live.classId)) openClass(live.classId, "live");

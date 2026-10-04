@@ -4,7 +4,7 @@
 // and quiz the student on a note with flashcards.
 import { streamAssistant } from "./assistant-api.js?v=1";
 import { renderMarkdown, toMarkdown, markdownToPlain, markdownToHtml } from "./markdown.js?v=1";
-import { confirmAction } from "./class-live.js?v=6";
+import { confirmAction } from "./class-live.js?v=8";
 
 const app = await window.neuroFocusReady;
 

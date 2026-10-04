@@ -133,6 +133,44 @@ It saves every live session (`class_sessions`) and takes attendance (`session_at
 
 Without this update, live sessions still work as before, but nothing is saved and attendance isn't taken.
 
+## Live workflow update (run after the sessions and attendance update)
+
+Run `supabase/migrations/20261006000000_live_workflow_hardening.sql` once in the SQL Editor. It is safe to run again.
+
+- **Shared attention history is tied to the live session it came from.** The database only lets a student save class-linked history while that class has an open live session they haven't been removed from. Everything else stays personal, so teachers only ever see attention recorded during their own live sessions.
+- **Sessions can't be left open forever.** The teacher's dashboard checks in every minute while live. If it was closed without pressing **End**, the session is ended at the dashboard's last activity the next time the teacher opens Neuro-Focus, and students who never joined are marked absent.
+
+## The full class workflow
+
+1. **Teacher creates a class** (`create_class`) and shares the join code.
+2. **Student joins** (`join_class`) and appears on the teacher's master list straight away.
+3. **Teacher starts a live session** (`start_class_session`): a saved session is created and everyone on the master list is invited.
+4. **Student joins and tracks:** the attention tracker runs on the student's device. While they're in the session their browser checks in every 30 seconds (`check_in_session`, marking them present or late) and sends numbers only (score, state, focus) to the teacher. Video never leaves the device.
+5. **Teacher receives updates** on the Live monitor every second, and can remove a student from the session, let them back in or invite them again.
+6. **Session ends** (`end_class_session`, or automatically after the dashboard has been gone for 15 minutes): no-shows are marked absent.
+7. **Saved records:** attendance (Attendance tab, spreadsheet download), shared attention history per session (History tab, plus a Focus column in each session's attendance), and the student's own Focus history, which includes their personal tracking too.
+
+## Privacy and access rules
+
+Enforced by the database (Row Level Security), not just by the pages:
+
+| Data | Student | Their teacher | Classmates / other teachers |
+|---|---|---|---|
+| Profile name | Own only | Students in their classes | No |
+| Class membership | Own rows | Their classes | No |
+| Attendance | Own rows | Their classes | No |
+| Attention history and samples | All of their own | Only what was shared during that teacher's live sessions | No |
+| Notes | Own | No | No |
+| Live scores (realtime) | Can send in their own classes | Receives | Never receive |
+
+`tests/access-rules.test.mjs` checks all of this against every migration in an in-memory Postgres: `cd tests && npm install && npm test`.
+
+**Demonstration data:** the Live monitor's **Simulator (demo)** only uses made-up "Demo ·" learners, never real students. It shows a DEMO MODE banner, saves nothing, and its export is named `DEMO-simulated` and marked as demo. The dashboard always opens on the live classroom, and starting a real session switches out of the simulator.
+
+**Known limits:**
+- Live scores are reported by each student's browser, so a student could send made-up numbers for themselves. Realtime messages can't prove who sent them, so another class member could also post numbers under a classmate's ID to the teacher's live view. Students act on "removed" messages only after checking with the database. The saved records (attendance and history) are always written as the signed-in student and checked by the database.
+- Students in a class can see which (anonymous) account IDs are online in it, because Supabase presence is shared by everyone on the channel. They can't look those IDs up to find names.
+
 ## Test a teacher and a student side by side
 
 A browser keeps one sign-in per web address, shared by all its tabs, so two tabs on `http://localhost:8000` are always the same account. Use two addresses instead:
