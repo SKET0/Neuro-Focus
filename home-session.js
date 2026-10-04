@@ -12,7 +12,12 @@ function setLink(element, href, label) {
   else element.textContent = label;
 }
 
-try {
+// A password-reset link that landed here (the project's Site URL) belongs on the login page,
+// which lets the person choose a new password. Forward it before Supabase reads the link.
+const forwardingReset = /type=recovery/.test(window.location.hash);
+if (forwardingReset) window.location.replace(`login.html?mode=reset${window.location.hash}`);
+
+if (!forwardingReset) try {
   const supabase = await getSupabase();
   const { data: { session } } = await supabase.auth.getSession();
 

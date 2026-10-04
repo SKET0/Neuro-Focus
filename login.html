@@ -162,6 +162,25 @@
     .role-option small { display: block; font-size: 12px; color: var(--text-muted); line-height: 1.45; }
     .role-option.active { border-color: rgba(0, 217, 255, 0.5); background: rgba(0, 217, 255, 0.05); box-shadow: 0 0 0 3px rgba(0, 217, 255, 0.07); }
 
+    /* Google button (Google's dark-theme sign-in style) + divider */
+    .oauth { display: flex; flex-direction: column; gap: 16px; }
+    .btn-google {
+      display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; padding: 11px 16px; border-radius: 10px;
+      background: #131314; border: 1px solid #8e918f; color: #e3e3e3; font-size: 14px; font-weight: 600; cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+    .btn-google:hover { background: #1c1c1e; border-color: #b4b7b5; }
+    .btn-google:disabled { opacity: 0.6; cursor: progress; }
+    .google-g { width: 18px; height: 18px; flex: none; }
+    .divider { display: flex; align-items: center; gap: 12px; font-size: 12px; color: #6b6b75; }
+    .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+    .label-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .text-button.small { font-size: 12.5px; text-transform: none; letter-spacing: 0; font-weight: 600; }
+    .match-hint:empty { display: none; }
+    .match-hint[data-state="ok"] { color: #86efac; }
+    .match-hint[data-state="error"] { color: #fca5a5; }
+    .message-action { display: block; margin-top: 6px; font-size: 13px; }
+
     /* Status message */
     .form-message {
       display: flex; align-items: flex-start; gap: 10px; font-size: 13px; color: var(--text-soft); line-height: 1.5;
@@ -261,8 +280,9 @@
     <section class="auth-intro" aria-labelledby="introTitle">
       <p class="eyebrow-pill"><span class="tag"><svg><use href="#i-shield"/></svg>PRIVATE</span> Video never leaves your device</p>
       <h1 class="auth-title" id="introTitle">
-        <span data-show-mode="login">Welcome back to <span class="gradient-text">focused learning.</span></span>
-        <span data-show-mode="signup" hidden>Start learning with <span class="gradient-text">focus that adapts.</span></span>
+        <span data-modes="login">Welcome back to <span class="gradient-text">focused learning.</span></span>
+        <span data-modes="signup" hidden>Start learning with <span class="gradient-text">focus that adapts.</span></span>
+        <span data-modes="forgot reset" hidden>Let’s get you back to <span class="gradient-text">focused learning.</span></span>
       </h1>
       <p class="auth-lead">
         One account for your Neuro-Focus workspace. Pick up your focus sessions, notes and classes right where you left off.
@@ -289,18 +309,25 @@
         <span class="chip-icon"><svg><use href="#i-lock"/></svg></span>
         <div>
           <h2 id="auth-title">Sign in</h2>
-          <p data-show-mode="login">Use the email and password for your account.</p>
-          <p data-show-mode="signup" hidden>Free for students and teachers.</p>
+          <p id="authSubtitle">Use the email and password for your account.</p>
         </div>
       </div>
 
-      <div class="segmented" role="group" aria-label="Choose form mode">
+      <div class="segmented" role="group" aria-label="Choose form mode" data-modes="login signup">
         <button class="active" type="button" data-mode="login">Sign in</button>
         <button type="button" data-mode="signup">Create account</button>
       </div>
 
+      <div class="oauth" data-modes="login signup">
+        <button class="btn-google" type="button" id="googleButton">
+          <svg class="google-g" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+          <span>Continue with Google</span>
+        </button>
+        <div class="divider" role="separator"><span>or use your email</span></div>
+      </div>
+
       <form id="authForm" class="auth-form">
-        <fieldset class="role-picker signup-only" id="roleChoice" hidden>
+        <fieldset class="role-picker" id="roleChoice" data-modes="signup" hidden>
           <legend>I'm joining as</legend>
           <div class="role-options">
             <button class="role-option active" type="button" data-role="student">
@@ -314,34 +341,48 @@
           </div>
         </fieldset>
 
-        <label class="field-label signup-only" hidden>
-          Full name
+        <div class="field-label" data-modes="signup" hidden>
+          <label for="fullNameField">Full name</label>
           <span class="field-wrap">
             <svg class="icon"><use href="#i-user"/></svg>
             <input id="fullNameField" class="field-input" name="fullName" type="text" autocomplete="name" placeholder="Your full name" required disabled>
           </span>
-        </label>
-        <label class="field-label">
-          Email address
+        </div>
+        <div class="field-label" data-modes="login signup forgot">
+          <label for="emailField">Email address</label>
           <span class="field-wrap">
             <svg class="icon"><use href="#i-mail"/></svg>
             <input id="emailField" class="field-input" name="email" type="email" autocomplete="email" placeholder="name@school.edu" required>
           </span>
-        </label>
-        <label class="field-label">
-          Password
+        </div>
+        <div class="field-label" data-modes="login signup reset">
+          <span class="label-row">
+            <label for="passwordField" id="passwordLabel">Password</label>
+            <button class="text-button small" type="button" data-mode-link="forgot" data-modes="login">Forgot password?</button>
+          </span>
           <span class="field-wrap">
             <svg class="icon"><use href="#i-lock"/></svg>
             <input id="passwordField" class="field-input has-toggle" name="password" type="password" autocomplete="current-password" minlength="8" placeholder="Your password" required>
             <button class="reveal-toggle" id="passwordToggle" type="button" aria-label="Show password" aria-pressed="false"><svg><use href="#i-eye"/></svg></button>
           </span>
-          <span class="hint signup-only" hidden>At least 8 characters.</span>
-        </label>
+          <span class="hint" data-modes="signup reset" hidden>At least 8 characters.</span>
+        </div>
+        <div class="field-label" data-modes="signup reset" hidden>
+          <label for="confirmField">Confirm password</label>
+          <span class="field-wrap">
+            <svg class="icon"><use href="#i-lock"/></svg>
+            <input id="confirmField" class="field-input" name="confirmPassword" type="password" autocomplete="new-password" minlength="8" placeholder="Type it again" required disabled>
+          </span>
+          <span class="hint match-hint" id="matchHint" aria-live="polite"></span>
+        </div>
 
-        <p class="form-message" id="authMessageBox" hidden>
+        <div class="form-message" id="authMessageBox" hidden>
           <svg class="icon"><use href="#i-info"/></svg>
-          <span id="authMessage" role="status" aria-live="polite"></span>
-        </p>
+          <div>
+            <span id="authMessage" role="status" aria-live="polite"></span>
+            <button class="text-button message-action" type="button" id="authMessageAction" hidden></button>
+          </div>
+        </div>
 
         <button class="btn-primary" type="submit">
           <span class="spinner" aria-hidden="true"></span>
@@ -351,8 +392,10 @@
       </form>
 
       <div class="card-foot">
-        <p class="switch-line" data-show-mode="login">New to Neuro-Focus? <button class="text-button" type="button" data-mode-link="signup">Create an account</button></p>
-        <p class="switch-line" data-show-mode="signup" hidden>Already have an account? <button class="text-button" type="button" data-mode-link="login">Sign in</button></p>
+        <p class="switch-line" data-modes="login">New to Neuro-Focus? <button class="text-button" type="button" data-mode-link="signup">Create an account</button></p>
+        <p class="switch-line" data-modes="signup" hidden>Already have an account? <button class="text-button" type="button" data-mode-link="login">Sign in</button></p>
+        <p class="switch-line" data-modes="forgot" hidden>Remembered it? <button class="text-button" type="button" data-mode-link="login">Back to sign in</button></p>
+        <p class="switch-line" data-modes="reset" hidden>Changed your mind? <button class="text-button" type="button" id="cancelReset">Cancel and sign out</button></p>
         <p class="fine-print"><svg><use href="#i-shield"/></svg>Secured with Supabase Auth</p>
       </div>
     </section>
@@ -370,6 +413,6 @@
   </footer>
 
   <script src="neural-background.js?v=2"></script>
-  <script type="module" src="auth.js?v=3"></script>
+  <script type="module" src="auth.js?v=4"></script>
 </body>
 </html>

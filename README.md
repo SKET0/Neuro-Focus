@@ -14,7 +14,7 @@ A student-centered classroom prototype built with static HTML/CSS/JavaScript, Su
    supabase link --project-ref awklqioisiiyaqixnnbl
    supabase db push
    ```
-4. Add `http://localhost:8000/login.html` to **Authentication → URL Configuration → Redirect URLs**.
+4. In **Authentication → URL Configuration**, set **Site URL** to `http://localhost:8000` and add `http://localhost:8000/**` and `http://127.0.0.1:8000/**` to **Redirect URLs** (plus `http://localhost:8001/**` etc. if you run extra test ports). Email confirmation, password reset and Google sign-in links only return to addresses on this list.
 5. Serve this folder over HTTP with the included dev server, which turns off browser caching so your edits always show up:
 
    ```sh
@@ -22,6 +22,22 @@ A student-centered classroom prototype built with static HTML/CSS/JavaScript, Su
    ```
 
    Then open `http://localhost:8000`. Do not use `file://`; ES modules and camera access require localhost or HTTPS.
+
+## Sign-in options: Google and password reset
+
+The login page has **Continue with Google**, **Forgot password?** and a confirm-password box on sign-up.
+
+**Password reset** works once the Redirect URLs above are set. Supabase emails a link that opens `login.html?mode=reset`, where the person chooses a new password. Supabase's built-in email sender only sends a few emails per hour, so before real use add your own sender in **Authentication → Emails → SMTP Settings**.
+
+**Continue with Google** needs a one-time setup (until then the button explains that it isn't turned on):
+
+1. In [Google Cloud Console](https://console.cloud.google.com/), open **APIs & Services → OAuth consent screen**, choose **External**, and fill in the app name and support email. While the app is in *Testing*, add the Gmail accounts that may sign in under **Test users**.
+2. Go to **Credentials → Create credentials → OAuth client ID → Web application**.
+   - **Authorized JavaScript origins:** `http://localhost:8000` (and any other addresses you use).
+   - **Authorized redirect URIs:** `https://awklqioisiiyaqixnnbl.supabase.co/auth/v1/callback`
+3. Copy the client ID and client secret into **Supabase → Authentication → Sign In / Providers → Google**, turn it on and save.
+
+People who continue with Google get a student account named after their Google profile. Teachers are promoted with the SQL below, the same as email accounts. If someone already has an email account with the same Gmail address, Supabase links the two.
 
 ## Enable a teacher account
 
@@ -102,6 +118,21 @@ Run this once. It is safe to run again.
 
 It adds `student_notes`: each student can keep any number of notes, filed under one of their classes or kept personal. Existing class notes are copied in automatically. Students always keep their own notes, even after leaving a class, and teachers can never read them. The old `class_notes` table is no longer used by the app.
 
+## Sessions and attendance update (master list invites, remove from session, attendance)
+
+Run this once, after the updates above. It is safe to run again.
+
+1. Open **Supabase Dashboard → SQL Editor → New query**.
+2. Paste the whole of `supabase/migrations/20261005000000_sessions_attendance.sql` and click **Run**.
+
+It saves every live session (`class_sessions`) and takes attendance (`session_attendance`):
+
+- **Master list:** everyone who has joined a class. Starting a live session invites the whole list automatically, including students who join the class during the session. **Invite again** re-sends the invite to a student who hasn't joined.
+- **Remove from session:** takes a student out of the current live session only. Their focus stops being shared and they can't rejoin it until you press **Let back in**. They stay on the master list and are invited to the next session. **⋯ → Remove from class** is still there for taking someone off the list.
+- **Attendance:** students are marked present when they join, late if they join after the class's late threshold (10 minutes by default, set in **Settings**), and absent if they never join before you end the session. Teachers can change any mark to present, late, absent or excused in the **Attendance** tab and download a spreadsheet. Attendance records keep the student's name, so they survive the student leaving the class. Students see their own attendance on their class cards.
+
+Without this update, live sessions still work as before, but nothing is saved and attendance isn't taken.
+
 ## Test a teacher and a student side by side
 
 A browser keeps one sign-in per web address, shared by all its tabs, so two tabs on `http://localhost:8000` are always the same account. Use two addresses instead:
@@ -116,7 +147,7 @@ If one tab's account changes because another tab on the same address signed in o
 ## How classes and learning tools work
 
 - Teachers create classes and get a unique join code. They can add a password; class passwords are hashed in the database and are never returned to the browser.
-- Each class has four tabs for the teacher: **Live monitor**, **Students** (online status, **Remove**), **History** (saved sessions) and **Settings** (rename, open/close joining, password, new join code, delete).
+- Each class has five tabs for the teacher: **Live monitor**, **Master list** (online status, session status, attendance rate, **Remove from session**, **Remove from class**), **Attendance**, **History** (saved attention sessions) and **Settings** (rename, open/close joining, late threshold, password, new join code, delete).
 - Students join by code, and must also provide the password if one was set. Students already in a class can always rejoin; new students need joining to be open.
 - Students share attention scores (never video) only while their teacher runs a live session in the class they are working in. Outside a live session their saved history is personal and teachers can't see it.
 - A student's notes belong to their account (Row Level Security). They can file a note under one of their classes or keep it personal. Teachers do not have access to those notes.

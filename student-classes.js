@@ -2,8 +2,8 @@
 // leaving classes, and live sessions. During a teacher's live session the student's
 // attention numbers (never video) stream to that teacher over the private class channel.
 import {
-  openClassChannel, teacherStatus, confirmAction, notify, showMessage, missingDatabaseUpdates, showSetupBanner
-} from "./class-live.js?v=5";
+  openClassChannel, teacherStatus, confirmAction, notify, showMessage, missingDatabaseUpdates, showSetupBanner, isMissingSql
+} from "./class-live.js?v=6";
 
 const app = await window.neuroFocusReady;
 
@@ -29,10 +29,20 @@ if (app) {
   const leftClasses = new Set();   // classes this student left on purpose (not a removal)
   const liveNotices = new Map();   // classId -> close() for its "live session" notice
   let membershipTicks = 0;
+  const invitePings = new Map();   // classId -> last "please join" ping seen from the teacher
+  const myAttendance = new Map();  // classId -> { attended, counted } over finished sessions
+  let joinedSessionId = null;      // session the student pressed "Join session" for
+  let checkIn = { sessionId: null, timer: null, status: "" };
+  const CHECK_IN_MS = 30000;
   const shareToggle = $("#shareToggle");
   const shareStatus = $("#shareStatus");
 
   const current = () => classes.find((item) => item.id === currentId) || null;
+  // Removed from the live session by the teacher (still in the class).
+  const removedFromSession = (classId) => {
+    const status = teacher.get(classId);
+    return Boolean(status?.live && status.sessionRemoved?.includes(app.user.id));
+  };
   const missingSql = (error) => error && (error.code === "42501" || /permission denied/.test(error.message || ""));
   const clock = (iso) => (iso ? new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "");
 
@@ -49,11 +59,29 @@ if (app) {
     const removedNow = previous.filter((item) => !classes.some((other) => other.id === item.id) && !leftClasses.has(item.id));
     removedNow.forEach((item) => { void handleRemoved(item, { confirmed: true }); });
     if (!classes.some((item) => item.id === currentId)) currentId = classes[0]?.id || "";
+    void loadMyAttendance();
     // Other modules (student-notes.js) list every class the student is in.
     window.neuroFocusClasses = classes.map(({ id, name }) => ({ id, name }));
     window.dispatchEvent(new CustomEvent("neurofocus:classlist", { detail: window.neuroFocusClasses }));
     watchChannels();
     selectClass(currentId);
+  }
+
+  // The student's own attendance per class (finished sessions only).
+  async function loadMyAttendance() {
+    const { data, error } = await supabase.from("session_attendance")
+      .select("class_id, status, class_sessions(ended_at)")
+      .eq("student_id", app.user.id);
+    if (error) return;
+    myAttendance.clear();
+    (data || []).forEach((row) => {
+      if (!row.class_sessions?.ended_at || row.status === "excused") return;
+      const stats = myAttendance.get(row.class_id) || { attended: 0, counted: 0 };
+      stats.counted += 1;
+      if (row.status === "present" || row.status === "late") stats.attended += 1;
+      myAttendance.set(row.class_id, stats);
+    });
+    renderCards();
   }
 
   function selectClass(id) {
@@ -139,13 +167,51 @@ if (app) {
       void handleRemoved(item);
       return;
     }
-    if (status.live && !previous.live) {
-      const alreadyIn = classId === currentId && tracking;
+    const sessionRemovedNow = Boolean(status.live && status.sessionRemoved.includes(app.user.id));
+    const sessionRemovedBefore = Boolean(previous.live && previous.sessionId === status.sessionId && previous.sessionRemoved?.includes(app.user.id));
+    const ping = status.live ? status.invites?.[app.user.id] : null;
+    const newPing = Boolean(ping && ping !== invitePings.get(classId));
+    if (ping) invitePings.set(classId, ping);
+    const alreadyIn = classId === currentId && tracking && !sessionRemovedNow;
+
+    if (sessionRemovedNow && !sessionRemovedBefore) {
+      liveNotices.get(classId)?.();
+      liveNotices.delete(classId);
+      if (joinedSessionId === status.sessionId) joinedSessionId = null;
+      notify({
+        title: `You were removed from the live session in ${item.name}`,
+        text: "Your focus is no longer shared. You’re still in the class and will be invited to the next session.",
+        kind: "error",
+        timeoutMs: 15000
+      });
+    } else if (!sessionRemovedNow && sessionRemovedBefore && status.live) {
+      // Still tracking in this class: sharing resumes by itself.
+      const resumes = classId === currentId && tracking && shareToggle?.checked;
+      liveNotices.get(classId)?.();
+      liveNotices.set(classId, notify({
+        title: resumes ? `You’re back in the session in ${item.name}` : `You can rejoin the session in ${item.name}`,
+        text: resumes ? "Your teacher let you back in, so your focus is shared again." : "Your teacher let you back into the live session.",
+        kind: "live",
+        timeoutMs: 20000,
+        actions: resumes ? [] : [{ label: "Join session", primary: true, onClick: () => joinSession(classId) }]
+      }));
+    } else if (status.live && previous.live && newPing && !firstSync && !sessionRemovedNow && !alreadyIn) {
+      liveNotices.get(classId)?.();
+      liveNotices.set(classId, notify({
+        title: `Your teacher is inviting you to join ${item.name}`,
+        text: "The live session is on. Join to share your focus (never your video).",
+        kind: "live",
+        timeoutMs: 30000,
+        actions: [{ label: "Join session", primary: true, onClick: () => joinSession(classId) }]
+      }));
+    }
+
+    if (status.live && !previous.live && !sessionRemovedNow) {
       if (!alreadyIn) {
         liveNotices.get(classId)?.();
         liveNotices.set(classId, notify({
           title: firstSync ? `Live session in ${item.name}` : `${item.name} is live now`,
-          text: "Your teacher started a live session. Join to share your focus (never your video).",
+          text: "You’re invited: your teacher started a live session. Join to share your focus (never your video).",
           kind: "live",
           timeoutMs: 20000,
           actions: [{ label: "Join session", primary: true, onClick: () => joinSession(classId) }]
@@ -195,7 +261,7 @@ if (app) {
 
   // Scores go to the teacher only while their live session is on and sharing is allowed.
   function updateSharing() {
-    const live = Boolean(currentId && teacher.get(currentId)?.live);
+    const live = Boolean(currentId && teacher.get(currentId)?.live) && !removedFromSession(currentId);
     const next = live && shareToggle?.checked ? currentId : null;
     if (next !== sharingClassId) {
       if (sharingClassId) sendAttention(sharingClassId, { state: "Stopped" });
@@ -220,12 +286,18 @@ if (app) {
   // ---------- Live session actions ----------
   function joinSession(classId) {
     if (!classes.some((item) => item.id === classId)) return;
+    if (removedFromSession(classId)) {
+      notify({ title: "You can’t join this session", text: "Your teacher removed you from it. Ask them to let you back in.", kind: "error" });
+      return;
+    }
+    joinedSessionId = teacher.get(classId)?.sessionId || null;
     if (classId !== currentId) selectClass(classId);
     if (shareToggle && !shareToggle.checked) {
       shareToggle.checked = true;
       shareToggle.dispatchEvent(new Event("change"));
     }
     window.dispatchEvent(new CustomEvent("neurofocus:start-camera"));
+    render(); // checks in for attendance even if the camera is slow to start
     // Show the dashboard view (student-ui.js) with the tracker in sight.
     window.location.hash = "dashboard";
     window.setTimeout(() => document.querySelector("#focus-session")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
@@ -236,8 +308,37 @@ if (app) {
     if (stop && !stop.hidden) stop.click();
   }
 
+  // ---------- Attendance check-in ----------
+  // While the student is in a live session (sharing, and tracking or having pressed Join), the
+  // database marks them present or late and counts their minutes; repeated every 30 seconds.
+  function updateCheckIn() {
+    const status = currentId ? teacher.get(currentId) : null;
+    const inSession = status?.live && status.sessionId && sharingClassId === currentId
+      && (tracking || joinedSessionId === status.sessionId);
+    const sessionId = inSession ? status.sessionId : null;
+    if (sessionId === checkIn.sessionId) return;
+    window.clearInterval(checkIn.timer);
+    checkIn = { sessionId, timer: null, status: "" };
+    if (!sessionId) return;
+    const beat = async () => {
+      const { data, error } = await supabase.rpc("check_in_session", { p_session_id: sessionId });
+      if (checkIn.sessionId !== sessionId) return;
+      if (error) {
+        if (isMissingSql(error)) window.clearInterval(checkIn.timer); // attendance SQL not run yet
+        return;
+      }
+      if (data?.status && data.status !== checkIn.status) {
+        checkIn.status = data.status;
+        renderBanner();
+      }
+    };
+    void beat();
+    checkIn.timer = window.setInterval(() => { void beat(); }, CHECK_IN_MS);
+  }
+
   // ---------- Rendering ----------
   function render() {
+    updateCheckIn();
     renderSidebar();
     renderCards();
     renderBanner();
@@ -303,8 +404,15 @@ if (app) {
       const state = document.createElement("div");
       state.className = "my-class-status";
       state.dataset.live = String(Boolean(status?.live));
-      if (status?.live) state.append(liveDot(), `Live session since ${clock(status.since)}`);
+      if (status?.live && removedFromSession(item.id)) state.append(liveDot(), "Live session · you were removed from it");
+      else if (status?.live) state.append(liveDot(), `Live session since ${clock(status.since)}`);
       else state.textContent = status?.online ? "Teacher online · no live session" : "No live session";
+      const stats = myAttendance.get(item.id);
+      const attendanceLine = document.createElement("div");
+      attendanceLine.className = "my-class-attendance";
+      attendanceLine.textContent = stats?.counted
+        ? `Attendance ${Math.round((stats.attended / stats.counted) * 100)}% · ${stats.attended} of ${stats.counted} session${stats.counted === 1 ? "" : "s"}`
+        : "Attendance: no finished sessions yet";
 
       const actions = document.createElement("div");
       actions.className = "my-class-actions";
@@ -321,7 +429,7 @@ if (app) {
         tag.textContent = "✓ Current class";
         actions.append(tag);
       }
-      if (status?.live && !(item.id === currentId && tracking)) {
+      if (status?.live && !removedFromSession(item.id) && !(item.id === currentId && tracking)) {
         const join = document.createElement("button");
         join.type = "button";
         join.className = "btn-join";
@@ -337,7 +445,7 @@ if (app) {
       leave.addEventListener("click", () => leaveClass(item));
       actions.append(leave);
 
-      card.append(title, code, state, actions);
+      card.append(title, code, state, attendanceLine, actions);
       grid.append(card);
     });
   }
@@ -376,10 +484,16 @@ if (app) {
       banner.dataset.state = "error";
       kicker.textContent = "Live features unavailable";
       sub.textContent = `Live sessions can’t connect. ${SETUP_TEXT}`;
+    } else if (status?.live && removedFromSession(item.id)) {
+      banner.dataset.state = "error";
+      kicker.textContent = "Removed from this live session";
+      sub.textContent = "Your teacher removed you from today’s session, so your focus isn’t shared. You’re still in the class and will be invited to the next session.";
     } else if (status?.live && tracking && shareToggle?.checked) {
       banner.dataset.state = "sharing";
-      kicker.append(liveDot(), "You’re in the live session");
-      sub.textContent = "Your teacher sees your attention score, never your video.";
+      kicker.append(liveDot(), checkIn.status === "late" ? "You’re in the live session · marked late" : "You’re in the live session");
+      sub.textContent = checkIn.status
+        ? "Your attendance is recorded. Your teacher sees your attention score, never your video."
+        : "Your teacher sees your attention score, never your video.";
       actions.append(bannerButton("Leave session", "btn-action", leaveSession));
     } else if (status?.live) {
       banner.dataset.state = "live";
@@ -410,6 +524,7 @@ if (app) {
     let state = "";
     if (item && blockedClasses.has(item.id)) text = `Live sharing is unavailable. ${SETUP_TEXT}`;
     else if (!item) text = "Not shared · join a class to share your focus with a teacher.";
+    else if (live && removedFromSession(item.id)) text = "Not shared · your teacher removed you from this live session.";
     else if (!shareToggle?.checked) text = "Sharing paused · your teacher can’t see your focus.";
     else if (!live) text = `Private · your teacher in ${item.name} can only see your focus during a live session.`;
     else if (tracking) {

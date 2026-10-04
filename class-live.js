@@ -48,6 +48,8 @@ export function onlineStudentIds(state) {
   return new Set(Object.keys(state).filter((key) => state[key].some((meta) => meta.role === "student")));
 }
 
+// removed: students just removed from the class. sessionRemoved: students removed from the
+// live session only (they stay in the class). invites: { studentId: time } "please join" pings.
 export function teacherStatus(state) {
   const metas = Object.values(state).flat().filter((meta) => meta.role === "teacher");
   const live = metas.find((meta) => meta.live);
@@ -55,7 +57,10 @@ export function teacherStatus(state) {
     online: metas.length > 0,
     live: Boolean(live),
     since: live?.since || null,
-    removed: metas.flatMap((meta) => (Array.isArray(meta.removed) ? meta.removed : []))
+    sessionId: live?.sessionId || null,
+    removed: metas.flatMap((meta) => (Array.isArray(meta.removed) ? meta.removed : [])),
+    sessionRemoved: Array.isArray(live?.sessionRemoved) ? live.sessionRemoved : [],
+    invites: live?.invites && typeof live.invites === "object" ? live.invites : {}
   };
 }
 
@@ -184,8 +189,12 @@ export async function copyText(text) {
 // Lists the Phase 2 migration files that haven't been run in this Supabase project yet.
 export const MIGRATIONS = {
   history: "supabase/migrations/20261002000000_attention_history_and_private_live.sql",
-  classes: "supabase/migrations/20261003000000_class_management.sql"
+  classes: "supabase/migrations/20261003000000_class_management.sql",
+  attendance: "supabase/migrations/20261005000000_sessions_attendance.sql"
 };
+
+// PostgREST error codes for a table or function that doesn't exist yet.
+export const isMissingSql = (error) => Boolean(error && (error.code === "PGRST205" || error.code === "PGRST202" || error.code === "42P01" || error.code === "42883"));
 
 export async function missingDatabaseUpdates(supabase) {
   const missing = [];
@@ -193,6 +202,8 @@ export async function missingDatabaseUpdates(supabase) {
   if (history.error && (history.error.code === "PGRST205" || history.error.code === "42P01")) missing.push(MIGRATIONS.history);
   const settings = await supabase.from("classes").select("joining_open").limit(1);
   if (settings.error && (settings.error.code === "42703" || /joining_open/.test(settings.error.message || ""))) missing.push(MIGRATIONS.classes);
+  const sessions = await supabase.from("class_sessions").select("id").limit(1);
+  if (isMissingSql(sessions.error)) missing.push(MIGRATIONS.attendance);
   return missing;
 }
 
@@ -206,7 +217,7 @@ export function showSetupBanner(missing, { forTeacher = false } = {}) {
   title.textContent = "Database setup needed";
   const text = document.createElement("p");
   text.textContent = forTeacher
-    ? "Live sessions, saved history and class management won’t work until these files are run in Supabase → SQL Editor, in this order:"
+    ? "Live sessions, attendance, saved history and class management won’t work until these files are run in Supabase → SQL Editor, in this order:"
     : "Live sessions and saved history won’t work until your teacher or project owner runs these files in Supabase → SQL Editor, in this order:";
   const list = document.createElement("ol");
   missing.forEach((file) => {

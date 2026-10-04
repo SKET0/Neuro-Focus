@@ -321,6 +321,79 @@
     }
     .btn-remove:hover { background: rgba(239, 68, 68, 0.1); }
 
+    /* Master list (teacher-classes.js) */
+    .students-table { min-width: 760px; }
+    .student-name { display: inline-flex; flex-direction: column; vertical-align: middle; line-height: 1.3; }
+    .student-name small { font-size: 11.5px; color: var(--text-muted); }
+    .session-cell { font-size: 12.5px; color: var(--text-muted); white-space: nowrap; }
+    .session-cell[data-state="in"] { color: #86efac; font-weight: 600; }
+    .session-cell[data-state="joined"] { color: var(--text-soft); }
+    .session-cell[data-state="invited"] { color: #fcd34d; }
+    .session-cell[data-state="removed"] { color: #fca5a5; }
+    .session-cell[data-state="excused"] { color: var(--text-soft); }
+    .students-table[data-live="false"] th:nth-child(3), .students-table[data-live="false"] td.session-cell { display: none; }
+    .row-actions { display: inline-flex; align-items: center; gap: 6px; justify-content: flex-end; flex-wrap: nowrap; }
+    .btn-small { padding: 6px 10px; font-size: 12px; }
+    .row-menu { position: relative; }
+    .row-menu summary {
+      list-style: none; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; cursor: pointer;
+      color: var(--text-muted); border: 1px solid transparent; font-size: 16px; letter-spacing: 1px; user-select: none;
+    }
+    .row-menu summary::-webkit-details-marker { display: none; }
+    .row-menu summary:hover, .row-menu[open] summary { background: #1c1c21; border-color: var(--border-strong); color: var(--text-main); }
+    .row-menu-list {
+      position: absolute; right: 0; top: calc(100% + 4px); z-index: 30; min-width: 180px; padding: 6px; border-radius: 10px;
+      background: #17171b; border: 1px solid var(--border-strong); box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
+    }
+    .row-menu-danger { width: 100%; text-align: left; background: none; border: 0; border-radius: 7px; padding: 8px 10px; color: #fca5a5; font-size: 13px; cursor: pointer; }
+    .row-menu-danger:hover { background: rgba(239, 68, 68, 0.1); }
+    .table-note { font-size: 12.5px; color: var(--text-muted); margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); line-height: 1.5; }
+    .muted { color: var(--text-muted); }
+    .att-rate { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .att-bar { width: 64px; height: 6px; border-radius: 4px; background: #232328; overflow: hidden; }
+    .att-bar span { display: block; height: 100%; border-radius: 4px; background: var(--green); }
+    .att-rate[data-level="ok"] .att-bar span { background: var(--amber); }
+    .att-rate[data-level="low"] .att-bar span { background: var(--red); }
+    .att-rate[data-level="low"] { color: #fca5a5; }
+
+    /* Attendance (teacher-attendance.js) */
+    .attendance-status { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+    .att-students { min-width: 560px; }
+    .data-table .num { text-align: right; font-variant-numeric: tabular-nums; width: 80px; }
+    .left-tag, .edited-tag { margin-left: 8px; font-size: 11px; color: var(--text-muted); border: 1px solid var(--border-strong); border-radius: 999px; padding: 0 7px; vertical-align: 1px; }
+    .att-session-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+    .att-session { border: 1px solid var(--border); border-radius: 12px; background: #0f0f12; overflow: hidden; }
+    .att-session[data-open="true"] { border-color: var(--border-strong); }
+    .att-session-row {
+      width: 100%; display: grid; grid-template-columns: minmax(170px, 1fr) auto auto 18px; align-items: center; gap: 16px;
+      padding: 12px 14px; background: none; border: 0; text-align: left; cursor: pointer; color: inherit;
+    }
+    .att-session-row:hover { background: #141418; }
+    .att-when b { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; }
+    .att-when small { display: block; font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+    .att-chips { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+    .att-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-muted); padding: 3px 9px; border-radius: 999px; background: #17171b; border: 1px solid var(--border); white-space: nowrap; }
+    .att-chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #4a4a52; }
+    .att-chip b { color: var(--text-main); font-weight: 650; font-variant-numeric: tabular-nums; }
+    .att-chip.present::before { background: var(--green); }
+    .att-chip.late::before { background: var(--amber); }
+    .att-chip.absent::before { background: var(--red); }
+    .att-chip.excused::before { background: var(--cyan); }
+    .att-chip.invited::before { background: #6b6b75; }
+    .att-chevron { font-size: 20px; color: var(--text-muted); transition: transform 0.2s ease; text-align: center; }
+    .att-session[data-open="true"] .att-chevron { transform: rotate(90deg); }
+    .att-detail { padding: 4px 14px 14px; border-top: 1px solid var(--border); }
+    .att-table td { white-space: nowrap; }
+    .field-select { background: #101013; color: var(--text-main); border: 1px solid var(--border-strong); border-radius: 8px; padding: 6px 9px; font-size: 12.5px; cursor: pointer; }
+    .att-mark[data-status="present"] { border-color: rgba(34, 197, 94, 0.4); }
+    .att-mark[data-status="late"] { border-color: rgba(245, 183, 72, 0.45); }
+    .att-mark[data-status="absent"] { border-color: rgba(239, 68, 68, 0.45); }
+    .att-mark[data-status="excused"] { border-color: rgba(0, 217, 255, 0.4); }
+    .att-detail-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 12px; font-size: 12.5px; }
+    .att-more { align-self: center; margin-top: 12px; }
+    .late-field { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13.5px; color: var(--text-soft); }
+    .late-field .field-input { width: 84px; text-align: center; }
+
     /* Settings */
     .settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
     .settings-card { gap: 14px; }
@@ -361,6 +434,8 @@
       .stat-card .chip-icon { display: none; }
       .class-hero .class-initial { display: none; }
       .settings-grid { grid-template-columns: 1fr; }
+      .att-session-row { grid-template-columns: 1fr 18px; }
+      .att-session-row .att-chips, .att-session-row .att-rate { grid-column: 1; justify-content: flex-start; }
     }
   </style>
   <link rel="stylesheet" href="dashboard-layout.css?v=2">
@@ -390,6 +465,7 @@
     <symbol id="i-door" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M6 21V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v17"/><path d="M14 12h.01"/></symbol>
     <symbol id="i-pen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4Z"/></symbol>
     <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></symbol>
+    <symbol id="i-attendance" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/><path d="m9 15 2 2 4-4"/></symbol>
     <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 0 0 3.4 0"/></symbol>
   </svg>
 
@@ -409,7 +485,8 @@
       <div class="nav-group" id="classNav" hidden>
         <div class="nav-label" id="classNavLabel">Class</div>
         <button class="nav-item" type="button" data-nav="live"><svg class="icon"><use href="#i-live"/></svg>Live monitor <span class="nav-live" id="navLiveDot" hidden><span class="live-dot"></span></span></button>
-        <button class="nav-item" type="button" data-nav="students"><svg class="icon"><use href="#i-users"/></svg>Students <span class="nav-count" id="navStudentCount"></span></button>
+        <button class="nav-item" type="button" data-nav="students"><svg class="icon"><use href="#i-users"/></svg>Master list <span class="nav-count" id="navStudentCount"></span></button>
+        <button class="nav-item" type="button" data-nav="attendance"><svg class="icon"><use href="#i-attendance"/></svg>Attendance</button>
         <button class="nav-item" type="button" data-nav="history"><svg class="icon"><use href="#i-history"/></svg>History</button>
         <button class="nav-item" type="button" data-nav="settings"><svg class="icon"><use href="#i-settings"/></svg>Settings</button>
       </div>
@@ -506,7 +583,8 @@
 
         <div class="class-tabs" role="tablist" aria-label="Class sections">
           <button role="tab" type="button" data-tab="live" aria-selected="true"><svg class="icon"><use href="#i-live"/></svg>Live monitor</button>
-          <button role="tab" type="button" data-tab="students" aria-selected="false"><svg class="icon"><use href="#i-users"/></svg>Students <span class="tab-count" id="tabStudentCount"></span></button>
+          <button role="tab" type="button" data-tab="students" aria-selected="false"><svg class="icon"><use href="#i-users"/></svg>Master list <span class="tab-count" id="tabStudentCount"></span></button>
+          <button role="tab" type="button" data-tab="attendance" aria-selected="false"><svg class="icon"><use href="#i-attendance"/></svg>Attendance</button>
           <button role="tab" type="button" data-tab="history" aria-selected="false"><svg class="icon"><use href="#i-history"/></svg>History</button>
           <button role="tab" type="button" data-tab="settings" aria-selected="false"><svg class="icon"><use href="#i-settings"/></svg>Settings</button>
         </div>
@@ -578,7 +656,7 @@
                   <span id="liveTrackingLabel">students sharing live attention</span>
                 </div>
                 <ol class="live-steps">
-                  <li><span>Press <strong>Start live session</strong>. Students get a notification right away.</span></li>
+                  <li><span>Press <strong>Start live session</strong>. Everyone on the master list is invited automatically and attendance starts.</span></li>
                   <li><span>They press <strong>Join session</strong>, which starts their attention tracker.</span></li>
                   <li><span>Scores stream here every second, with no video. <strong>End session</strong> stops sharing.</span></li>
                 </ol>
@@ -654,21 +732,84 @@
           </section>
         </div>
 
-        <!-- Students (teacher-classes.js) -->
+        <!-- Master list (teacher-classes.js) -->
         <div class="tab-panel" id="tab-students" role="tabpanel" hidden>
           <div class="panel-card">
             <div class="panel-head">
               <div>
-                <div class="panel-title"><span class="chip-icon"><svg><use href="#i-users"/></svg></span>Students</div>
-                <div class="panel-sub" id="studentsStatus">Students appear here the moment they join, and the dots show who is online.</div>
+                <div class="panel-title"><span class="chip-icon"><svg><use href="#i-users"/></svg></span>Master list</div>
+                <div class="panel-sub" id="studentsStatus">Students appear here the moment they join. Everyone on this list is invited to each live session automatically.</div>
               </div>
               <button class="btn-action" type="button" id="copyInvite"><svg class="icon"><use href="#i-copy"/></svg>Copy join code</button>
             </div>
             <div class="table-scroll" style="max-height: none;">
-              <table class="data-table students-table">
-                <thead><tr><th>Student</th><th>Status</th><th>Joined</th><th><span class="sr-only">Actions</span></th></tr></thead>
+              <table class="data-table students-table" id="studentsTable">
+                <thead><tr><th>Student</th><th>Status</th><th>This session</th><th>Attendance</th><th><span class="sr-only">Actions</span></th></tr></thead>
                 <tbody id="studentRows"></tbody>
               </table>
+            </div>
+            <p class="table-note">“Remove from session” only takes a student out of the live session; they stay on this list and are invited next time. To take someone off the list, use ⋯ → Remove from class.</p>
+          </div>
+        </div>
+
+        <!-- Attendance (teacher-attendance.js) -->
+        <div class="tab-panel" id="tab-attendance" role="tabpanel" hidden>
+          <div class="stack">
+            <p class="attendance-status" id="attendanceStatus" aria-live="polite">Loading attendance…</p>
+            <div id="attendanceContent" class="stack">
+              <div class="stat-grid">
+                <article class="stat-card">
+                  <span class="stat-label">Sessions held</span>
+                  <span class="chip-icon"><svg><use href="#i-attendance"/></svg></span>
+                  <strong id="attSessions">—</strong>
+                  <small id="attSessionsNote">&nbsp;</small>
+                </article>
+                <article class="stat-card">
+                  <span class="stat-label">Average attendance</span>
+                  <span class="chip-icon green"><svg><use href="#i-users"/></svg></span>
+                  <strong id="attRate">—</strong>
+                  <small id="attRateNote">&nbsp;</small>
+                </article>
+                <article class="stat-card">
+                  <span class="stat-label">Arrived late</span>
+                  <span class="chip-icon amber"><svg><use href="#i-timer"/></svg></span>
+                  <strong id="attLate">—</strong>
+                  <small id="attLateNote">&nbsp;</small>
+                </article>
+                <article class="stat-card">
+                  <span class="stat-label">Need a check-in</span>
+                  <span class="chip-icon red"><svg><use href="#i-flag"/></svg></span>
+                  <strong id="attLow">—</strong>
+                  <small id="attLowNote">&nbsp;</small>
+                </article>
+              </div>
+
+              <div class="panel-card">
+                <div class="panel-head">
+                  <div>
+                    <div class="panel-title"><span class="chip-icon"><svg><use href="#i-users"/></svg></span>By student</div>
+                    <div class="panel-sub">Lowest attendance first. Excused sessions don’t count against a student.</div>
+                  </div>
+                  <button class="btn-action" type="button" id="attDownload"><svg class="icon"><use href="#i-download"/></svg>Download spreadsheet</button>
+                </div>
+                <div class="table-scroll" style="max-height: 420px;">
+                  <table class="data-table att-students">
+                    <thead><tr><th>Student</th><th class="num">Present</th><th class="num">Late</th><th class="num">Absent</th><th class="num">Excused</th><th>Attendance</th></tr></thead>
+                    <tbody id="attStudentRows"></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="panel-card">
+                <div class="panel-head">
+                  <div>
+                    <div class="panel-title"><span class="chip-icon"><svg><use href="#i-history"/></svg></span>Sessions</div>
+                    <div class="panel-sub">Open a session to see who came and change any mark.</div>
+                  </div>
+                </div>
+                <ul class="att-session-list" id="attSessionList"></ul>
+                <button class="btn-action att-more" type="button" id="attMore" hidden>Show older sessions</button>
+              </div>
             </div>
           </div>
         </div>
@@ -708,6 +849,16 @@
               </label>
               <p class="panel-sub">Students already in the class can always get back in.</p>
             </div>
+
+            <form class="panel-card settings-card" id="lateForm">
+              <div class="panel-title"><span class="chip-icon amber"><svg><use href="#i-attendance"/></svg></span>Attendance</div>
+              <label class="late-field">Mark students late after
+                <input class="field-input" id="lateInput" type="number" min="0" max="240" step="1" inputmode="numeric" aria-describedby="lateHint">
+                minutes
+              </label>
+              <p class="panel-sub" id="lateHint">Students who join a live session after this many minutes are marked late.</p>
+              <div class="settings-actions"><button class="btn-primary" type="submit">Save</button></div>
+            </form>
 
             <div class="panel-card settings-card">
               <div class="panel-title"><span class="chip-icon"><svg><use href="#i-key"/></svg></span>Join code</div>
@@ -761,7 +912,8 @@
   <script src="dashboard-nav.js?v=2"></script>
   <script src="teacher-ui.js?v=1"></script>
   <script type="module" src="auth-guard.js?v=2"></script>
-  <script type="module" src="teacher-classes.js?v=5"></script>
-  <script type="module" src="teacher-analytics.js?v=3"></script>
+  <script type="module" src="teacher-classes.js?v=6"></script>
+  <script type="module" src="teacher-attendance.js?v=1"></script>
+  <script type="module" src="teacher-analytics.js?v=4"></script>
 </body>
 </html>

@@ -137,9 +137,9 @@ function tokenSubject(token: string) {
 }
 
 const configuredOrigin = Deno.env.get("APP_ORIGIN");
+// Local dev server ports 8000-8003 (serve.py can run several for side-by-side test accounts).
 const allowedOrigins = new Set([
-  "http://localhost:8000",
-  "http://127.0.0.1:8000",
+  ...[8000, 8001, 8002, 8003].flatMap((port) => [`http://localhost:${port}`, `http://127.0.0.1:${port}`]),
   ...(configuredOrigin ? [configuredOrigin] : [])
 ]);
 

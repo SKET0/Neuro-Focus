@@ -1,9 +1,11 @@
 // Teacher class management: all-classes overview, one class at a time with tabs
-// (Live monitor, Students, History, Settings), live sessions, student moderation and
-// class settings. Live updates use private Supabase Realtime class channels (class-live.js).
+// (Live monitor, Students, Attendance, History, Settings), live sessions, the class master
+// list, removing students from a session or the class, and class settings. Live sessions are
+// saved (class_sessions) so attendance can be taken; teacher-attendance.js shows it.
+// Live updates use private Supabase Realtime class channels (class-live.js).
 import {
-  openClassChannel, onlineStudentIds, confirmAction, notify, copyText, missingDatabaseUpdates, showSetupBanner
-} from "./class-live.js?v=5";
+  openClassChannel, onlineStudentIds, confirmAction, notify, copyText, missingDatabaseUpdates, showSetupBanner, isMissingSql
+} from "./class-live.js?v=6";
 
 const app = await window.neuroFocusReady;
 
@@ -12,7 +14,7 @@ if (app) {
   const $ = (selector) => document.querySelector(selector);
   const selectedKey = "neuroFocusCurrentClassId";
   const liveKey = `neuroFocusLiveSession:${app.user.id}`;
-  const TABS = ["live", "students", "history", "settings"];
+  const TABS = ["live", "students", "attendance", "history", "settings"];
   const REMOVED_NOTICE_MS = 2 * 60 * 1000; // removed students are told within this window
   const SHARING_STALE_MS = 6000;
   const SETUP_TEXT = "Run the class management database update first (see README).";
@@ -30,7 +32,12 @@ if (app) {
   const online = new Map();        // classId -> Set(studentId)
   const sharing = new Map();       // classId -> Map(studentId -> last reading time)
   const removed = new Map();       // classId -> [{ id, at }]
-  let live = loadLive();           // { classId, since } | null
+  let live = loadLive();           // { classId, since, sessionId } | null
+  let hasSessions = true;          // false until the attendance SQL has been run
+  let sessionRemovedIds = new Set(); // students removed from the live session (still in the class)
+  let invites = new Map();         // studentId -> time of the last "please join" ping
+  let attendance = { classId: "", current: new Map(), byStudent: new Map() }; // from teacher-attendance.js
+  let lastInviteKey = "";
   let presenceWarned = false;
   let channelWarned = false;
 
@@ -58,8 +65,11 @@ if (app) {
   // ---------- Data ----------
   async function loadClasses() {
     const columns = "id, name, join_code, join_password_protected, created_at, class_members(count)";
-    let { data, error } = await supabase.from("classes").select(`${columns}, joining_open`).order("created_at", { ascending: false });
-    if (error && (error.code === "42703" || /joining_open/.test(error.message || ""))) {
+    // Columns added by later database updates are dropped if those haven't been run yet.
+    const missingColumn = (error) => error && (error.code === "42703" || /joining_open|late_after_minutes/.test(error.message || ""));
+    let { data, error } = await supabase.from("classes").select(`${columns}, joining_open, late_after_minutes`).order("created_at", { ascending: false });
+    if (missingColumn(error)) ({ data, error } = await supabase.from("classes").select(`${columns}, joining_open`).order("created_at", { ascending: false }));
+    if (missingColumn(error)) {
       hasClassSettings = false;
       ({ data, error } = await supabase.from("classes").select(columns).order("created_at", { ascending: false }));
     }
@@ -67,6 +77,7 @@ if (app) {
     classes = (data || []).map((item) => ({
       ...item,
       joining_open: item.joining_open ?? true,
+      late_after_minutes: item.late_after_minutes ?? null,
       memberCount: item.class_members?.[0]?.count ?? 0
     }));
     if (live && !classes.some((item) => item.id === live.classId)) {
@@ -104,13 +115,57 @@ if (app) {
     window.dispatchEvent(new CustomEvent("neurofocus:roster-loaded", { detail: { classId, members: window.neuroFocusRoster } }));
     renderStudents();
     renderClassHeader();
+    void inviteNewMembers();
   }
+
+  // ---------- Saved live sessions ----------
+  // The open session in the database is the source of truth (it works across devices);
+  // before the attendance SQL is run, the live state is kept on this device only.
+  async function loadOpenSession() {
+    const { data, error } = await supabase.from("class_sessions")
+      .select("id, class_id, started_at").is("ended_at", null)
+      .order("started_at", { ascending: false }).limit(1);
+    if (error) {
+      if (isMissingSql(error)) hasSessions = false;
+      return;
+    }
+    hasSessions = true;
+    const open = (data || []).find((row) => classes.some((item) => item.id === row.class_id));
+    const before = live?.sessionId;
+    if (!open) {
+      if (live) { live = null; saveLive(); }
+    } else if (open.id !== before) {
+      live = { classId: open.class_id, since: open.started_at, sessionId: open.id };
+      saveLive();
+      invites = new Map();
+      const { data: removedRows } = await supabase.from("session_attendance")
+        .select("student_id").eq("session_id", open.id).not("removed_at", "is", null);
+      sessionRemovedIds = new Set((removedRows || []).map((row) => row.student_id));
+    }
+    if (live?.sessionId !== before) {
+      classes.forEach((item) => publishPresence(item.id));
+      announceLive();
+    }
+  }
+
+  // Students who join the class during a live session are invited to it automatically.
+  async function inviteNewMembers() {
+    if (!live?.sessionId || live.classId !== selectedId || !roster.length) return;
+    const key = `${live.sessionId}:${roster.map((member) => member.id).sort().join(",")}`;
+    if (key === lastInviteKey) return;
+    lastInviteKey = key;
+    const { data, error } = await supabase.rpc("invite_class_members", { p_session_id: live.sessionId });
+    if (!error && data > 0) refreshAttendance();
+  }
+
+  const refreshAttendance = () => window.dispatchEvent(new CustomEvent("neurofocus:attendance-refresh"));
 
   function scheduleRefresh() {
     window.clearTimeout(refreshTimer);
     refreshTimer = window.setTimeout(async () => {
       try {
         await loadClasses();
+        if (hasSessions) await loadOpenSession();
         if (view === "class" || selectedId) await loadRoster();
       } catch (error) {
         console.error("Class refresh failed", error);
@@ -181,7 +236,15 @@ if (app) {
     const recent = (removed.get(classId) || []).filter((item) => now - item.at < REMOVED_NOTICE_MS);
     removed.set(classId, recent);
     const isLive = live?.classId === classId;
-    entry.channel.track({ role: "teacher", live: isLive, since: isLive ? live.since : null, removed: recent.map((item) => item.id) })
+    entry.channel.track({
+      role: "teacher",
+      live: isLive,
+      since: isLive ? live.since : null,
+      sessionId: isLive ? live.sessionId || null : null,
+      sessionRemoved: isLive ? [...sessionRemovedIds] : [],
+      invites: isLive ? Object.fromEntries(invites) : {},
+      removed: recent.map((item) => item.id)
+    })
       .then((result) => {
         if (result === "ok" || presenceWarned) return;
         presenceWarned = true;
@@ -197,7 +260,7 @@ if (app) {
 
   function handleBroadcast(classId, event, payload) {
     if (event === "attention") {
-      if (!payload.studentId || live?.classId !== classId) return;
+      if (!payload.studentId || live?.classId !== classId || sessionRemovedIds.has(payload.studentId)) return;
       const map = sharing.get(classId) || new Map();
       sharing.set(classId, map);
       if (payload.state === "Stopped") map.delete(payload.studentId);
@@ -358,8 +421,86 @@ if (app) {
     toggle.textContent = isLive ? "■ End live session" : "▶ Start live session";
     const other = live && live.classId !== item.id ? classes.find((entry) => entry.id === live.classId) : null;
     $("#sessionHint").textContent = isLive
-      ? `Live since ${clock(live.since)} · ${sharingCount(item.id)} of ${plural(item.memberCount, "student")} sharing`
-      : other ? `${other.name} is live. Starting here ends that session.` : "Students share their attention only during a live session.";
+      ? `Live since ${clock(live.since)} · ${joinedSummary(item)} · ${sharingCount(item.id)} sharing now`
+      : other ? `${other.name} is live. Starting here ends that session.` : "Starting a session invites everyone on the master list.";
+  }
+
+  // "12 of 20 joined" for the live session (attendance rows from teacher-attendance.js).
+  function joinedSummary(item) {
+    if (!live?.sessionId || attendance.classId !== item.id) return `${plural(item.memberCount, "student")} invited`;
+    const rows = [...attendance.current.values()];
+    const joined = rows.filter((row) => row.joined_at && !row.removed_at).length;
+    return `${joined} of ${plural(rows.length, "student")} joined`;
+  }
+
+  // What the "This session" column says for one student.
+  function sessionState(member) {
+    const item = selected();
+    if (!item || live?.classId !== item.id) return { state: "none", text: "—" };
+    if (sessionRemovedIds.has(member.id)) return { state: "removed", text: "Removed from session" };
+    const row = attendance.classId === item.id ? attendance.current.get(member.id) : null;
+    const late = row?.status === "late" ? "Late · " : "";
+    if (studentState(member.id) === "session") return { state: "in", text: `${late}In session${row?.joined_at ? ` since ${clock(row.joined_at)}` : ""}` };
+    if (row?.joined_at) return { state: "joined", text: `${late}Joined ${clock(row.joined_at)} · not sharing now` };
+    if (row?.status === "excused") return { state: "excused", text: "Excused" };
+    return { state: "invited", text: invites.has(member.id) ? `Invited again at ${clock(new Date(invites.get(member.id)).toISOString())}` : "Invited · not joined yet" };
+  }
+
+  function smallButton(label, className, onClick, ariaLabel) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = className;
+    button.textContent = label;
+    if (ariaLabel) button.setAttribute("aria-label", ariaLabel);
+    button.addEventListener("click", onClick);
+    return button;
+  }
+
+  // Row actions are only rebuilt when they change, so keyboard focus isn't lost.
+  function fillActions(cell, member, state) {
+    const key = `${state}:${live?.classId === selectedId}`;
+    if (cell.dataset.key === key) return;
+    cell.dataset.key = key;
+    const wrap = document.createElement("div");
+    wrap.className = "row-actions";
+    if (state === "removed") {
+      wrap.append(smallButton("Let back in", "btn-action btn-small", () => { void setSessionRemoved(member, false); }, `Let ${member.name} back into the session`));
+    } else if (state !== "none") {
+      if (state === "invited") wrap.append(smallButton("Invite again", "btn-action btn-small", () => inviteAgain(member), `Invite ${member.name} to the session again`));
+      wrap.append(smallButton("Remove from session", "btn-remove", () => { void setSessionRemoved(member, true); }, `Remove ${member.name} from this live session`));
+    }
+    const menu = document.createElement("details");
+    menu.className = "row-menu";
+    const summary = document.createElement("summary");
+    summary.setAttribute("aria-label", `More actions for ${member.name}`);
+    summary.textContent = "⋯";
+    const list = document.createElement("div");
+    list.className = "row-menu-list";
+    list.append(smallButton("Remove from class", "row-menu-danger", () => { menu.open = false; void removeStudent(member); }, `Remove ${member.name} from the class`));
+    menu.append(summary, list);
+    wrap.append(menu);
+    cell.replaceChildren(wrap);
+  }
+
+  function attendanceCell(cell, member) {
+    const stats = attendance.classId === selectedId ? attendance.byStudent.get(member.id) : null;
+    cell.replaceChildren();
+    if (!stats || !stats.counted) {
+      cell.append(Object.assign(document.createElement("span"), { className: "muted", textContent: hasSessions ? "No sessions yet" : "—" }));
+      return;
+    }
+    const rate = Math.round((stats.attended / stats.counted) * 100);
+    const wrap = document.createElement("span");
+    wrap.className = "att-rate";
+    wrap.dataset.level = rate >= 90 ? "good" : rate >= 75 ? "ok" : "low";
+    const bar = document.createElement("span");
+    bar.className = "att-bar";
+    const fill = document.createElement("span");
+    fill.style.width = `${rate}%`;
+    bar.append(fill);
+    wrap.append(bar, `${rate}%`);
+    wrap.title = `Attended ${stats.attended} of ${plural(stats.counted, "session")}${stats.late ? ` (${stats.late} late)` : ""}${stats.excused ? ` · ${stats.excused} excused` : ""}`;
+    cell.append(wrap);
   }
 
   function renderStudents() {
@@ -367,10 +508,12 @@ if (app) {
     body.replaceChildren();
     const item = selected();
     if (!item) return;
+    const isLive = live?.classId === item.id;
+    $("#studentsTable").dataset.live = String(isLive);
     if (!roster.length) {
       const row = document.createElement("tr");
       const cell = document.createElement("td");
-      cell.colSpan = 4;
+      cell.colSpan = 5;
       cell.className = "empty-state";
       cell.textContent = `No students yet. Share the join code ${item.join_code}; students appear here the moment they join.`;
       row.append(cell);
@@ -384,22 +527,23 @@ if (app) {
       const avatar = document.createElement("span");
       avatar.className = "mini-avatar";
       avatar.textContent = member.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase();
-      name.append(avatar, member.name);
+      const nameText = document.createElement("span");
+      nameText.className = "student-name";
+      const joined = document.createElement("small");
+      joined.textContent = `Joined ${new Date(member.joinedAt).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}`;
+      nameText.append(member.name, joined);
+      name.append(avatar, nameText);
       const status = document.createElement("td");
       const badge = document.createElement("span");
       badge.className = "student-status";
       status.append(badge);
-      const joined = document.createElement("td");
-      joined.textContent = new Date(member.joinedAt).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
+      const session = document.createElement("td");
+      session.className = "session-cell";
+      const attendanceTd = document.createElement("td");
+      attendanceTd.className = "attendance-cell";
       const actions = document.createElement("td");
-      const remove = document.createElement("button");
-      remove.type = "button";
-      remove.className = "btn-remove";
-      remove.textContent = "Remove";
-      remove.setAttribute("aria-label", `Remove ${member.name} from the class`);
-      remove.addEventListener("click", () => removeStudent(member));
-      actions.append(remove);
-      row.append(name, status, joined, actions);
+      actions.className = "actions-cell";
+      row.append(name, status, session, attendanceTd, actions);
       body.append(row);
     });
     newIds = new Set();
@@ -408,20 +552,29 @@ if (app) {
 
   function updateStudentStatuses() {
     const labels = { session: "In live session", online: "Online", offline: "Offline" };
+    const memberById = new Map(roster.map((member) => [member.id, member]));
     document.querySelectorAll("#studentRows tr[data-student-id]").forEach((row) => {
-      const state = studentState(row.dataset.studentId);
+      const member = memberById.get(row.dataset.studentId);
+      if (!member) return;
+      const state = studentState(member.id);
       const badge = row.querySelector(".student-status");
       badge.dataset.state = state;
       badge.textContent = labels[state];
+      const session = sessionState(member);
+      const sessionCell = row.querySelector(".session-cell");
+      sessionCell.textContent = session.text;
+      sessionCell.dataset.state = session.state;
+      attendanceCell(row.querySelector(".attendance-cell"), member);
+      fillActions(row.querySelector(".actions-cell"), member, session.state);
     });
     const item = selected();
     if (!item) return;
     const onlineCount = online.get(item.id)?.size || 0;
     const parts = [plural(roster.length, "student"), `${onlineCount} online`];
-    if (live?.classId === item.id) parts.push(`${sharingCount(item.id)} in the live session`);
+    if (live?.classId === item.id) parts.push(joinedSummary(item));
     $("#studentsStatus").textContent = roster.length
-      ? `${parts.join(" · ")}. Updates live.`
-      : "Students appear here the moment they join, and the dots show who is online.";
+      ? `${parts.join(" · ")}. Everyone here is invited to each live session automatically.`
+      : "Students appear here the moment they join. Everyone on this list is invited to each live session automatically.";
   }
 
   function renderSettings() {
@@ -431,6 +584,11 @@ if (app) {
     $("#joiningToggle").checked = item.joining_open;
     $("#passwordState").textContent = item.join_password_protected ? "· On" : "· Off";
     $("#removePassword").disabled = !item.join_password_protected;
+    $("#lateInput").value = item.late_after_minutes ?? 10;
+    $("#lateForm button[type='submit']").disabled = item.late_after_minutes === null;
+    $("#lateHint").textContent = item.late_after_minutes === null
+      ? "Run the attendance database update (see README) to change this."
+      : `Students who join a live session more than ${plural(item.late_after_minutes, "minute")} after it starts are marked late.`;
     ["#joiningToggle", "#regenerateCode", "#removePassword", "#passwordForm button[type='submit']", "#deleteClass"].forEach((selector) => {
       const element = $(selector);
       if (element && !hasClassSettings) element.disabled = true;
@@ -450,7 +608,7 @@ if (app) {
         else button.removeAttribute("aria-current");
       }
     });
-    const names = { live: "Live monitor", students: "Students", history: "History", settings: "Settings" };
+    const names = { live: "Live monitor", students: "Master list", attendance: "Attendance", history: "History", settings: "Settings" };
     $("#crumbCurrent").textContent = inClass ? `${selected().name} · ${names[tab]}` : "Classes";
     if (inClass) renderClassHeader();
   }
@@ -461,6 +619,7 @@ if (app) {
       button.setAttribute("aria-selected", String(button.dataset.tab === tab));
     });
     TABS.forEach((name) => { $(`#tab-${name}`).hidden = name !== tab; });
+    window.dispatchEvent(new CustomEvent("neurofocus:class-tab", { detail: { tab } }));
     if (tab === "settings") renderSettings();
     if (tab === "students") renderStudents();
     renderView();
@@ -495,7 +654,7 @@ if (app) {
 
   function announceLive() {
     const isLive = live?.classId === selectedId;
-    window.neuroFocusLiveSession = { classId: selectedId, live: isLive, since: isLive ? live.since : null };
+    window.neuroFocusLiveSession = { classId: selectedId, live: isLive, since: isLive ? live.since : null, sessionId: isLive ? live.sessionId || null : null };
     window.dispatchEvent(new CustomEvent("neurofocus:live-session", { detail: window.neuroFocusLiveSession }));
   }
 
@@ -503,30 +662,121 @@ if (app) {
   async function toggleSession() {
     const item = selected();
     if (!item) return;
+    const toggle = $("#sessionToggle");
     if (live?.classId === item.id) {
       const ok = await confirmAction({
         title: "End the live session?",
-        message: `Students in ${item.name} will stop sharing their attention with you.`,
+        message: live.sessionId
+          ? `Students in ${item.name} stop sharing their attention with you. Attendance is saved, and anyone who didn’t join is marked absent.`
+          : `Students in ${item.name} will stop sharing their attention with you.`,
         confirmLabel: "End session"
       });
       if (!ok) return;
+      const sessionId = live.sessionId;
+      toggle.disabled = true;
+      const { error } = sessionId ? await supabase.rpc("end_class_session", { p_session_id: sessionId }) : { error: null };
+      toggle.disabled = false;
+      if (error) {
+        notify({ title: "Couldn’t end the session", text: error.message, kind: "error", timeoutMs: 9000 });
+        return;
+      }
       live = null;
       saveLive();
+      sessionRemovedIds = new Set();
+      invites = new Map();
       publishPresence(item.id);
-      notify({ title: "Live session ended", text: `${item.name} is no longer sharing attention.` });
+      notify({
+        title: "Live session ended",
+        text: sessionId ? "Attendance is saved. Students who didn’t join are marked absent." : `${item.name} is no longer sharing attention.`,
+        kind: "success",
+        actions: sessionId ? [{ label: "View attendance", onClick: () => setTab("attendance") }] : []
+      });
     } else {
+      let session = null;
+      if (hasSessions) {
+        toggle.disabled = true;
+        const { data, error } = await supabase.rpc("start_class_session", { p_class_id: item.id });
+        toggle.disabled = false;
+        if (error && isMissingSql(error)) hasSessions = false;
+        else if (error) {
+          notify({ title: "Couldn’t start the live session", text: error.message, kind: "error", timeoutMs: 9000 });
+          return;
+        } else session = data;
+      }
       const previous = live?.classId;
-      live = { classId: item.id, since: new Date().toISOString() };
+      live = { classId: item.id, since: session?.started_at || new Date().toISOString(), sessionId: session?.id || null };
       saveLive();
+      sessionRemovedIds = new Set();
+      invites = new Map();
+      lastInviteKey = "";
       if (previous) publishPresence(previous);
       publishPresence(item.id);
-      notify({ title: "You’re live", text: `Students in ${item.name} have been asked to join the session.`, kind: "live" });
+      notify({
+        title: "You’re live",
+        text: session
+          ? `${plural(session.invited, "student")} on the master list ${session.invited === 1 ? "was" : "were"} invited automatically. Attendance is being taken.`
+          : `Students in ${item.name} have been asked to join. Run the attendance database update (see README) to save attendance.`,
+        kind: "live"
+      });
       setTab("live");
     }
     sharing.set(item.id, new Map());
     announceLive();
+    refreshAttendance();
     renderClassHeader();
     renderClassGrid();
+    if (tab === "students") renderStudents();
+  }
+
+  // Removing a student from the live session keeps them on the master list; they can be let back in.
+  async function setSessionRemoved(member, remove) {
+    const item = selected();
+    if (!item || live?.classId !== item.id) return;
+    if (remove) {
+      const ok = await confirmAction({
+        title: `Remove ${member.name} from this session?`,
+        message: `${member.name} stops sharing with you and can’t rejoin this session unless you let them back in. They stay on the ${item.name} master list and are invited to future sessions automatically.`,
+        confirmLabel: "Remove from session",
+        danger: true
+      });
+      if (!ok) return;
+    }
+    if (live.sessionId) {
+      const { error } = await supabase.rpc("set_session_removed", { p_session_id: live.sessionId, p_student_id: member.id, p_remove: remove });
+      if (error) {
+        notify({ title: "Couldn’t update the session", text: error.message, kind: "error", timeoutMs: 9000 });
+        return;
+      }
+    }
+    invites.delete(member.id);
+    if (remove) {
+      sessionRemovedIds.add(member.id);
+      sharing.get(item.id)?.delete(member.id);
+      window.dispatchEvent(new CustomEvent("neurofocus:live-attention", { detail: { studentId: member.id, classId: item.id, state: "Stopped" } }));
+    } else sessionRemovedIds.delete(member.id);
+    publishPresence(item.id);
+    notify({
+      title: remove ? `${member.name} was removed from the session` : `${member.name} can rejoin the session`,
+      text: remove ? "They’re still on the master list." : "They’ve been told they can join again.",
+      kind: "success"
+    });
+    refreshAttendance();
+    updateStudentStatuses();
+    renderClassHeader();
+  }
+
+  function inviteAgain(member) {
+    const item = selected();
+    if (!item || live?.classId !== item.id) return;
+    invites.set(member.id, Date.now());
+    publishPresence(item.id);
+    const isOnline = online.get(item.id)?.has(member.id);
+    notify({
+      title: `Invite sent to ${member.name}`,
+      text: isOnline ? "They’ll see a notification now." : "They’ll see it as soon as they open Neuro-Focus during this session.",
+      kind: "success"
+    });
+    updateStudentStatuses();
   }
 
   async function removeStudent(member) {
@@ -534,8 +784,8 @@ if (app) {
     if (!item) return;
     const ok = await confirmAction({
       title: `Remove ${member.name}?`,
-      message: `${member.name} will lose access to ${item.name}, its live sessions and their class notes. They can rejoin with the join code unless you close joining or make a new code in Settings.`,
-      confirmLabel: "Remove student",
+      message: `${member.name} comes off the ${item.name} master list and loses access to its live sessions. Their past attendance is kept. They can rejoin with the join code unless you close joining or make a new code in Settings. To take them out of just today’s session, use “Remove from session” instead.`,
+      confirmLabel: "Remove from class",
       danger: true
     });
     if (!ok) return;
@@ -547,10 +797,11 @@ if (app) {
     }
     removed.set(item.id, [...(removed.get(item.id) || []), { id: member.id, at: Date.now() }]);
     sharing.get(item.id)?.delete(member.id);
+    sessionRemovedIds.delete(member.id);
     publishPresence(item.id);
     notify({
       title: `${member.name} was removed`,
-      text: `They no longer have access to ${item.name}.`,
+      text: `They’re off the master list and no longer have access to ${item.name}.`,
       kind: "success",
       actions: [{ label: "Make a new code", onClick: () => setTab("settings") }]
     });
@@ -659,6 +910,25 @@ if (app) {
     notify({ title: "New join code", text: `${data} · the old code no longer works.`, kind: "success", actions: [{ label: "Copy code", primary: true, onClick: () => copyCode() }] });
     await loadClasses();
   });
+  $("#lateForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const minutes = Math.round(Number($("#lateInput").value));
+    if (!Number.isFinite(minutes) || minutes < 0 || minutes > 240) {
+      notify({ title: "Choose 0 to 240 minutes", kind: "error" });
+      return;
+    }
+    if (minutes === selected()?.late_after_minutes) return;
+    await updateClass({ late_after_minutes: minutes }, `Late after ${plural(minutes, "minute")}`);
+  });
+
+  // Attendance data loaded by teacher-attendance.js fills the master list's columns.
+  window.addEventListener("neurofocus:attendance", (event) => {
+    attendance = event.detail || attendance;
+    if (attendance.classId !== selectedId) return;
+    updateStudentStatuses();
+    renderClassHeader();
+  });
+
   $("#passwordForm").addEventListener("submit", async (event) => {
     event.preventDefault();
     const password = $("#passwordInput").value;
@@ -704,6 +974,8 @@ if (app) {
     if (live?.classId === item.id) {
       live = null;
       saveLive();
+      sessionRemovedIds = new Set();
+      invites = new Map();
     }
     selectedId = "";
     window.neuroFocusClass = null;
@@ -733,6 +1005,7 @@ if (app) {
   void recheckSetup();
   try {
     await loadClasses();
+    await loadOpenSession();
     let start = "";
     try { start = localStorage.getItem(selectedKey) || ""; } catch { /* storage unavailable */ }
     if (live && classes.some((item) => item.id === live.classId)) openClass(live.classId, "live");
