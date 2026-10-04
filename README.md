@@ -86,6 +86,22 @@ Run this once, after the update above. It is safe to run again.
 
 It lets teachers remove students, open or close joining, change the join password or code, rename and delete classes, and announce live sessions to their students. Students can leave classes, and rejoining a class they were already in always works.
 
+## Notes update (many notes per class, formatting, quizzes)
+
+Run this once. It is safe to run again.
+
+1. Open **Supabase Dashboard → SQL Editor → New query**.
+2. Paste the whole of `supabase/migrations/20261004000000_student_notes.sql` and click **Run**.
+3. Redeploy the assistant so answers stream in as they're written and **Quiz me** works:
+
+   ```sh
+   npx supabase functions deploy learning-assistant
+   ```
+
+   (Or paste the new `supabase/functions/learning-assistant/index.ts` into the function in the dashboard editor and deploy.)
+
+It adds `student_notes`: each student can keep any number of notes, filed under one of their classes or kept personal. Existing class notes are copied in automatically. Students always keep their own notes, even after leaving a class, and teachers can never read them. The old `class_notes` table is no longer used by the app.
+
 ## Test a teacher and a student side by side
 
 A browser keeps one sign-in per web address, shared by all its tabs, so two tabs on `http://localhost:8000` are always the same account. Use two addresses instead:
@@ -103,8 +119,8 @@ If one tab's account changes because another tab on the same address signed in o
 - Each class has four tabs for the teacher: **Live monitor**, **Students** (online status, **Remove**), **History** (saved sessions) and **Settings** (rename, open/close joining, password, new join code, delete).
 - Students join by code, and must also provide the password if one was set. Students already in a class can always rejoin; new students need joining to be open.
 - Students share attention scores (never video) only while their teacher runs a live session in the class they are working in. Outside a live session their saved history is personal and teachers can't see it.
-- A student's class notes are scoped to their account and joined class with Row Level Security. Teachers do not have access to those notes.
-- The tutor receives the selected class name and the student's submitted question. The note organizer receives the selected class name and the text the student submits. It does not record a live class, meeting, audio, or video.
+- A student's notes belong to their account (Row Level Security). They can file a note under one of their classes or keep it personal. Teachers do not have access to those notes.
+- The tutor receives the selected class name and the student's submitted question. The note organizer receives the note's class name and the rough text the student submits; **Quiz me** receives the class name and the text of that one note. Nothing records a live class, meeting, audio, or video.
 - Notes are drafts for the student to review. The experimental camera preview remains optional, local, and separate from teacher reporting.
 
 Before using real student data, finish deployment configuration and review privacy, consent, data-retention, and applicable school requirements.

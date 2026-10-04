@@ -1,7 +1,7 @@
 // Get these values from Supabase Dashboard → Project Settings → API.
 // The publishable/anon key is intended for browser use. Never put a service_role key here.
-const SUPABASE_URL = "https://awklqioisiiyaqixnnbl.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NNY55ArTOwOhB7GwYmyHVQ_d7D7hOcw";
+export const SUPABASE_URL = "https://awklqioisiiyaqixnnbl.supabase.co";
+export const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NNY55ArTOwOhB7GwYmyHVQ_d7D7hOcw";
 
 const configured = SUPABASE_URL.startsWith("https://")
   && !SUPABASE_URL.includes("PASTE_")

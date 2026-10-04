@@ -49,6 +49,9 @@ if (app) {
     const removedNow = previous.filter((item) => !classes.some((other) => other.id === item.id) && !leftClasses.has(item.id));
     removedNow.forEach((item) => { void handleRemoved(item, { confirmed: true }); });
     if (!classes.some((item) => item.id === currentId)) currentId = classes[0]?.id || "";
+    // Other modules (student-notes.js) list every class the student is in.
+    window.neuroFocusClasses = classes.map(({ id, name }) => ({ id, name }));
+    window.dispatchEvent(new CustomEvent("neurofocus:classlist", { detail: window.neuroFocusClasses }));
     watchChannels();
     selectClass(currentId);
   }

@@ -1,17 +1,17 @@
+// NeuroBuddy chat: answers stream in as they are written and render simple formatting
+// (bold, lists, headings). Class notes live in student-notes.js.
+import { streamAssistant } from "./assistant-api.js?v=1";
+import { renderMarkdown } from "./markdown.js?v=1";
+
 const app = await window.neuroFocusReady;
 
 if (app) {
   const { supabase } = app;
   const conversation = document.querySelector("#tutorConversation");
   const tutorForm = document.querySelector("#tutorForm");
-  const notesInput = document.querySelector("#noteCaptureInput");
-  const notesOutput = document.querySelector("#classNotes");
-  const notesState = document.querySelector("#notesSaveState");
   const historyByClass = new Map();
   let currentClass = window.neuroFocusClass || null;
   let renderedClassId = undefined;
-  let noteSaveTimer;
-  let noteDirty = false;
 
   // NeuroBuddy chats are kept on this device per account and class, so a refresh keeps them.
   const chatKey = (historyKey) => `neuroFocusChat:${app.user.id}:${historyKey}`;
@@ -45,93 +45,35 @@ if (app) {
     element.dataset.state = isError ? "error" : "";
   }
 
+  function setBubbleText(bubble, text, type) {
+    if (type === "assistant") {
+      bubble.replaceChildren(renderMarkdown(text));
+      bubble.classList.add("rich");
+    } else bubble.textContent = text;
+  }
+
   function addBubble(text, type) {
-    const bubble = document.createElement("p");
+    const bubble = document.createElement(type === "assistant" ? "div" : "p");
     bubble.className = `chat-bubble ${type}-bubble`;
-    bubble.textContent = text;
+    setBubbleText(bubble, text, type);
     conversation.append(bubble);
     conversation.scrollTop = conversation.scrollHeight;
     return bubble;
   }
 
-  async function saveNotes(classId, text) {
-    const { error } = await supabase.from("class_notes").upsert({
-      class_id: classId,
-      student_id: app.user.id,
-      note_text: text,
-      updated_at: new Date().toISOString()
-    }, { onConflict: "class_id,student_id" });
-    if (currentClass?.id === classId) {
-      notesState.textContent = error ? "Could not save" : "Saved to your account";
-      if (error) status("#notesMessage", "Your notes are still on screen but did not sync. Try again before leaving.", true);
-    }
-    return !error;
-  }
-
-  async function loadNotes(classId) {
-    notesOutput.disabled = true;
-    notesState.textContent = "Loading your private notes…";
-    const { data, error } = await supabase
-      .from("class_notes")
-      .select("note_text")
-      .eq("class_id", classId)
-      .eq("student_id", app.user.id)
-      .maybeSingle();
-    if (currentClass?.id !== classId) return;
-    notesOutput.disabled = false;
-    if (error) {
-      notesState.textContent = "Could not load notes";
-      status("#notesMessage", "Could not load your private notes. Check the database setup and try again.", true);
-      return;
-    }
-    notesOutput.value = data?.note_text || "";
-    notesState.textContent = "Saved to your account";
-  }
-
   function applyClass(classInfo) {
     const nextClassId = classInfo?.id || "";
     if (nextClassId !== renderedClassId) {
-      if (noteDirty && currentClass) {
-        clearTimeout(noteSaveTimer);
-        void saveNotes(currentClass.id, notesOutput.value);
-      }
-      noteDirty = false;
       renderedClassId = nextClassId;
-      notesOutput.value = "";
-      notesInput.value = "";
       showGreeting(classInfo);
       currentClass = classInfo;
       currentHistory().forEach((message) => addBubble(message.content, message.role === "user" ? "student" : "assistant"));
     }
     currentClass = classInfo;
-    if (classInfo) {
-      void loadNotes(classInfo.id);
-      status("#tutorMessage", `NeuroBuddy is using ${classInfo.name} for context. Your question and class name go to the AI service when you ask; avoid personal details.`);
-      status("#notesMessage", `Your notes are private to your account. AI requests send this class name and only the text you choose; avoid personal details.`);
-    } else {
-      notesOutput.value = "";
-      notesOutput.disabled = true;
-      notesState.textContent = "Choose a class";
-      status("#tutorMessage", "No class needed to chat. Pick a class any time to give NeuroBuddy context.");
-      status("#notesMessage", "Join a class before creating class notes.");
-    }
+    status("#tutorMessage", classInfo
+      ? `NeuroBuddy is using ${classInfo.name} for context. Your question and class name go to the AI service when you ask; avoid personal details.`
+      : "No class needed to chat. Pick a class any time to give NeuroBuddy context.");
     tutorForm.querySelector("button[type='submit']").disabled = false;
-    document.querySelector("#generateNotesButton").disabled = !classInfo;
-  }
-
-  async function requestAssistant(payload) {
-    const { data, error } = await supabase.functions.invoke("learning-assistant", { body: payload });
-    if (error) {
-      let details;
-      try {
-        details = await error.context?.json();
-      } catch { /* Use the generic setup message when the function response is not JSON. */ }
-      if (details?.error) throw new Error(details.error);
-      throw new Error("NeuroBuddy isn’t connected yet. Deploy the learning-assistant function and add your AI API key secret first.");
-    }
-    if (data?.error) throw new Error(data.error);
-    if (!data?.text) throw new Error("The AI service returned no text. Try again.");
-    return data.text;
   }
 
   tutorForm.addEventListener("submit", async (event) => {
@@ -147,21 +89,30 @@ if (app) {
     submit.disabled = true;
     status("#tutorMessage", "NeuroBuddy is thinking through that with you…");
     const pending = addBubble("Thinking…", "assistant");
+    pending.classList.add("is-pending");
 
     try {
-      const answer = await requestAssistant({
+      // Keep the newest words in view unless the student scrolled up to read.
+      const stickToBottom = () => conversation.scrollHeight - conversation.scrollTop - conversation.clientHeight < 80;
+      const answer = await streamAssistant(supabase, {
         task: "tutor",
         ...(currentClass ? { classId: currentClass.id } : {}),
         prompt,
         style: document.querySelector("#supportStyle").value,
         history
+      }, (textSoFar) => {
+        const follow = stickToBottom();
+        pending.classList.remove("is-pending");
+        setBubbleText(pending, textSoFar, "assistant");
+        if (follow) conversation.scrollTop = conversation.scrollHeight;
       });
-      pending.textContent = answer;
+      setBubbleText(pending, answer, "assistant");
       history.push({ role: "user", content: prompt }, { role: "assistant", content: answer });
       if (history.length > 16) history.splice(0, history.length - 16);
       saveHistory();
       status("#tutorMessage", "You can ask a follow-up or request another explanation.");
     } catch (error) {
+      pending.classList.remove("is-pending", "rich");
       pending.textContent = error instanceof Error ? error.message : "NeuroBuddy could not reply. Try again.";
       pending.classList.add("assistant-error-bubble");
       status("#tutorMessage", "Your question was not answered. Please try again later.", true);
@@ -177,47 +128,6 @@ if (app) {
     saveHistory();
     showGreeting(currentClass);
     status("#tutorMessage", "Chat cleared. Ask NeuroBuddy anything.");
-  });
-
-  document.querySelector("#generateNotesButton").addEventListener("click", async (event) => {
-    const button = event.currentTarget;
-    const studentInput = notesInput.value.trim();
-    if (!currentClass || !studentInput) {
-      status("#notesMessage", currentClass ? "Add a few ideas or notes first." : "Join a class before creating class notes.", true);
-      return;
-    }
-    button.disabled = true;
-    button.textContent = "Organizing…";
-    status("#notesMessage", "Organizing the text you provided…");
-    const targetClassId = currentClass.id;
-    try {
-      const draft = await requestAssistant({ task: "notes", classId: targetClassId, studentInput });
-      if (currentClass?.id !== targetClassId) return;
-      notesOutput.value = draft;
-      noteDirty = false;
-      const saved = await saveNotes(targetClassId, draft);
-      status("#notesMessage", saved
-        ? "Draft ready and saved to your account. Review it and edit anything you want to change."
-        : "Draft ready, but it did not sync. Copy it before leaving, then check your connection.", !saved);
-    } catch (error) {
-      status("#notesMessage", error instanceof Error ? error.message : "Could not organize notes. Try again.", true);
-    } finally {
-      button.disabled = !currentClass;
-      button.textContent = "Organize my notes";
-    }
-  });
-
-  notesOutput.addEventListener("input", () => {
-    if (!currentClass) return;
-    noteDirty = true;
-    notesState.textContent = "Saving…";
-    clearTimeout(noteSaveTimer);
-    const classId = currentClass.id;
-    noteSaveTimer = window.setTimeout(() => {
-      const contents = notesOutput.value;
-      noteDirty = false;
-      void saveNotes(classId, contents);
-    }, 650);
   });
 
   window.addEventListener("neurofocus:classchange", (event) => applyClass(event.detail));

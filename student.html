@@ -314,12 +314,128 @@
     .tips-card li b { display: block; color: var(--text-main); font-weight: 600; margin-bottom: 2px; }
     .tips-card .chip-icon { width: 30px; height: 30px; }
 
-    /* Notes */
-    .notes-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    .field-label { display: flex; flex-direction: column; gap: 8px; font-size: 11.5px; text-transform: uppercase; color: var(--text-muted); font-weight: 650; letter-spacing: 0.6px; }
-    .notes-grid textarea.field-input { min-height: 340px; text-transform: none; letter-spacing: 0; font-weight: 400; }
-    .notes-actions { display: flex; justify-content: flex-end; margin-top: 14px; }
-    .notes-state { font-size: 12px; color: var(--text-muted); white-space: nowrap; padding: 5px 10px; border: 1px solid var(--border); border-radius: 999px; }
+    /* Formatted text: notes editor + NeuroBuddy replies (markdown.js) */
+    .rich { line-height: 1.6; overflow-wrap: anywhere; }
+    .rich > :first-child { margin-top: 0; }
+    .rich > :last-child { margin-bottom: 0; }
+    .rich h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; line-height: 1.3; margin: 20px 0 8px; color: var(--text-main); }
+    .rich h3 { font-size: 15px; font-weight: 650; line-height: 1.35; margin: 16px 0 6px; color: var(--text-main); }
+    .rich p { margin: 0 0 8px; }
+    .rich ul, .rich ol { margin: 0 0 10px; padding-left: 22px; }
+    .rich li { margin: 3px 0; padding-left: 2px; }
+    .rich li > ul, .rich li > ol { margin: 4px 0 4px; }
+    .rich li::marker { color: var(--cyan); }
+    .rich ol > li::marker { font-weight: 650; font-size: 0.92em; }
+    .rich strong, .rich b { color: #fff; font-weight: 650; }
+    .rich code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; background: #1c1c21; border: 1px solid var(--border); border-radius: 5px; padding: 1px 5px; }
+    .rich pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; background: #0c0c0e; border: 1px solid var(--border); border-radius: 10px; padding: 12px; overflow-x: auto; margin: 0 0 10px; white-space: pre; }
+    .rich blockquote { margin: 0 0 10px; padding: 6px 12px; border-left: 3px solid var(--cyan); background: rgba(0, 217, 255, 0.04); border-radius: 0 8px 8px 0; color: var(--text-soft); }
+    .rich blockquote p { margin: 2px 0; }
+    .rich hr { border: 0; border-top: 1px solid var(--border); margin: 14px 0; }
+    .chat-bubble.rich { white-space: normal; }
+    .chat-bubble.rich h2 { font-size: 15px; margin: 12px 0 4px; }
+    .chat-bubble.rich h3 { font-size: 14px; margin: 10px 0 4px; }
+    .chat-bubble.is-pending { color: var(--text-muted); }
+
+    /* Notes (student-notes.js) */
+    .notes-layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 20px; align-items: start; }
+    .notes-sidebar { position: sticky; top: 80px; padding: 14px; gap: 10px; }
+    .search-field { position: relative; display: flex; align-items: center; }
+    .search-field .icon { position: absolute; left: 11px; width: 15px; height: 15px; color: var(--text-muted); pointer-events: none; }
+    .search-field input {
+      width: 100%; background: #0e0e11; border: 1px solid var(--border-strong); border-radius: 9px; padding: 9px 12px 9px 34px;
+      font-size: 13px; outline: none; transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .search-field input:focus { border-color: rgba(0, 217, 255, 0.45); box-shadow: 0 0 0 3px rgba(0, 217, 255, 0.08); }
+    .notes-sidebar .field-select { width: 100%; }
+    .note-list { list-style: none; display: flex; flex-direction: column; gap: 2px; max-height: calc(100vh - 300px); min-height: 120px; overflow-y: auto; margin: 4px -6px 0; padding: 0 6px; }
+    .note-item {
+      width: 100%; display: flex; flex-direction: column; gap: 3px; text-align: left; padding: 10px 11px; border: 0; border-radius: 10px;
+      background: none; cursor: pointer; transition: background 0.15s ease;
+    }
+    .note-item:hover { background: #17171b; }
+    .note-item[aria-current="true"] { background: #1c1c21; box-shadow: inset 2px 0 0 var(--cyan); }
+    .note-item b { font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .note-snippet { font-size: 12.5px; color: var(--text-muted); line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .note-item-meta { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: #6b6b75; margin-top: 2px; min-width: 0; }
+    .note-item-meta .class-tag { font-size: 11px; padding: 0 7px; max-width: 150px; }
+
+    .note-panel { min-height: 520px; }
+    .note-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 8px; padding: 48px 20px; color: var(--text-muted); font-size: 13.5px; }
+    .note-empty .chip-icon { width: 52px; height: 52px; border-radius: 16px; margin-bottom: 6px; }
+    .note-empty .chip-icon svg { width: 24px; height: 24px; }
+    .note-empty b { color: var(--text-main); font-size: 16px; }
+    .note-empty p { max-width: 420px; line-height: 1.55; }
+    .note-empty strong { color: var(--text-soft); }
+    .note-empty-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+    .note-editor-wrap { display: flex; flex-direction: column; min-width: 0; }
+    .note-head { display: flex; align-items: center; gap: 12px; }
+    .note-title { flex: 1; min-width: 0; background: none; border: 0; outline: none; font-size: 24px; font-weight: 700; letter-spacing: -0.03em; padding: 2px 0; }
+    .note-title::placeholder { color: #4a4a52; }
+    .note-title:disabled { color: var(--text-soft); }
+    .notes-state { font-size: 12px; color: var(--text-muted); white-space: nowrap; padding: 4px 10px; border: 1px solid var(--border); border-radius: 999px; }
+    .notes-state[data-state="error"] { color: #fca5a5; border-color: rgba(239, 68, 68, 0.35); }
+    .note-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; margin: 10px 0 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+    .note-class { display: inline-flex; align-items: center; gap: 6px; padding: 4px 4px 4px 10px; border: 1px solid var(--border-strong); border-radius: 8px; background: #101013; color: var(--text-muted); }
+    .note-class .icon { width: 14px; height: 14px; }
+    .note-class select { background: transparent; border: 0; color: var(--text-main); font-size: 12.5px; padding: 2px 4px; outline: none; max-width: 200px; cursor: pointer; }
+    .note-class select option { background: #141417; }
+    .note-info { font-size: 12.5px; color: var(--text-muted); }
+    .note-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+    .icon-btn {
+      width: 32px; height: 32px; display: grid; place-items: center; border-radius: 8px; border: 1px solid var(--border-strong);
+      background: #18181c; color: var(--text-soft); cursor: pointer; transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    }
+    .icon-btn:hover { background: #222227; color: var(--text-main); }
+    .icon-btn.danger:hover { color: #fca5a5; border-color: rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.08); }
+    .icon-btn .icon { width: 15px; height: 15px; }
+    .icon-btn:disabled, .note-toolbar button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .note-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; padding: 4px; margin-bottom: 14px; background: #0e0e11; border: 1px solid var(--border); border-radius: 10px; }
+    .note-toolbar button {
+      min-width: 32px; height: 30px; padding: 0 8px; display: grid; place-items: center; border: 0; border-radius: 7px; background: none;
+      color: var(--text-soft); font-size: 13px; font-weight: 650; cursor: pointer; transition: background 0.15s ease, color 0.15s ease;
+    }
+    .note-toolbar button:hover { background: #1c1c21; color: var(--text-main); }
+    .note-toolbar button[aria-pressed="true"] { background: rgba(0, 217, 255, 0.12); color: var(--cyan); }
+    .note-toolbar .icon { width: 16px; height: 16px; }
+    .toolbar-sep { width: 1px; height: 18px; background: var(--border-strong); margin: 0 4px; }
+    .toolbar-tip { margin-left: auto; padding: 0 8px; font-size: 12px; color: #6b6b75; }
+    .note-writing { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--cyan); margin-bottom: 12px; }
+    .writing-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 10px rgba(0, 217, 255, 0.7); animation: writing-pulse 1.2s ease-in-out infinite; }
+    @keyframes writing-pulse { 50% { opacity: 0.3; transform: scale(0.75); } }
+    .note-editor { position: relative; min-height: 360px; outline: none; font-size: 15px; color: #e4e4e7; padding: 2px 2px 24px; caret-color: var(--cyan); }
+    .note-editor.is-empty::before { content: attr(data-placeholder); position: absolute; top: 2px; left: 2px; color: #55555e; pointer-events: none; }
+    .note-editor[contenteditable="false"] { cursor: default; }
+    .notes-message:empty { display: none; }
+    .notes-message { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+
+    /* Organize + quiz dialogs */
+    .nf-dialog-wide { width: min(600px, calc(100vw - 32px)); }
+    .organize-input { resize: vertical; min-height: 180px; line-height: 1.55; font-family: inherit; }
+    .organize-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+    .organize-row .nf-dialog-label { flex: 1; max-width: 300px; }
+    .char-count { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; padding-bottom: 9px; }
+    .quiz-body { padding: 22px; display: flex; flex-direction: column; gap: 14px; }
+    .quiz-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+    .quiz-head h2 { overflow-wrap: anywhere; }
+    .nf-dialog p.quiz-sub { font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }
+    .quiz-progress { height: 6px; background: #1f1f24; border-radius: 4px; overflow: hidden; }
+    .quiz-progress span { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #00b8d9, var(--green)); border-radius: 4px; transition: width 0.3s ease; }
+    .quiz-card { min-height: 190px; display: flex; flex-direction: column; justify-content: center; gap: 14px; padding: 22px; border-radius: 14px; background: #0e0e11; border: 1px solid var(--border); }
+    .quiz-label { font-size: 11px; font-weight: 700; letter-spacing: 0.7px; text-transform: uppercase; color: var(--cyan); }
+    .nf-dialog p.quiz-q { font-size: 18px; font-weight: 650; line-height: 1.4; color: var(--text-main); letter-spacing: -0.2px; }
+    .quiz-answer { padding-top: 14px; border-top: 1px dashed var(--border-strong); display: flex; flex-direction: column; gap: 6px; }
+    .quiz-answer .quiz-label { color: var(--green); }
+    .nf-dialog .quiz-answer p { font-size: 15px; color: var(--text-main); }
+    .quiz-loading { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; color: var(--text-muted); font-size: 13.5px; }
+    .quiz-score { font-size: 40px; font-weight: 750; letter-spacing: -0.04em; line-height: 1; text-align: center; }
+    .quiz-score small { display: block; font-size: 13px; font-weight: 500; color: var(--text-muted); letter-spacing: 0; margin-top: 8px; }
+    .quiz-review { list-style: none; display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+    .quiz-review li { padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: #111114; }
+    .quiz-review b { display: block; color: var(--text-main); font-weight: 600; margin-bottom: 2px; }
+    .quiz-review span { color: var(--text-soft); }
+    .quiz-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+    .quiz-actions .btn-join, .quiz-actions .btn-primary { min-width: 140px; justify-content: center; }
 
     /* History (student-history.js) */
     .range-switch { display: inline-flex; gap: 3px; padding: 3px; background: #0e0e11; border: 1px solid var(--border); border-radius: 10px; }
@@ -425,7 +541,8 @@
     @media (prefers-reduced-motion: reduce) {
       main { scroll-behavior: auto; }
       .view, .focus-toast { animation: none; }
-      #timerRing, .progress span, .switch input::after { transition: none; }
+      #timerRing, .progress span, .switch input::after, .quiz-progress span { transition: none; }
+      .writing-dot { animation: none; }
     }
 
     @media (max-width: 1280px) {
@@ -433,11 +550,16 @@
     }
     @media (max-width: 1100px) {
       .stat-grid { grid-template-columns: repeat(2, 1fr); }
-      .dash-grid, .buddy-grid, .history-grid { grid-template-columns: 1fr; }
+      .dash-grid, .buddy-grid, .history-grid, .notes-layout { grid-template-columns: 1fr; }
+      .notes-sidebar { position: static; }
+      .note-list { max-height: 260px; }
     }
     @media (max-width: 760px) {
-      .notes-grid { grid-template-columns: 1fr; }
-      .notes-grid textarea.field-input { min-height: 200px; }
+      .toolbar-tip { display: none; }
+      .note-title { font-size: 20px; }
+      .note-actions { margin-left: 0; width: 100%; }
+      .note-actions .btn-action { flex: 1; }
+      .note-editor { min-height: 260px; }
       .portal-main { padding: 20px 16px 32px; }
       .welcome-title, .page-title { font-size: 24px; }
     }
@@ -471,6 +593,11 @@
     <symbol id="i-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></symbol>
     <symbol id="i-trend" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 17 6-6 4 4 8-8"/><path d="M15 7h6v6"/></symbol>
     <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13M9 7V4h6v3"/></symbol>
+    <symbol id="i-ol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 6h11M10 12h11M10 18h11M4 6h1v4M4 10h2M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></symbol>
     <symbol id="i-history" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></symbol>
     <symbol id="i-school" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m2 9 10-5 10 5-10 5Z"/><path d="M6 11v5c3 2.5 9 2.5 12 0v-5"/></symbol>
     <symbol id="i-video" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="m16 10 6-3v10l-6-3"/></symbol>
@@ -771,29 +898,68 @@
           <div>
             <div class="page-kicker">Private to you</div>
             <h1 class="page-title" id="notesPageTitle">Class notes</h1>
-            <p class="page-sub">Jot down rough ideas, then let NeuroBuddy organize them into clear study notes.</p>
+            <p class="page-sub">Write notes, or paste messy ones and let NeuroBuddy tidy them up. Then quiz yourself.</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn-action" type="button" data-notes-action="organize"><svg class="icon"><use href="#i-spark"/></svg>Organize rough notes</button>
+            <button class="btn-primary" type="button" data-notes-action="new"><svg class="icon"><use href="#i-plus"/></svg>New note</button>
           </div>
         </div>
-        <section class="panel-card" id="class-notes" aria-labelledby="notesTitle">
-          <div class="panel-head">
-            <div>
-              <div class="panel-title" id="notesTitle"><span class="chip-icon"><svg><use href="#i-note"/></svg></span>Notes for your current class</div>
-              <div class="panel-sub" id="notesMessage">Join a class before creating class notes.</div>
+        <div class="notes-layout">
+          <div class="panel-card notes-sidebar" role="region" aria-label="Your notes">
+            <label class="search-field">
+              <svg class="icon"><use href="#i-search"/></svg>
+              <input id="noteSearch" type="search" placeholder="Search notes" aria-label="Search notes" autocomplete="off">
+            </label>
+            <select id="noteFilter" class="field-select" aria-label="Show notes from"><option value="all">All notes</option></select>
+            <ul class="note-list" id="noteList"><li class="empty-state">Loading your notes…</li></ul>
+          </div>
+
+          <section class="panel-card note-panel" aria-label="Note">
+            <div class="note-empty" id="noteEmpty">
+              <span class="chip-icon"><svg><use href="#i-note"/></svg></span>
+              <b>Pick a note or start a new one</b>
+              <p>Tip: paste messy notes from class into <strong>Organize rough notes</strong> and NeuroBuddy turns them into clear study notes you can quiz yourself on.</p>
+              <div class="note-empty-actions">
+                <button class="btn-action" type="button" data-notes-action="organize"><svg class="icon"><use href="#i-spark"/></svg>Organize rough notes</button>
+                <button class="btn-action" type="button" data-notes-action="new"><svg class="icon"><use href="#i-plus"/></svg>Blank note</button>
+              </div>
             </div>
-            <span class="notes-state" id="notesSaveState">Choose a class</span>
-          </div>
-          <div class="notes-grid">
-            <label class="field-label">Rough notes or key ideas
-              <textarea id="noteCaptureInput" class="field-input" maxlength="6000" placeholder="Jot down anything from class, even messy bullet points…"></textarea>
-            </label>
-            <label class="field-label">Your organized notes (autosaves)
-              <textarea id="classNotes" class="field-input" disabled placeholder="Organized notes appear here. You can edit them too."></textarea>
-            </label>
-          </div>
-          <div class="notes-actions">
-            <button id="generateNotesButton" class="btn-primary" type="button" disabled><svg class="icon"><use href="#i-spark"/></svg>Organize my notes</button>
-          </div>
-        </section>
+
+            <div class="note-editor-wrap" id="noteEditorWrap" hidden>
+              <div class="note-head">
+                <input id="noteTitle" class="note-title" type="text" maxlength="200" placeholder="Untitled note" aria-label="Note title" autocomplete="off">
+                <span class="notes-state" id="noteSaveState" aria-live="polite">Saved</span>
+              </div>
+              <div class="note-meta">
+                <label class="note-class" title="Class this note is filed under">
+                  <svg class="icon"><use href="#i-school"/></svg>
+                  <select id="noteClass" aria-label="Class for this note"></select>
+                </label>
+                <span class="note-info" id="noteInfo"></span>
+                <div class="note-actions">
+                  <button class="btn-action" type="button" id="quizButton"><svg class="icon"><use href="#i-help"/></svg>Quiz me</button>
+                  <button class="icon-btn" type="button" id="copyNote" title="Copy note" aria-label="Copy note"><svg class="icon"><use href="#i-copy"/></svg></button>
+                  <button class="icon-btn danger" type="button" id="deleteNote" title="Delete note" aria-label="Delete note"><svg class="icon"><use href="#i-trash"/></svg></button>
+                </div>
+              </div>
+              <div class="note-toolbar" role="toolbar" aria-label="Formatting">
+                <button type="button" data-format="h2" title="Heading" aria-label="Heading" aria-pressed="false">H1</button>
+                <button type="button" data-format="h3" title="Subheading" aria-label="Subheading" aria-pressed="false">H2</button>
+                <span class="toolbar-sep" aria-hidden="true"></span>
+                <button type="button" data-format="bold" title="Bold (Ctrl/⌘ B)" aria-label="Bold" aria-pressed="false"><b>B</b></button>
+                <button type="button" data-format="italic" title="Italic (Ctrl/⌘ I)" aria-label="Italic" aria-pressed="false"><i>I</i></button>
+                <span class="toolbar-sep" aria-hidden="true"></span>
+                <button type="button" data-format="ul" title="Bullet list" aria-label="Bullet list" aria-pressed="false"><svg class="icon"><use href="#i-list"/></svg></button>
+                <button type="button" data-format="ol" title="Numbered list" aria-label="Numbered list" aria-pressed="false"><svg class="icon"><use href="#i-ol"/></svg></button>
+                <span class="toolbar-tip">Type “- ” for a bullet or “# ” for a heading</span>
+              </div>
+              <div class="note-writing" id="noteWriting" hidden><span class="writing-dot"></span>NeuroBuddy is organizing your notes…</div>
+              <div id="noteEditor" class="note-editor rich" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Note text" data-placeholder="Start writing…" spellcheck="true"></div>
+            </div>
+            <p class="panel-sub notes-message" id="notesMessage" aria-live="polite"></p>
+          </section>
+        </div>
       </section>
 
       <!-- ================= Focus history ================= -->
@@ -908,6 +1074,44 @@
     </div>
   </main>
 
+  <!-- Organize rough notes (student-notes.js) -->
+  <dialog class="nf-dialog nf-dialog-wide" id="organizeDialog" aria-labelledby="organizeTitle">
+    <form id="organizeForm" method="dialog">
+      <h2 id="organizeTitle">Organize rough notes</h2>
+      <p>Paste or type anything from class, even messy bullet points. NeuroBuddy turns it into a new note with key ideas, important words and questions to revisit. It only uses what you write here.</p>
+      <label class="nf-dialog-label">Rough notes
+        <textarea class="nf-dialog-input organize-input" id="organizeInput" rows="9" maxlength="12000" required placeholder="e.g. photosynthesis = plants make food w/ sunlight. chlorophyll (green). needs CO2 + water, gives off oxygen?"></textarea>
+      </label>
+      <div class="organize-row">
+        <label class="nf-dialog-label">File under
+          <select class="nf-dialog-input" id="organizeClass"></select>
+        </label>
+        <span class="char-count" id="organizeCount">0 / 12,000</span>
+      </div>
+      <p class="nf-dialog-message" id="organizeMessage">Only this text and the class name go to the AI service. Avoid personal details.</p>
+      <div class="nf-dialog-actions">
+        <button type="button" class="btn-action" id="organizeCancel">Cancel</button>
+        <button type="submit" class="btn-primary"><svg class="icon"><use href="#i-spark"/></svg>Organize</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Flashcard quiz (student-notes.js) -->
+  <dialog class="nf-dialog nf-dialog-wide quiz-dialog" id="quizDialog" aria-labelledby="quizTitle">
+    <div class="quiz-body">
+      <div class="quiz-head">
+        <div>
+          <h2 id="quizTitle">Quiz</h2>
+          <p class="quiz-sub" id="quizSub"></p>
+        </div>
+        <button class="icon-btn" type="button" id="quizClose" aria-label="Close quiz"><svg class="icon"><use href="#i-close"/></svg></button>
+      </div>
+      <div class="quiz-progress" aria-hidden="true"><span id="quizBar"></span></div>
+      <div class="quiz-card" id="quizCard" aria-live="polite"></div>
+      <div class="quiz-actions" id="quizActions"></div>
+    </div>
+  </dialog>
+
   <!-- Join a class -->
   <dialog class="nf-dialog" id="joinDialog" aria-labelledby="joinTitle">
     <form id="joinClassForm" method="dialog">
@@ -943,8 +1147,9 @@
   <!-- auth-guard.js must load first: the other modules wait on window.neuroFocusReady -->
   <script type="module" src="auth-guard.js?v=2"></script>
   <script type="module" src="eye-analyzer.js?v=2"></script>
-  <script type="module" src="learning-assistant.js?v=2"></script>
-  <script type="module" src="student-classes.js?v=5"></script>
+  <script type="module" src="learning-assistant.js?v=3"></script>
+  <script type="module" src="student-notes.js?v=1"></script>
+  <script type="module" src="student-classes.js?v=6"></script>
   <script type="module" src="student-focus.js?v=4"></script>
   <script type="module" src="student-history.js?v=1"></script>
 </body>

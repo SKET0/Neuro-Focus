@@ -30,37 +30,112 @@ const backupModel = provider.models.find((name) => name !== primaryModel) ?? pri
 
 // Free tiers are often briefly busy or overloaded, so temporary failures are retried.
 const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
-const ATTEMPT_TIMEOUT_MS = 15000;
+const FIRST_TEXT_TIMEOUT_MS = 15000; // a model that hasn't started writing by then is retried
+const TOTAL_TIMEOUT_MS = 90000;
 const ATTEMPTS = [
   { model: primaryModel, delayMs: 0 },
   { model: backupModel, delayMs: 400 },
   { model: primaryModel, delayMs: 1200 }
 ];
 
-type AttemptResult = { status: number; text: string; error?: { message?: string; status?: string; type?: string } };
+type AttemptResult = {
+  status: number;
+  stream?: ReadableStream<Uint8Array>;
+  error?: { message?: string; status?: string; type?: string };
+};
 
-async function askModel(model: string, body: Record<string, unknown>): Promise<AttemptResult> {
+// Asks the model to stream its answer. Resolves once the first words arrive, so a busy or
+// silent model can still be retried; the rest of the answer is passed on as plain text.
+async function startAnswer(model: string, body: Record<string, unknown>): Promise<AttemptResult> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), ATTEMPT_TIMEOUT_MS);
+  let timer = setTimeout(() => controller.abort(), FIRST_TEXT_TIMEOUT_MS);
   try {
     const response = await fetch(`${provider.baseUrl}/chat/completions`, {
       method: "POST",
       headers: { "Authorization": `Bearer ${aiApiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model, ...body }),
+      body: JSON.stringify({ model, ...body, stream: true }),
       signal: controller.signal
     });
-    const payload = await response.json().catch(() => null);
-    // Gemini sometimes wraps errors in an array.
-    const error = Array.isArray(payload) ? payload[0]?.error : payload?.error;
-    const text = response.ok ? String(payload?.choices?.[0]?.message?.content ?? "").trim() : "";
-    return { status: response.status, text, error };
+    if (!response.ok || !response.body) {
+      const payload = await response.json().catch(() => null);
+      clearTimeout(timer);
+      // Gemini sometimes wraps errors in an array.
+      return { status: response.status, error: Array.isArray(payload) ? payload[0]?.error : payload?.error };
+    }
+
+    // Server-sent events: "data: {json}" lines, ending with "data: [DONE]".
+    const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+    let buffer = "";
+    const nextText = async (): Promise<string | null> => {
+      while (true) {
+        const newline = buffer.indexOf("\n");
+        if (newline >= 0) {
+          const line = buffer.slice(0, newline).trim();
+          buffer = buffer.slice(newline + 1);
+          if (!line.startsWith("data:")) continue;
+          const data = line.slice(5).trim();
+          if (data === "[DONE]") return null;
+          try {
+            const text = JSON.parse(data)?.choices?.[0]?.delta?.content;
+            if (text) return text;
+          } catch { /* ignore keep-alive or partial lines */ }
+          continue;
+        }
+        const { value, done } = await reader.read();
+        if (done) return null;
+        buffer += value;
+      }
+    };
+
+    const first = await nextText();
+    clearTimeout(timer);
+    if (!first) return { status: 200, error: { message: "empty answer" } };
+    timer = setTimeout(() => controller.abort(), TOTAL_TIMEOUT_MS);
+    const encoder = new TextEncoder();
+    const finish = () => { clearTimeout(timer); reader.cancel().catch(() => {}); };
+    const stream = new ReadableStream<Uint8Array>({
+      start(output) { output.enqueue(encoder.encode(first)); },
+      async pull(output) {
+        try {
+          const text = await nextText();
+          if (text === null) { finish(); output.close(); } else output.enqueue(encoder.encode(text));
+        } catch {
+          finish();
+          output.close();
+        }
+      },
+      cancel() { finish(); controller.abort(); }
+    });
+    return { status: 200, stream };
   } catch (error) {
+    clearTimeout(timer);
     // status 0 = timed out or network failure
-    return { status: 0, text: "", error: { message: error instanceof Error ? error.name : "network error" } };
-  } finally {
-    clearTimeout(timeout);
+    return { status: 0, error: { message: error instanceof Error ? error.name : "network error" } };
   }
 }
+
+async function readAll(stream: ReadableStream<Uint8Array>) {
+  let text = "";
+  const reader = stream.pipeThrough(new TextDecoderStream()).getReader();
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) return text.trim();
+    text += value;
+  }
+}
+
+// The gateway has already verified the token (Verify JWT); this reads its user id so the
+// profile and class checks can run at the same time as getUser.
+function tokenSubject(token: string) {
+  try {
+    const part = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const claims = JSON.parse(atob(part.padEnd(Math.ceil(part.length / 4) * 4, "=")));
+    return typeof claims.sub === "string" ? claims.sub : "";
+  } catch {
+    return "";
+  }
+}
+
 const configuredOrigin = Deno.env.get("APP_ORIGIN");
 const allowedOrigins = new Set([
   "http://localhost:8000",
@@ -68,15 +143,18 @@ const allowedOrigins = new Set([
   ...(configuredOrigin ? [configuredOrigin] : [])
 ]);
 
+function corsHeaders(origin: string) {
+  return {
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info, x-supabase-api-version",
+    "Vary": "Origin"
+  };
+}
+
 function json(body: unknown, status = 200, origin = "http://localhost:8000") {
   return new Response(JSON.stringify(body), {
     status,
-    headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": origin,
-      "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info, x-supabase-api-version",
-      "Vary": "Origin"
-    }
+    headers: { "Content-Type": "application/json", ...corsHeaders(origin) }
   });
 }
 
@@ -84,14 +162,7 @@ Deno.serve(async (request) => {
   const origin = request.headers.get("origin") || "";
   const responseOrigin = allowedOrigins.has(origin) ? origin : "null";
   if (request.method === "OPTIONS") {
-    return new Response("ok", {
-      headers: {
-        "Access-Control-Allow-Origin": responseOrigin,
-        "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info, x-supabase-api-version",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Vary": "Origin"
-      }
-    });
+    return new Response("ok", { headers: { ...corsHeaders(responseOrigin), "Access-Control-Allow-Methods": "POST, OPTIONS" } });
   }
   if (request.method !== "POST") return json({ error: "Use POST for assistant requests." }, 405, responseOrigin);
   if (!allowedOrigins.has(origin)) return json({ error: "This site is not allowed to use the assistant." }, 403, responseOrigin);
@@ -99,20 +170,9 @@ Deno.serve(async (request) => {
 
   const authorization = request.headers.get("Authorization");
   if (!authorization?.startsWith("Bearer ")) return json({ error: "Sign in to use the learning assistant." }, 401, responseOrigin);
-
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    global: { headers: { Authorization: authorization } },
-    auth: { persistSession: false, autoRefreshToken: false }
-  });
   const accessToken = authorization.slice("Bearer ".length);
-  const { data: userData, error: userError } = await supabase.auth.getUser(accessToken);
-  if (userError || !userData.user) return json({ error: "Your session expired. Sign in again." }, 401, responseOrigin);
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", userData.user.id)
-    .maybeSingle();
-  if (profileError || profile?.role !== "student") return json({ error: "The student learning helper is available to student accounts." }, 403, responseOrigin);
+  const userId = tokenSubject(accessToken);
+  if (!userId) return json({ error: "Your session expired. Sign in again." }, 401, responseOrigin);
 
   let body: Record<string, unknown>;
   try {
@@ -120,23 +180,27 @@ Deno.serve(async (request) => {
   } catch {
     return json({ error: "Request body must be JSON." }, 400, responseOrigin);
   }
-
   const task = body.task;
   const classId = typeof body.classId === "string" ? body.classId : "";
-  if (task !== "tutor" && task !== "notes") return json({ error: "Unknown assistant task." }, 400, responseOrigin);
-  if (task === "notes" && !classId) return json({ error: "Choose one of your classes before organizing class notes." }, 400, responseOrigin);
+  const wantsStream = body.stream === true;
+  if (task !== "tutor" && task !== "notes" && task !== "quiz") return json({ error: "Unknown assistant task." }, 400, responseOrigin);
 
-  // Class context is optional for the tutor. If provided, RLS verifies membership.
-  let className = "";
-  if (classId) {
-    const { data: classRow, error: classError } = await supabase
-      .from("classes")
-      .select("id, name")
-      .eq("id", classId)
-      .maybeSingle();
-    if (classError || !classRow) return json({ error: "That class is not available to your account." }, 403, responseOrigin);
-    className = classRow.name;
-  }
+  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: authorization } },
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+  // Check the session, the student role and the class together. Class context is optional;
+  // when given, RLS only returns the class if the student is a member.
+  const [userResult, profileResult, classResult] = await Promise.all([
+    supabase.auth.getUser(accessToken),
+    supabase.from("profiles").select("role").eq("id", userId).maybeSingle(),
+    classId ? supabase.from("classes").select("id, name").eq("id", classId).maybeSingle() : Promise.resolve({ data: null, error: null })
+  ]);
+  if (userResult.error || userResult.data.user?.id !== userId) return json({ error: "Your session expired. Sign in again." }, 401, responseOrigin);
+  if (profileResult.error || profileResult.data?.role !== "student") return json({ error: "The student learning helper is available to student accounts." }, 403, responseOrigin);
+  if (classId && (classResult.error || !classResult.data)) return json({ error: "That class is not available to your account." }, 403, responseOrigin);
+  const className = classResult.data?.name || "";
+  const classLine = className ? `Class (name only): ${className}\n\n` : "";
 
   let instructions: string;
   let messages: Array<{ role: "user" | "assistant"; content: string }>;
@@ -156,13 +220,31 @@ Deno.serve(async (request) => {
       : [];
     if (!prompt || prompt.length > 2000) return json({ error: "Ask a question up to 2,000 characters." }, 400, responseOrigin);
 
-    instructions = `You are NeuroBuddy, the friendly AI study buddy inside the Neuro-Focus learning platform. If asked who you are, say you are NeuroBuddy. You are a kind, patient learning helper for a neurodivergent student. Explain ideas without judgement. Use short paragraphs and plain language. Follow the requested support style: ${style}. Ask one question at a time when clarification would help. Do not diagnose, infer disability, grade the student, or claim certainty when unsure. Help the student understand rather than simply doing graded work for them. Never ask for identifying personal details.`;
+    instructions = `You are NeuroBuddy, the friendly AI study buddy inside the Neuro-Focus learning platform. If asked who you are, say you are NeuroBuddy. You are a kind, patient learning helper for a neurodivergent student. Explain ideas without judgement. Use short paragraphs and plain language. Follow the requested support style: ${style}. Ask one question at a time when clarification would help. Do not diagnose, infer disability, grade the student, or claim certainty when unsure. Help the student understand rather than simply doing graded work for them. Never ask for identifying personal details.
+Formatting: plain text with simple Markdown only: "- " bullets, "1." numbered steps, **bold** for key words and "### " for a short heading when an answer has parts. No tables, code blocks or HTML.`;
     messages = [...history, { role: "user", content: `${className ? `Class context (class name only): ${className}\n` : ""}Question: ${prompt}` }];
-  } else {
+  } else if (task === "notes") {
     const studentInput = typeof body.studentInput === "string" ? body.studentInput.trim() : "";
     if (!studentInput || studentInput.length > 12000) return json({ error: "Add class text or ideas (up to 12,000 characters)." }, 400, responseOrigin);
-    instructions = "Create clear, editable study notes for a neurodivergent student. Use a short title, key ideas, useful vocabulary, and questions to revisit. Keep the language plain and organize ideas into small chunks. Only use the student's supplied input; do not invent lecture content. Mark unclear items as questions instead of guessing. These notes are a draft for the student to review.";
-    messages = [{ role: "user", content: `Class context (class name only): ${className}\n\nTurn this student-provided class input into notes:\n\n${studentInput}` }];
+    instructions = `You turn a student's rough class notes into clear study notes for a neurodivergent learner.
+Output Markdown only, in this shape:
+# A short title (up to 8 words)
+## Section heading
+- one idea per bullet, under 20 words
+
+Use 2 to 5 sections, choosing from: Key ideas, Important words, Steps or examples, Questions to revisit. Skip sections that don't apply. Use "1." lists only for steps in order. Put key terms in **bold**; under Important words write "- **term**: short meaning".
+Rules: use only information in the student's text and do not add facts. If something is unclear or looks wrong, list it under Questions to revisit instead of guessing. Keep the notes no longer than the input needs. Write in the same language as the student's notes. No tables, code blocks, emojis, HTML or text before the title.`;
+    messages = [{ role: "user", content: `${classLine}Student's rough notes:\n\n${studentInput}` }];
+  } else {
+    const noteText = typeof body.noteText === "string" ? body.noteText.trim() : "";
+    const count = Math.min(10, Math.max(3, Number(body.count) || 5));
+    if (noteText.length < 40) return json({ error: "Write a bit more in this note first, then NeuroBuddy can quiz you on it." }, 400, responseOrigin);
+    if (noteText.length > 20000) return json({ error: "This note is too long to quiz on. Try a shorter note." }, 400, responseOrigin);
+    instructions = `Write ${count} flashcards that help a student review their own study notes. Use only facts that are in the notes. Mix "what", "why" and "how" questions and cover different parts of the notes. Keep each question under 20 words and each answer under 30 words, in the same language as the notes.
+Output exactly this plain-text format, with a blank line between cards and nothing else:
+Q: question
+A: answer`;
+    messages = [{ role: "user", content: `${classLine}Notes:\n\n${noteText}` }];
   }
 
   const { error: quotaError } = await supabase.rpc("consume_learning_request");
@@ -173,7 +255,7 @@ Deno.serve(async (request) => {
       : "Could not check your learning helper allowance. Please try again." }, atLimit ? 429 : 503, responseOrigin);
   }
 
-  const userHash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(userData.user.id));
+  const userHash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(userId));
   const safetyIdentifier = `nf_${Array.from(new Uint8Array(userHash), (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
   const requestBody: Record<string, unknown> = {
     messages: [{ role: "system", content: instructions }, ...messages],
@@ -185,11 +267,17 @@ Deno.serve(async (request) => {
   let last: AttemptResult | undefined;
   for (const attempt of ATTEMPTS) {
     if (attempt.delayMs) await new Promise((resolve) => setTimeout(resolve, attempt.delayMs));
-    const result = await askModel(attempt.model, requestBody);
-    if (result.text) return json({ text: result.text }, 200, responseOrigin);
+    const result = await startAnswer(attempt.model, requestBody);
+    if (result.stream) {
+      // Streaming clients show the answer as it is written; others get it as JSON at the end.
+      if (!wantsStream) return json({ text: await readAll(result.stream) }, 200, responseOrigin);
+      return new Response(result.stream, {
+        headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-cache", "X-Content-Type-Options": "nosniff", ...corsHeaders(responseOrigin) }
+      });
+    }
     last = result;
     console.error("AI attempt failed", providerName, attempt.model, result.status,
-      result.error?.status || result.error?.type || "", String(result.error?.message || (result.status === 200 ? "empty answer" : "")).slice(0, 200));
+      result.error?.status || result.error?.type || "", String(result.error?.message || "").slice(0, 200));
     if (result.status === 400 && "reasoning_effort" in requestBody) {
       // A model that rejects reasoning_effort gets one retry without it.
       delete requestBody.reasoning_effort;
