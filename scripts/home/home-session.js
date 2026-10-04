@@ -1,6 +1,6 @@
 // Home page: when a user is already signed in, swap the sign-in / sign-up
 // calls to action for links back to their dashboard and a sign-out option.
-import { getSupabase } from "./supabase-client.js";
+import { getSupabase } from "../services/supabase-client.js";
 
 const hook = (name) => document.querySelector(`[data-session="${name}"]`);
 
@@ -15,7 +15,7 @@ function setLink(element, href, label) {
 // A password-reset link that landed here (the project's Site URL) belongs on the login page,
 // which lets the person choose a new password. Forward it before Supabase reads the link.
 const forwardingReset = /type=recovery/.test(window.location.hash);
-if (forwardingReset) window.location.replace(`login.html?mode=reset${window.location.hash}`);
+if (forwardingReset) window.location.replace(`pages/login.html?mode=reset${window.location.hash}`);
 
 if (!forwardingReset) try {
   const supabase = await getSupabase();
@@ -30,7 +30,7 @@ if (!forwardingReset) try {
 
     if (profile) {
       const isTeacher = profile.role === "teacher";
-      const dashboard = isTeacher ? "teacher.html" : "student.html";
+      const dashboard = isTeacher ? "pages/teacher.html" : "pages/student.html";
       const dashboardName = isTeacher ? "Teacher Dashboard" : "Student Workspace";
 
       const signOut = async (event) => {
@@ -79,8 +79,8 @@ if (!forwardingReset) try {
     }
   } else {
     // Signed out: both workspaces need a sign-in first.
-    hook("hub-student")?.setAttribute("href", "login.html");
-    hook("hub-teacher")?.setAttribute("href", "login.html");
+    hook("hub-student")?.setAttribute("href", "pages/login.html");
+    hook("hub-teacher")?.setAttribute("href", "pages/login.html");
   }
 } catch (error) {
   // Leave the signed-out buttons in place if Supabase is unreachable.

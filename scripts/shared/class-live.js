@@ -50,8 +50,10 @@ export function onlineStudentIds(state) {
 
 // removed: students just removed from the class. sessionRemoved: students removed from the
 // live session only (they stay in the class). invites: { studentId: time } "please join" pings.
-export function teacherStatus(state) {
-  const metas = Object.values(state).flat().filter((meta) => meta.role === "teacher");
+// Pass the class's teacher_id so only that account's presence counts; anything else on the
+// channel claiming to be the teacher is ignored.
+export function teacherStatus(state, teacherId = "") {
+  const metas = (teacherId ? state[teacherId] || [] : Object.values(state).flat()).filter((meta) => meta.role === "teacher");
   const live = metas.find((meta) => meta.live);
   return {
     online: metas.length > 0,
@@ -110,12 +112,19 @@ export function confirmAction({ title, message, confirmLabel = "Confirm", danger
     dialog.append(form);
     document.body.append(dialog);
 
-    let confirmed = false;
-    cancel.addEventListener("click", () => dialog.close());
-    form.addEventListener("submit", () => { confirmed = true; });
+    // Answer as soon as a button is pressed rather than waiting for the dialog's "close" event,
+    // which browsers may hold back (e.g. in a background tab).
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+    cancel.addEventListener("click", () => { dialog.close(); finish(false); });
+    form.addEventListener("submit", () => finish(true));
     dialog.addEventListener("close", () => {
       dialog.remove();
-      resolve(confirmed);
+      finish(false); // closed some other way, e.g. the Escape key
     });
     dialog.showModal();
     (input || (cancelLabel ? cancel : ok)).focus();
@@ -190,7 +199,8 @@ export async function copyText(text) {
 export const MIGRATIONS = {
   history: "supabase/migrations/20261002000000_attention_history_and_private_live.sql",
   classes: "supabase/migrations/20261003000000_class_management.sql",
-  attendance: "supabase/migrations/20261005000000_sessions_attendance.sql"
+  attendance: "supabase/migrations/20261005000000_sessions_attendance.sql",
+  workflow: "supabase/migrations/20261006000000_live_workflow_hardening.sql"
 };
 
 // PostgREST error codes for a table or function that doesn't exist yet.
@@ -204,6 +214,8 @@ export async function missingDatabaseUpdates(supabase) {
   if (settings.error && (settings.error.code === "42703" || /joining_open/.test(settings.error.message || ""))) missing.push(MIGRATIONS.classes);
   const sessions = await supabase.from("class_sessions").select("id").limit(1);
   if (isMissingSql(sessions.error)) missing.push(MIGRATIONS.attendance);
+  const linked = await supabase.from("attention_sessions").select("class_session_id").limit(1);
+  if (!missing.includes(MIGRATIONS.attendance) && linked.error && (linked.error.code === "42703" || /class_session_id/.test(linked.error.message || ""))) missing.push(MIGRATIONS.workflow);
   return missing;
 }
 

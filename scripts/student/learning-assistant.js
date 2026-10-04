@@ -1,7 +1,7 @@
 // NeuroBuddy chat: answers stream in as they are written and render simple formatting
 // (bold, lists, headings). Class notes live in student-notes.js.
-import { streamAssistant } from "./assistant-api.js?v=1";
-import { renderMarkdown } from "./markdown.js?v=1";
+import { streamAssistant } from "../services/assistant-api.js?v=1";
+import { renderMarkdown } from "../shared/markdown.js?v=1";
 
 const app = await window.neuroFocusReady;
 
