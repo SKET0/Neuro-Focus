@@ -31,6 +31,7 @@ if (app) {
   let filter = "all";
   let setupMissing = false;
   let tempCount = 0;
+  let notesLoaded = false;
   const saveTimers = new Map(); // note key -> pending save
   const dirty = new Set();
   try { filter = localStorage.getItem(filterKey) || "all"; } catch { /* storage unavailable */ }
@@ -46,6 +47,9 @@ if (app) {
   const active = () => notes.find((note) => note.key === activeKey) || null;
   const className = (id) => (id ? classes.find((item) => item.id === id)?.name || "Former class" : "Personal");
   const knownClass = (id) => Boolean(id && classes.some((item) => item.id === id));
+  // Each class's colour, the same as on Home's class cards (student-dashboard.js).
+  const CLASS_COLORS = ["#22d3ee", "#a78bfa", "#4ade80", "#fb923c", "#60a5fa", "#f472b6", "#facc15", "#2dd4bf"];
+  const classColor = (id) => (id ? CLASS_COLORS[[...String(id)].reduce((total, ch) => (total * 31 + ch.charCodeAt(0)) % 997, 7) % CLASS_COLORS.length] : "");
   const message = (text, isError = false) => {
     els.message.textContent = text;
     els.message.dataset.state = isError ? "error" : "";
@@ -93,7 +97,34 @@ if (app) {
       .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
   }
 
+  // Class filter chips, one per option of the hidden #noteFilter list, with how many notes each holds.
+  function renderFilterChips() {
+    const wrap = $("#noteFilterChips");
+    if (!wrap) return;
+    const focused = wrap.contains(document.activeElement) ? document.activeElement.dataset.value : null;
+    const count = (value) => notes.filter((note) => (value === "all" ? true : value === PERSONAL ? !note.class_id : note.class_id === value)).length;
+    wrap.replaceChildren(...[...els.filter.options].map((option) => {
+      const chip = el("button", "filter-chip");
+      chip.type = "button";
+      chip.dataset.value = option.value;
+      chip.setAttribute("aria-pressed", String(option.value === els.filter.value));
+      if (classColor(option.value !== "all" && option.value !== PERSONAL ? option.value : "")) chip.style.setProperty("--class-color", classColor(option.value));
+      chip.append(el("span", "", option.textContent), el("small", "", String(count(option.value))));
+      chip.setAttribute("aria-label", `${option.textContent}, ${plural(count(option.value), "note")}`);
+      chip.addEventListener("click", () => {
+        if (els.filter.value === option.value) return;
+        els.filter.value = option.value;
+        els.filter.dispatchEvent(new Event("change"));
+      });
+      return chip;
+    }));
+    if (focused) wrap.querySelector(`[data-value="${CSS.escape(focused)}"]`)?.focus();
+    const counter = $("#notesCount");
+    if (counter && notesLoaded) counter.textContent = notes.length ? `${plural(notes.length, "note")} · only you can see them` : "Only you can see your notes";
+  }
+
   function renderList() {
+    renderFilterChips();
     const items = visibleNotes();
     if (!items.length) {
       const text = setupMissing ? SETUP_TEXT
@@ -108,6 +139,7 @@ if (app) {
       const button = el("button", "note-item");
       button.type = "button";
       if (note.key === activeKey) button.setAttribute("aria-current", "true");
+      if (note.class_id) button.style.setProperty("--class-color", classColor(note.class_id));
       const meta = el("span", "note-item-meta");
       meta.append(el("span", "class-tag", className(note.class_id)), el("span", "", relativeTime(note.updated_at)));
       button.append(
@@ -624,7 +656,6 @@ if (app) {
 
   // ---------- Opened from the Home view (student-dashboard.js) ----------
   // "Continue where you left off" opens one saved note; a class card shows that class's notes.
-  let notesLoaded = false;
   let pendingOpenId = null;
   function openById(id) {
     if (!id) return;

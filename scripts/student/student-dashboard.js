@@ -9,7 +9,9 @@
 // "neurofocus:class-status"), the timer and steps (student-focus.js) and the profile
 // (student-profile.js). Notes and the latest saved session are read here.
 
-import { buildCoaching, averageFocus, focusedSeconds, sum, levelFor } from "./focus-analysis.js?v=1";
+import { buildCoaching, averageFocus, focusedSeconds, sum, levelFor } from "./focus-analysis.js?v=2";
+import { paintAvatar, greetingName } from "../shared/avatars.js?v=1";
+import { selectWithQuality } from "../shared/tracking-states.js?v=1";
 import { notify } from "../shared/class-live.js?v=9";
 
 const app = await window.neuroFocusReady;
@@ -110,7 +112,7 @@ if (app) {
   function renderGreeting() {
     const hour = new Date().getHours();
     const greeting = hour < 5 ? "Hello" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-    const name = el("span", "gradient-name", (app.profile.display_name || "").trim() || "there");
+    const name = el("span", "gradient-name", greetingName(app.profile.display_name));
     $("#welcomeTitle").replaceChildren(`${greeting}, `, name);
     const isNew = classStatus.loaded && !classStatus.error && !(classStatus.classes || []).length;
     $("#heroLead").textContent = isNew
@@ -327,7 +329,7 @@ if (app) {
     const grid = $("#homeClassGrid");
     const classes = classStatus.classes || [];
     const key = JSON.stringify([classStatus.loaded, classStatus.error, classStatus.currentId,
-      classes.map((item) => [item.id, item.name, item.teacherName, item.live, item.since, item.online, item.removed, item.inSession])]);
+      classes.map((item) => [item.id, item.name, item.teacherName, item.teacherAvatar, item.live, item.since, item.online, item.removed, item.inSession])]);
     renderIfChanged("classes", key, grid, () => {
       if (!classStatus.loaded) {
         grid.replaceChildren(el("p", "empty-state", "Loading your classes…"));
@@ -360,8 +362,16 @@ if (app) {
         tile.setAttribute("aria-hidden", "true");
         const name = el("div", "class-card-name");
         name.append(el("h3", "", item.name));
-        if (item.teacherName) name.append(el("small", "", `with ${item.teacherName}`));
         top.append(tile, name);
+        // The class's teacher, with their picture or built-in avatar.
+        const teacher = el("div", "class-teacher");
+        if (item.teacherName) {
+          const face = el("span", "nf-avatar sm");
+          paintAvatar(face, { name: item.teacherName, preset: item.teacherAvatar?.preset, url: item.teacherAvatar?.url });
+          const who = el("span", "class-teacher-name");
+          who.append(el("b", "", item.teacherName), el("small", "", "Teacher"));
+          teacher.append(face, who);
+        }
 
         const chip = el("span", "class-chip");
         if (item.inSession) { chip.dataset.state = "in-session"; chip.textContent = "You’re in the live session"; }
@@ -390,7 +400,7 @@ if (app) {
         notes.dataset.focusKey = `notes-${item.id}`;
         notes.setAttribute("aria-label", `Notes for ${item.name}`);
         row.append(notes);
-        card.append(top, chip, row);
+        card.append(top, ...(item.teacherName ? [teacher] : []), chip, row);
         return card;
       }));
     });
@@ -441,7 +451,7 @@ if (app) {
       }
       if (lastSession) {
         const minutes = Math.max(1, Math.round(lastSession.tracked_seconds / 60));
-        const focus = lastSession.focus_percent === null || lastSession.focus_percent === undefined ? "" : ` · ${lastSession.focus_percent}% focused`;
+        const focus = lastSession.focus_percent === null || lastSession.focus_percent === undefined ? "" : ` · about ${lastSession.focus_percent}% on screen (estimate)`;
         row("i-history", "", lastSession.ended_at ? "Your last focus session" : "Your last focus session (unfinished)", `${relativeTime(lastSession.started_at)} · ${minutes} min tracked${focus}`, null, "session", "#progress");
       }
       if (!items.length) {
@@ -459,7 +469,7 @@ if (app) {
     extrasLoadedAt = Date.now();
     const [notes, sessions] = await Promise.all([
       supabase.from("student_notes").select("id, title, class_id, updated_at").eq("student_id", app.user.id).order("updated_at", { ascending: false }).limit(3),
-      supabase.from("attention_sessions").select("id, started_at, last_seen_at, ended_at, tracked_seconds, focus_percent, lapses, best_streak_seconds").eq("student_id", app.user.id).gt("tracked_seconds", 4).order("started_at", { ascending: false }).limit(60)
+      selectWithQuality((quality) => supabase.from("attention_sessions").select(`id, started_at, last_seen_at, ended_at, tracked_seconds, focus_percent, lapses, best_streak_seconds${quality}`).eq("student_id", app.user.id).gt("tracked_seconds", 4).order("started_at", { ascending: false }).limit(60))
     ]);
     recentNotes = notes.error ? [] : notes.data || [];
     // The session being recorded right now isn't saved history yet (student-focus.js decides).
@@ -581,22 +591,22 @@ if (app) {
       basis.textContent = coaching.basis;
       $("#focus-coach").dataset.stage = coaching.stage;
 
+      // Until there's enough measured data: what personal suggestions need, and how far along it is.
       progressBox.hidden = !coaching.progress;
       if (coaching.progress) {
-        const { done, needed } = coaching.progress;
+        const { sessions, days, minutes } = coaching.progress;
+        const share = Math.min(sessions.done / sessions.needed, days.done / days.needed, minutes.done / minutes.needed);
         const meter = el("div", "unlock-meter");
         const fill = el("span");
-        fill.style.width = `${Math.round((done / needed) * 100)}%`;
+        fill.style.width = `${Math.round(share * 100)}%`;
         meter.append(fill);
         meter.setAttribute("role", "progressbar");
         meter.setAttribute("aria-valuemin", "0");
-        meter.setAttribute("aria-valuemax", String(needed));
-        meter.setAttribute("aria-valuenow", String(done));
-        meter.setAttribute("aria-label", "Sessions until personal tips");
+        meter.setAttribute("aria-valuemax", "100");
+        meter.setAttribute("aria-valuenow", String(Math.round(share * 100)));
+        meter.setAttribute("aria-label", "Measured data collected for personal suggestions");
         progressBox.replaceChildren(
-          el("p", "", done
-            ? `${done} of ${needed} sessions tracked. After ${needed}, these tips are based on how you actually focus.`
-            : `Track ${needed} focus sessions and these tips will be based on how you actually focus. Until then, here are tips that help most students.`),
+          el("p", "", `Personal suggestions need ${sessions.needed} sessions on ${days.needed} different days with ${minutes.needed} minutes of measured tracking (time the camera could see your face). So far: ${sessions.done} of ${sessions.needed} sessions, ${days.done} of ${days.needed} days, ${minutes.done} of ${minutes.needed} minutes.`),
           meter
         );
       }
@@ -626,7 +636,7 @@ if (app) {
   timerPreset?.addEventListener("change", renderCoach);
 
   // ---------- At a glance: focus score and this week ----------
-  // From finished saved sessions only. The score is the share of tracked time spent focused
+  // From finished saved sessions only. The score is the estimated share of measured time on screen
   // (the same measure as My progress), weighted by session length.
   const DAY_MS = 86400000;
   const startOfDay = (date) => { const d = new Date(date); d.setHours(0, 0, 0, 0); return d; };

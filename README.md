@@ -182,6 +182,25 @@ What students get:
 
 The chosen theme is also remembered in the browser for that account only, so pages open in the right colours straight away. It is cleared on sign-out and ignored if a different account signs in. Teacher pages always keep the default look.
 
+## Teacher avatars update (teacher name and picture on students' class cards)
+
+Run `supabase/migrations/20261008000000_teacher_avatars.sql` once in **Supabase Dashboard → SQL Editor**, after the student profiles update. It is safe to run again and doesn't change any data.
+
+- Students' class cards show their teacher's name and avatar (built-in avatar or uploaded picture).
+- A teacher's uploaded picture can be viewed by the teacher and by students in that teacher's classes, through the same short-lived signed links. Nobody else can see it and it is never public. Students' pictures are unchanged: only the student and their class teachers can see them.
+
+Until it is run, class cards show the teacher's name with initials.
+
+## Tracking quality update (unavailable time is not zero attention)
+
+Run `supabase/migrations/20261009000000_tracking_quality.sql` once in **Supabase Dashboard → SQL Editor**, after the earlier updates. It is safe to run again. It only adds columns and allows new sample states; no existing row is deleted or changed.
+
+- Each saved session records how much time the tracker could actually measure (`usable_seconds`), how much it couldn't (`unavailable_seconds`: no face, more than one face, no readings) and break time (`break_seconds`). `focus_percent` is the estimated on-screen share of the measured time only.
+- Samples can be saved as `Unavailable` or `Break` with no score, so gaps are stored as gaps, never as 0.
+- Older sessions keep their numbers and are shown as "older method": back then, time with no face in view counted as not focused. They still appear in history and totals, but Focus Coach only uses sessions with tracking-quality information for personal suggestions.
+
+Until it is run, the app still works: unavailable and break samples aren't saved (they show as gaps), and a session's tracked time is its measured time, so its percentage keeps the same meaning. Attendance never depends on any of this.
+
 ## The full class workflow
 
 1. **Teacher creates a class** (`create_class`) and shares the join code.
@@ -200,7 +219,7 @@ Enforced by the database (Row Level Security), not just by the pages:
 |---|---|---|---|
 | Profile name | Own only | Students in their classes | No |
 | Profile picture, theme | Own (only they can change them) | Pictures of students in their classes | No |
-| Teacher's name | Of their own classes' teachers | — | No |
+| Teacher's name and picture | Of their own classes' teachers | — | No |
 | Class membership | Own rows | Their classes | No |
 | Attendance | Own rows | Their classes | No |
 | Attention history and samples | All of their own | Only what was shared during that teacher's live sessions | No |

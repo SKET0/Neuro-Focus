@@ -1,10 +1,10 @@
-// Student appearance: the theme ("default" | "light" | "dark") and accent colour live on <html>
-// as data-theme / data-accent, so every student page, dialog and chart picks them up from the
-// theme tokens in styles/student.css. Only student pages call this; teachers keep the default look.
+// Appearance: the theme ("default" | "light" | "dark") and accent colour live on <html> as
+// data-theme / data-accent, so every page, dialog and chart picks them up from the theme tokens
+// in styles/theme.css. Students and teachers each choose their own in My profile.
 //
-// The saved choice is also cached on this device for the signed-in account. pages/student.html
-// applies that cache before the page paints, but only if it belongs to the account signed in on
-// this browser, so one student's theme never shows for another.
+// The saved choice is also cached on this device for the signed-in account. The student and
+// teacher pages apply that cache before they paint, but only if it belongs to the account signed
+// in on this browser, so one person's theme never shows for another.
 
 export const THEMES = ["default", "light", "dark"];
 export const ACCENTS = ["default", "blue", "purple", "green", "orange"];

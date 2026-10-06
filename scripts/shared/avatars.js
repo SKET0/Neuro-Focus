@@ -19,6 +19,16 @@ export const AVATAR_PRESETS = [
 const presetById = new Map(AVATAR_PRESETS.map((preset) => [preset.id, preset]));
 export const avatarPreset = (id) => presetById.get(id) || null;
 
+// The name to greet someone by on Home: their first name ("Sam Rivera" → "Sam"). A title stays
+// when it's how they're addressed ("Ms Rivera" stays "Ms Rivera"; "Ms Elena Rivera" → "Elena").
+const TITLES = /^(mr|mrs|ms|miss|mx|dr|prof|sir|madam|mme|mlle)\.?$/i;
+export function greetingName(name) {
+  const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "there";
+  if (TITLES.test(parts[0])) return parts.length >= 3 ? parts[1] : parts.join(" ");
+  return parts[0];
+}
+
 export function initialsOf(name) {
   const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
   if (!parts.length) return "?";

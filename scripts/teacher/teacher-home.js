@@ -6,8 +6,9 @@
 // (class_sessions), attendance (session_attendance), focus shared during live sessions
 // (attention_sessions) and the master lists (class_members). Nothing is estimated or invented.
 // Class names, online students and the live session come from teacher-classes.js.
-import { paintAvatar, avatarUrls } from "../shared/avatars.js?v=1";
-import { averageFocus, sum, levelFor, compareGroups, TIMES, timeOfDay } from "../student/focus-analysis.js?v=1";
+import { paintAvatar, avatarUrls, greetingName } from "../shared/avatars.js?v=1";
+import { averageFocus, sum, levelFor, compareGroups, TIMES, timeOfDay, measuredSeconds } from "../student/focus-analysis.js?v=2";
+import { selectWithQuality } from "../shared/tracking-states.js?v=1";
 
 const app = await window.neuroFocusReady;
 const view = document.querySelector("#classesView");
@@ -113,7 +114,7 @@ if (app && view) {
     const [sessions, attendance, focus, roster] = await Promise.all([
       supabase.from("class_sessions").select("id, class_id, started_at, ended_at").in("class_id", ids).gte("started_at", since).order("started_at", { ascending: false }).limit(300),
       supabase.from("session_attendance").select("session_id, class_id, student_id, student_name, status").in("class_id", ids).gte("invited_at", since).limit(10000),
-      supabase.from("attention_sessions").select("class_id, class_session_id, student_id, started_at, tracked_seconds, focus_percent, lapses").in("class_id", ids).gte("started_at", since).gt("tracked_seconds", 4).limit(10000),
+      selectWithQuality((quality) => supabase.from("attention_sessions").select(`class_id, class_session_id, student_id, started_at, tracked_seconds, focus_percent, lapses${quality}`).in("class_id", ids).gte("started_at", since).gt("tracked_seconds", 4).limit(10000)),
       members("display_name, avatar_preset, avatar_path").then((result) => (result.error ? members("display_name") : result))
     ]);
     data = {
@@ -155,18 +156,13 @@ if (app && view) {
   function renderGreeting() {
     const hour = new Date().getHours();
     const greeting = hour < 5 ? "Hello" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-    $("#classesTitle").replaceChildren(`${greeting}, `, el("span", "gradient-name", (app.profile.display_name || "").trim() || "there"));
+    $("#classesTitle").replaceChildren(`${greeting}, `, el("span", "gradient-name", greetingName(app.profile.display_name)));
     const online = status.classes.reduce((total, item) => total + item.online, 0);
     const liveClass = status.live ? className(status.live.classId) : "";
     $("#teacherLead").textContent = !status.loaded ? "Here’s how your classes are doing."
       : liveClass ? `Your live session in ${liveClass} is running.`
       : !status.classes.length ? "Welcome! Create your first class to get a join code for your students."
       : `${plural(online, "student")} online now across ${plural(status.classes.length, "class")}.`;
-  }
-
-  async function paintTeacherAvatar() {
-    const urls = app.profile.avatar_path ? await avatarUrls(supabase, [app.profile.avatar_path]) : new Map();
-    paintAvatar($("#teacherAvatar"), { name: app.profile.display_name, preset: app.profile.avatar_preset, url: urls.get(app.profile.avatar_path) || null });
   }
 
   // ---------- The one main action ----------
@@ -426,7 +422,10 @@ if (app && view) {
     const now = Date.now();
     const week = data.focus.filter((s) => now - new Date(s.started_at) < 7 * DAY);
     const before = data.focus.filter((s) => { const age = now - new Date(s.started_at); return age >= 7 * DAY && age < 14 * DAY; });
-    const change = week.length && before.length ? averageFocus(week) - averageFocus(before) : null;
+    // Focus figures are estimates of on-screen time; a change is only mentioned with 60+ measured
+    // minutes on each side and a difference of 10 points or more.
+    const enoughToCompare = sum(week, measuredSeconds) >= 3600 && sum(before, measuredSeconds) >= 3600;
+    const change = enoughToCompare ? averageFocus(week) - averageFocus(before) : null;
 
     if (!status.classes.length) {
       tips.push({ icon: "i-school", title: "Create your first class", text: "You’ll get a join code to share with your students.", action: { label: "New class", run: () => actions().openNewClass?.() } });
@@ -444,22 +443,22 @@ if (app && view) {
 
     if (rate !== null && rate >= 85) wins.push({ icon: "i-attendance", title: `Strong attendance: ${rate}%`, text: `Across ${plural(sessions.length, "live session")} in the last 30 days.` });
     if (lateRate !== null && sum(sessions, attended) >= 5 && lateRate < 10) wins.push({ icon: "i-timer", title: "Students join on time", text: `Only ${lateRate}% of students who joined were late.` });
-    if (change !== null && change >= 5) wins.push({ icon: "i-trend", title: "Class focus is improving", text: `This week’s live sessions average ${averageFocus(week)}% focus, up ${change} points.` });
+    if (change !== null && change >= 10) wins.push({ icon: "i-trend", title: "Recorded on-screen time is up", text: `This week’s live sessions were estimated at ${averageFocus(week)}% of measured time on screen, up ${change} points. An estimate, not a measure of learning.` });
     const times = compareGroups(data.focus, timeOfDay);
     if (times) {
       const best = TIMES.find((t) => t.key === times.best.key);
       const worst = TIMES.find((t) => t.key === times.worst.key);
-      wins.push({ icon: "i-sun", title: `Classes focus best ${best.phrase}`, text: `${times.best.avg}% focus, compared with ${times.worst.avg}% ${worst.phrase}. Plan demanding work for then.` });
+      wins.push({ icon: "i-sun", title: `Higher estimates ${best.phrase}`, text: `${times.best.avg}% of measured time on screen, against ${times.worst.avg}% ${worst.phrase}. A tentative pattern that may also reflect what was taught then.` });
     }
 
     if (rate !== null && rate < 70) tips.push({ icon: "i-attendance", tone: "amber", title: `Attendance is ${rate}%`, text: "Check in with the students listed above, and send the invite again when you go live." });
     if (lateRate !== null && sum(sessions, attended) >= 5 && lateRate >= 25) {
       tips.push({ icon: "i-timer", tone: "amber", title: `${lateRate}% of students join late`, text: "Announce the session a couple of minutes before you start, or press Invite again for anyone who hasn’t joined." });
     }
-    if (change !== null && change <= -5) tips.push({ icon: "i-flag", tone: "amber", title: "Class focus dipped this week", text: `Live sessions average ${averageFocus(week)}%, down ${Math.abs(change)} points. Shorter activities or a quick break can help.` });
+    if (change !== null && change <= -10) tips.push({ icon: "i-flag", tone: "amber", title: "Recorded on-screen time is down this week", text: `Estimated ${averageFocus(week)}% of measured time, down ${Math.abs(change)} points. This can reflect the kind of activity (e.g. writing on paper). If it matches what you saw, shorter activities might be worth trying.` });
     const lengths = compareGroups(data.focus, (s) => (s.tracked_seconds >= 40 * 60 ? "long" : "short"));
-    if (lengths && lengths.best.key === "short" && lengths.best.avg - lengths.worst.avg >= 8) {
-      tips.push({ icon: "i-timer", title: "Focus drops in long sessions", text: `${lengths.worst.avg}% focus when students track 40+ minutes, versus ${lengths.best.avg}% in shorter stretches. Try a 2-minute break about 25 minutes in.` });
+    if (lengths && lengths.best.key === "short") {
+      tips.push({ icon: "i-timer", title: "Lower estimates in long sessions", text: `${lengths.worst.avg}% of measured time on screen when students track 40+ minutes, against ${lengths.best.avg}% in shorter stretches. A tentative pattern; a short break partway through might be worth trying.` });
     }
     const lastByClass = new Map();
     data.sessions.forEach((s) => { if (!lastByClass.has(s.class_id)) lastByClass.set(s.class_id, s.started_at); });
@@ -471,7 +470,7 @@ if (app && view) {
       }
     });
     if (!wins.length) wins.push({ icon: "i-check", title: `${plural(sessions.length, "live session")} this month`, text: `${totalCounted ? `${rate}% attendance` : "Attendance is being recorded"} across your classes.` });
-    if (!tips.length) tips.push({ icon: "i-check", title: "Nothing needs attention", text: "Attendance, punctuality and focus all look steady. Keep the rhythm going." });
+    if (!tips.length) tips.push({ icon: "i-check", title: "Nothing stands out", text: "Attendance and punctuality look steady, and the focus estimates show no clear pattern to act on." });
     return { basis: `Based on ${plural(sessions.length, "live session")} in the last 30 days`, wins: wins.slice(0, 3), tips: tips.slice(0, 3) };
   }
 
@@ -544,8 +543,10 @@ if (app && view) {
     });
   });
 
+  // A new name in My profile updates the greeting (avatars are repainted by profile.js).
+  window.addEventListener("neurofocus:profile-updated", renderGreeting);
+
   renderAll();
-  void paintTeacherAvatar();
   if (!view.hidden) {
     view.classList.add("is-entering");
     window.setTimeout(() => view.classList.remove("is-entering"), 900);

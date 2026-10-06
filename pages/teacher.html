@@ -1,466 +1,53 @@
 <!DOCTYPE html>
-<html lang="en" class="auth-check-pending">
+<html lang="en" class="auth-check-pending" data-theme="default" data-accent="default">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#09090b">
   <title>Neuro-Focus | Teacher Dashboard</title>
+  <script>
+    // Apply the signed-in teacher's saved theme before the page paints, so it doesn't flash the
+    // wrong colours. The cache is only used if it belongs to the account signed in on this browser
+    // (otherwise it is cleared). auth-guard.js then applies the values saved on the account.
+    (function () {
+      try {
+        var cached = JSON.parse(localStorage.getItem("neuroFocusAppearance") || "null");
+        if (!cached) return;
+        var userId = null;
+        for (var i = 0; i < localStorage.length; i++) {
+          var key = localStorage.key(i);
+          if (/^sb-.+-auth-token$/.test(key)) {
+            var auth = JSON.parse(localStorage.getItem(key) || "null");
+            userId = auth && auth.user && auth.user.id;
+            break;
+          }
+        }
+        if (!userId || userId !== cached.userId) {
+          localStorage.removeItem("neuroFocusAppearance");
+          return;
+        }
+        var theme = ["light", "dark"].indexOf(cached.theme) >= 0 ? cached.theme : "default";
+        var accent = ["blue", "purple", "green", "orange"].indexOf(cached.accent) >= 0 ? cached.accent : "default";
+        document.documentElement.setAttribute("data-theme", theme);
+        document.documentElement.setAttribute("data-accent", accent);
+        var bar = { default: "#09090b", light: "#f4f5f8", dark: "#0f141a" }[theme];
+        document.querySelector('meta[name="theme-color"]').setAttribute("content", bar);
+      } catch (error) { /* storage unavailable: the default look is used */ }
+    })();
+  </script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <link rel="stylesheet" href="../styles/theme.css?v=1">
-  <style>
-    :root {
-      --bg: #09090b;
-      --sidebar: #0c0c0f;
-      --card: #131316;
-      --border: #222226;
-      --border-strong: #2e2e34;
-      --text-main: #f4f4f5;
-      --text-soft: #b4b4bc;
-      --text-muted: #82828c;
-      --green: #22c55e;
-      --red: #ef4444;
-      --amber: #f5b748;
-      --cyan: #00d9ff;
-    }
-
-    /* Hidden until auth-guard.js confirms a signed-in teacher */
-    .auth-check-pending body { visibility: hidden; }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background: var(--bg); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; -webkit-font-smoothing: antialiased; }
-    [hidden] { display: none !important; }
-    button, input, select, textarea { font: inherit; color: inherit; }
-    button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
-    .icon { width: 17px; height: 17px; flex: none; }
-    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-
-    /* ---------- Sidebar ---------- */
-    aside {
-      width: 248px; flex-shrink: 0; background: var(--sidebar); border-right: 1px solid var(--border);
-      display: flex; flex-direction: column; justify-content: space-between; padding: 16px 12px; overflow-y: auto;
-    }
-    .brand-box { display: flex; align-items: center; gap: 10px; padding: 6px 10px 18px; border-bottom: 1px solid var(--border); }
-    .brand-mark {
-      width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; flex: none;
-      background: linear-gradient(145deg, #13232b, #0c0c0f); border: 1px solid #1f3a44; color: var(--cyan);
-      box-shadow: 0 0 18px rgba(0, 217, 255, 0.16);
-    }
-    .brand-mark svg { width: 18px; height: 18px; }
-    .brand-text b { display: block; font-size: 14px; font-weight: 650; letter-spacing: -0.2px; }
-    .brand-text small { font-size: 11.5px; color: var(--text-muted); }
-    .nav-group { margin-top: 18px; display: flex; flex-direction: column; gap: 2px; }
-    .nav-label { font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; padding: 0 10px 6px; letter-spacing: 0.6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .nav-item {
-      display: flex; align-items: center; gap: 11px; width: 100%; padding: 8px 10px; border-radius: 8px; border: 0; background: none;
-      font-size: 13.5px; font-weight: 500; color: var(--text-muted); text-decoration: none; text-align: left; cursor: pointer;
-      transition: background 0.15s ease, color 0.15s ease;
-    }
-    .nav-item:hover { background: #17171b; color: var(--text-main); }
-    .nav-item[aria-current] { background: #1c1c21; color: var(--text-main); box-shadow: inset 2px 0 0 var(--cyan); }
-    .nav-item[aria-current] .icon { color: var(--cyan); }
-    .nav-count { margin-left: auto; font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; background: #1c1c21; border: 1px solid var(--border); border-radius: 999px; padding: 0 7px; }
-    .nav-count:empty { display: none; }
-    .nav-live { margin-left: auto; display: inline-flex; }
-    .user-card {
-      display: flex; align-items: center; gap: 10px; padding: 10px; margin-top: 16px; border: 1px solid var(--border);
-      border-radius: 12px; background: #111114;
-    }
-    .avatar {
-      width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; flex: none; font-size: 12.5px; font-weight: 700;
-      color: #062a33; background: linear-gradient(135deg, #67e8f9, #00b8d9);
-    }
-    .user-card > div { min-width: 0; }
-    .user-card b { display: block; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .user-card small { font-size: 11.5px; color: var(--text-muted); }
-
-    /* ---------- Main + header ---------- */
-    main { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow-y: auto; background: var(--bg); }
-    header {
-      height: 60px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 28px;
-      position: sticky; top: 0; z-index: 20; background: rgba(9, 9, 11, 0.82); backdrop-filter: blur(14px); border-bottom: 1px solid var(--border);
-    }
-    .breadcrumbs { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); font-weight: 500; white-space: nowrap; min-width: 0; }
-    .breadcrumbs b { color: var(--text-main); font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
-    .header-actions { display: flex; align-items: center; gap: 8px; }
-
-    .btn-action {
-      display: inline-flex; align-items: center; justify-content: center; gap: 7px; background: #18181c; color: var(--text-main);
-      border: 1px solid var(--border-strong); border-radius: 8px; font-size: 12.5px; font-weight: 500; padding: 7px 12px;
-      cursor: pointer; text-decoration: none; white-space: nowrap; transition: background 0.15s ease, border-color 0.15s ease;
-    }
-    .btn-action:hover { background: #222227; border-color: #3a3a42; }
-    .btn-action:disabled { opacity: 0.5; cursor: not-allowed; }
-    .btn-action .icon { width: 15px; height: 15px; }
-    .btn-primary {
-      display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: var(--text-main); color: #09090b; border: 0;
-      border-radius: 9px; padding: 10px 16px; font-size: 13.5px; font-weight: 600; cursor: pointer; white-space: nowrap;
-      box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 8px 22px rgba(0, 217, 255, 0.10); transition: background 0.15s ease, box-shadow 0.15s ease;
-    }
-    .btn-primary:hover { background: #fff; box-shadow: 0 0 0 1px rgba(255,255,255,0.18), 0 10px 26px rgba(0, 217, 255, 0.18); }
-    .btn-primary:disabled { opacity: 0.55; cursor: progress; }
-    .btn-primary .icon { width: 16px; height: 16px; }
-
-    .portal-main { padding: 28px; max-width: 1440px; margin: 0 auto; width: 100%; display: flex; flex-direction: column; gap: 20px; }
-    .stack { display: flex; flex-direction: column; gap: 20px; animation: view-in 0.25s ease; }
-    @keyframes view-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-
-    /* Page heading */
-    .page-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
-    .page-kicker { font-size: 12px; color: var(--text-muted); font-weight: 600; letter-spacing: 0.4px; }
-    .page-title { font-size: 28px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.15; margin-top: 2px; }
-    .page-sub { font-size: 14px; color: var(--text-muted); margin-top: 4px; }
-    .section-label { font-size: 13px; font-weight: 650; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.6px; margin-top: 4px; }
-
-    /* ---------- Cards ---------- */
-    .panel-card {
-      background: linear-gradient(180deg, #141417, #111114); border: 1px solid var(--border); border-radius: 16px;
-      padding: 22px; display: flex; flex-direction: column; min-width: 0;
-    }
-    .panel-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 18px; }
-    .panel-title { display: flex; align-items: center; gap: 10px; font-size: 15.5px; font-weight: 650; letter-spacing: -0.2px; }
-    .panel-title .chip-icon { width: 30px; height: 30px; }
-    .panel-sub { font-size: 12.5px; color: var(--text-muted); margin-top: 4px; line-height: 1.5; }
-    .panel-sub[data-state="error"] { color: #fca5a5; }
-    .chip-icon {
-      width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; flex: none;
-      color: var(--cyan); background: rgba(0, 217, 255, 0.08); border: 1px solid rgba(0, 217, 255, 0.2);
-    }
-    .chip-icon svg { width: 17px; height: 17px; }
-    .chip-icon.green { color: var(--green); background: rgba(34, 197, 94, 0.08); border-color: rgba(34, 197, 94, 0.22); }
-    .chip-icon.amber { color: var(--amber); background: rgba(245, 183, 72, 0.08); border-color: rgba(245, 183, 72, 0.22); }
-    .chip-icon.red { color: #f87171; background: rgba(239, 68, 68, 0.08); border-color: rgba(239, 68, 68, 0.22); }
-    .field-input {
-      width: 100%; background: #0e0e11; border: 1px solid var(--border-strong); border-radius: 9px;
-      padding: 10px 12px; color: var(--text-main); font-size: 13.5px; outline: none; transition: border-color 0.15s ease, box-shadow 0.15s ease;
-    }
-    .field-input:focus { border-color: rgba(0, 217, 255, 0.45); box-shadow: 0 0 0 3px rgba(0, 217, 255, 0.08); }
-    .empty-state {
-      font-size: 13px; color: var(--text-muted); background: #0e0e11; border: 1px dashed var(--border-strong);
-      border-radius: 12px; padding: 22px; text-align: center; line-height: 1.5;
-    }
-
-    /* KPI cards */
-    .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
-    .stat-card {
-      background: linear-gradient(180deg, #141417, #111114); border: 1px solid var(--border); border-radius: 16px; padding: 18px 20px;
-      display: grid; grid-template-columns: 1fr auto; column-gap: 12px; align-content: start;
-    }
-    .stat-label { font-size: 12.5px; color: var(--text-muted); font-weight: 500; }
-    .stat-card .chip-icon { grid-column: 2; grid-row: 1 / span 2; }
-    .stat-card strong { font-size: 30px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.15; margin-top: 6px; font-variant-numeric: tabular-nums; }
-    .stat-card small { grid-column: 1 / -1; font-size: 12px; color: var(--text-muted); margin-top: 4px; }
-    .stat-card small[data-trend="up"] { color: var(--green); }
-    .stat-card small[data-trend="down"] { color: #fca5a5; }
-    .stat-card[data-live="true"] { border-color: rgba(239, 68, 68, 0.35); background: linear-gradient(160deg, rgba(239, 68, 68, 0.1), #111114 60%); }
-    .stat-card[data-live="true"] strong { color: #fca5a5; }
-
-    /* ---------- All classes ---------- */
-    .class-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
-    .class-card {
-      background: linear-gradient(180deg, #141417, #111114); border: 1px solid var(--border); border-radius: 16px; padding: 20px; display: flex;
-      flex-direction: column; gap: 14px; text-align: left; color: inherit; cursor: pointer;
-      transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
-    }
-    .class-card:hover { border-color: #3a3a42; transform: translateY(-2px); box-shadow: 0 14px 34px rgba(0, 0, 0, 0.35); }
-    .class-card-top { display: flex; align-items: center; gap: 12px; }
-    .class-card h3 { flex: 1; font-size: 16px; font-weight: 650; letter-spacing: -0.2px; overflow-wrap: anywhere; }
-    .class-initial {
-      width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center; flex: none; font-size: 16px; font-weight: 700;
-      color: var(--cyan); background: rgba(0, 217, 255, 0.09); border: 1px solid rgba(0, 217, 255, 0.24);
-    }
-    .class-card-stats { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; color: var(--text-muted); }
-    .class-card-stats .online { color: var(--green); }
-    .class-card-foot { font-size: 12.5px; font-weight: 600; color: var(--text-soft); border-top: 1px solid var(--border); padding-top: 12px; }
-    .class-card:hover .class-card-foot { color: var(--cyan); }
-    .live-pill {
-      display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; text-transform: uppercase;
-      letter-spacing: 0.5px; color: #fca5a5; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.35);
-      border-radius: 999px; padding: 3px 9px; white-space: nowrap;
-    }
-    .code-chip {
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--cyan);
-      background: rgba(0, 217, 255, 0.08); border: 1px solid rgba(0, 217, 255, 0.25); border-radius: 7px; padding: 4px 9px;
-      cursor: pointer; width: fit-content;
-    }
-    button.code-chip:hover { background: rgba(0, 217, 255, 0.14); }
-
-    /* ---------- One class ---------- */
-    .back-link { width: fit-content; padding: 6px 11px; font-size: 12.5px; }
-    .class-hero {
-      display: flex; justify-content: space-between; align-items: center; gap: 18px 24px; flex-wrap: wrap;
-      border: 1px solid var(--border); border-radius: 18px; padding: 22px 24px;
-      background: radial-gradient(ellipse 60% 140% at 0% 0%, rgba(0, 217, 255, 0.08), transparent 60%), linear-gradient(180deg, #141417, #111114);
-    }
-    .class-hero-main { display: flex; align-items: center; gap: 16px; min-width: 0; }
-    .class-hero .class-initial { width: 56px; height: 56px; border-radius: 15px; font-size: 22px; }
-    .class-hero h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.15; overflow-wrap: anywhere; }
-    .class-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; font-size: 13px; color: var(--text-muted); margin-top: 8px; }
-    .joining-chip { font-size: 11.5px; color: #fde68a; border: 1px solid rgba(245, 183, 72, 0.35); border-radius: 999px; padding: 2px 9px; }
-    .session-control { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
-    .session-control small { font-size: 12.5px; color: var(--text-muted); text-align: right; max-width: 300px; }
-    .btn-live {
-      display: inline-flex; align-items: center; gap: 8px; background: var(--green); color: #052e16; border: 0; border-radius: 10px;
-      padding: 12px 20px; font-size: 14.5px; font-weight: 700; cursor: pointer; box-shadow: 0 10px 26px rgba(34, 197, 94, 0.25);
-    }
-    .btn-live:hover { filter: brightness(1.08); }
-    .btn-live[data-live="true"] { background: rgba(239, 68, 68, 0.12); color: #fecaca; border: 1px solid rgba(239, 68, 68, 0.5); box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.08); }
-    .btn-live:disabled { opacity: 0.6; cursor: not-allowed; }
-    .class-tabs {
-      display: flex; gap: 4px; padding: 4px; background: #0e0e11; border: 1px solid var(--border); border-radius: 12px;
-      width: fit-content; max-width: 100%; overflow-x: auto; scrollbar-width: none;
-    }
-    .class-tabs button {
-      display: inline-flex; align-items: center; gap: 8px; background: none; border: 0; border-radius: 9px; color: var(--text-muted);
-      font-size: 13.5px; font-weight: 500; padding: 8px 14px; cursor: pointer; white-space: nowrap; transition: background 0.15s ease, color 0.15s ease;
-    }
-    .class-tabs button .icon { width: 15px; height: 15px; }
-    .class-tabs button:hover { color: var(--text-main); }
-    .class-tabs button[aria-selected="true"] { background: #1d1d22; color: var(--text-main); box-shadow: inset 0 0 0 1px #2e2e34; }
-    .class-tabs button[aria-selected="true"] .icon { color: var(--cyan); }
-    .tab-count { font-size: 11px; color: var(--text-muted); background: #232328; border-radius: 999px; padding: 0 7px; }
-    .tab-count:empty { display: none; }
-
-    /* Live monitor */
-    .section-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
-    .section-head h2 { font-size: 19px; font-weight: 650; letter-spacing: -0.3px; }
-    .section-head p { font-size: 13px; color: var(--text-muted); margin-top: 3px; }
-    .mode-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-    .mode-switch { display: inline-flex; gap: 3px; padding: 3px; background: #0e0e11; border: 1px solid var(--border); border-radius: 10px; }
-    .mode-switch button { background: transparent; border: 0; border-radius: 7px; padding: 6px 12px; font-size: 12.5px; font-weight: 500; color: var(--text-muted); cursor: pointer; }
-    .mode-switch button:hover { color: var(--text-main); }
-    .mode-switch button.active { background: #1d1d22; color: var(--text-main); box-shadow: inset 0 0 0 1px #2e2e34; }
-    #modeLive.active { color: var(--green); }
-    .sim-badge {
-      display: inline-flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 650; text-transform: uppercase;
-      letter-spacing: 0.6px; color: var(--text-muted); background: #121215; border: 1px solid var(--border); border-radius: 999px; padding: 5px 11px;
-    }
-    .sim-badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #55555e; }
-    .sim-badge[data-state="live"] { color: var(--green); border-color: rgba(34, 197, 94, 0.3); }
-    .sim-badge[data-state="live"]::before { background: var(--green); box-shadow: 0 0 6px rgba(34,197,94,0.6); }
-    .analytics-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr); gap: 20px; align-items: stretch; }
-    .chart-box { position: relative; height: 270px; }
-    .live-summary { display: flex; align-items: baseline; gap: 10px; margin-bottom: 16px; }
-    .live-summary strong { font-size: 40px; font-weight: 700; letter-spacing: -0.04em; color: var(--green); }
-    .live-summary span { font-size: 13px; color: var(--text-muted); }
-    .live-steps { list-style: none; counter-reset: step; display: flex; flex-direction: column; gap: 10px; font-size: 13px; color: var(--text-muted); line-height: 1.45; margin-bottom: 16px; }
-    .live-steps li { counter-increment: step; display: flex; gap: 10px; }
-    .live-steps li::before {
-      content: counter(step); flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 11.5px; font-weight: 700;
-      color: var(--cyan); border: 1px solid rgba(0, 217, 255, 0.35); background: rgba(0, 217, 255, 0.06);
-    }
-    .live-steps strong { color: var(--text-main); font-weight: 600; }
-    .sim-controls { display: flex; flex-direction: column; gap: 10px; }
-    .sim-controls .btn-primary, .sim-controls .btn-action { width: 100%; padding: 10px 16px; font-size: 13px; }
-    .sim-controls label { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; color: var(--text-muted); gap: 12px; }
-    .sim-controls select { background: #101013; border: 1px solid var(--border-strong); border-radius: 8px; padding: 6px 8px; font-size: 12.5px; }
-    .sim-source { font-size: 12px; color: var(--text-muted); line-height: 1.45; border-top: 1px solid var(--border); padding-top: 12px; margin-top: 4px; }
-    .sim-note { font-size: 11.5px; color: #6b6b74; line-height: 1.5; margin-top: auto; }
-
-    .table-scroll { max-height: 380px; overflow: auto; }
-    .data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 380px; }
-    .data-table th {
-      text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-muted); font-weight: 650;
-      padding: 0 12px 12px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: #121215; white-space: nowrap;
-    }
-    .data-table td { padding: 11px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-    .data-table tbody tr:hover td { background: #141418; }
-    .data-table tr:last-child td { border-bottom: 0; }
-    .history-table { min-width: 640px; }
-    .history-table td { white-space: nowrap; font-variant-numeric: tabular-nums; }
-    .mini-avatar {
-      display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; margin-right: 10px; vertical-align: middle;
-      font-size: 10.5px; font-weight: 700; color: #cffafe; background: linear-gradient(135deg, #155e75, #0e3a47);
-    }
-    /* Student pictures and built-in avatars (scripts/shared/avatars.js) */
-    .mini-avatar { overflow: hidden; flex: none; }
-    .mini-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
-    .mini-avatar svg { width: 58%; height: 58%; color: #fff; }
-    .score-value { display: inline-block; width: 40px; font-variant-numeric: tabular-nums; font-weight: 600; }
-    .score-bar { display: inline-block; vertical-align: middle; width: 96px; height: 6px; border-radius: 4px; background: #1f1f24; overflow: hidden; }
-    .score-bar span { display: block; height: 100%; border-radius: 4px; background: var(--cyan); transition: width 0.4s ease; }
-    .score-bar span[data-state="Drifting"] { background: var(--amber); }
-    .score-bar span[data-state="Distracted"] { background: var(--red); }
-    .state-pill { font-size: 11.5px; font-weight: 600; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); white-space: nowrap; }
-    .state-pill[data-state="Focused"] { color: var(--green); background: rgba(34,197,94,0.08); border-color: rgba(34,197,94,0.25); }
-    .state-pill[data-state="Drifting"] { color: var(--amber); background: rgba(245,183,72,0.08); border-color: rgba(245,183,72,0.25); }
-    .state-pill[data-state="Distracted"] { color: #fca5a5; background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.3); }
-    .state-pill[data-state="Offline"] { color: var(--text-muted); background: transparent; }
-
-    .alert-feed { list-style: none; display: flex; flex-direction: column; gap: 8px; }
-    .alert-feed li {
-      display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: start; padding: 11px 12px;
-      border: 1px solid rgba(239, 68, 68, 0.18); background: rgba(239, 68, 68, 0.04); border-radius: 11px;
-    }
-    .alert-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); margin-top: 6px; box-shadow: 0 0 6px rgba(239,68,68,0.5); }
-    .alert-feed strong { display: block; font-size: 13px; font-weight: 600; }
-    .alert-feed small { font-size: 12px; color: var(--text-muted); }
-    .alert-feed time { font-size: 11.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
-    .panel-card .btn-action.full { width: 100%; margin-top: 14px; padding: 9px 12px; }
-
-    .heatmap-scroll { overflow-x: auto; }
-    .heatmap { min-width: 480px; display: grid; grid-template-columns: minmax(120px, 170px) repeat(20, minmax(10px, 1fr)); gap: 4px; align-items: center; }
-    .heat-label { font-size: 12.5px; color: var(--text-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 8px; }
-    .heat-cell { height: 20px; border-radius: 5px; background: #17171b; }
-    .heat-cell[data-state="Focused"] { background: rgba(0, 217, 255, var(--level)); }
-    .heat-cell[data-state="Drifting"] { background: rgba(245, 183, 72, var(--level)); }
-    .heat-cell[data-state="Distracted"] { background: rgba(239, 68, 68, var(--level)); }
-    .heat-legend { display: flex; gap: 18px; font-size: 12px; color: var(--text-muted); margin-top: 16px; flex-wrap: wrap; }
-    .heat-legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 7px; vertical-align: -1px; }
-    .heat-legend .lg-focused::before { background: var(--cyan); }
-    .heat-legend .lg-drifting::before { background: var(--amber); }
-    .heat-legend .lg-distracted::before { background: var(--red); }
-
-    /* Students */
-    .students-table td:last-child { text-align: right; }
-    .student-status { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-muted); }
-    .student-status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #3a3a42; }
-    .student-status[data-state="online"] { color: var(--text-main); }
-    .student-status[data-state="online"]::before { background: var(--green); box-shadow: 0 0 6px rgba(34,197,94,0.6); }
-    .student-status[data-state="session"] { color: #86efac; }
-    .student-status[data-state="session"]::before { background: var(--red); box-shadow: 0 0 6px rgba(239,68,68,0.6); }
-    .row-new td { animation: row-new 2.4s ease; }
-    @keyframes row-new { 0%, 40% { background: rgba(0, 217, 255, 0.12); } 100% { background: transparent; } }
-    .btn-remove {
-      background: transparent; color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px;
-      padding: 6px 11px; font-size: 12px; cursor: pointer;
-    }
-    .btn-remove:hover { background: rgba(239, 68, 68, 0.1); }
-
-    /* Simulator: impossible to mistake for real data */
-    .demo-banner {
-      display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 16px; border-radius: 12px; font-size: 13px; color: #fde68a;
-      border: 1px dashed rgba(245, 183, 72, 0.6);
-      background: repeating-linear-gradient(135deg, rgba(245, 183, 72, 0.10) 0 12px, rgba(245, 183, 72, 0.04) 12px 24px);
-    }
-    .demo-banner span:nth-child(2) { flex: 1; min-width: 220px; }
-    .demo-tag { font-size: 11px; font-weight: 800; letter-spacing: 1px; color: #1a1205; background: var(--amber); border-radius: 6px; padding: 3px 8px; }
-    #overview[data-mode="sim"] .stat-card, #overview[data-mode="sim"] .panel-card { border-style: dashed; border-color: rgba(245, 183, 72, 0.35); }
-
-    /* Master list (teacher-classes.js) */
-    .students-table { min-width: 760px; }
-    .student-name { display: inline-flex; flex-direction: column; vertical-align: middle; line-height: 1.3; }
-    .student-name small { font-size: 11.5px; color: var(--text-muted); }
-    .session-cell { font-size: 12.5px; color: var(--text-muted); white-space: nowrap; }
-    .session-cell[data-state="in"] { color: #86efac; font-weight: 600; }
-    .session-cell[data-state="joined"] { color: var(--text-soft); }
-    .session-cell[data-state="invited"] { color: #fcd34d; }
-    .session-cell[data-state="removed"] { color: #fca5a5; }
-    .session-cell[data-state="excused"] { color: var(--text-soft); }
-    .students-table[data-live="false"] th:nth-child(3), .students-table[data-live="false"] td.session-cell { display: none; }
-    .row-actions { display: inline-flex; align-items: center; gap: 6px; justify-content: flex-end; flex-wrap: nowrap; }
-    .btn-small { padding: 6px 10px; font-size: 12px; }
-    .row-menu { position: relative; }
-    .row-menu summary {
-      list-style: none; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; cursor: pointer;
-      color: var(--text-muted); border: 1px solid transparent; font-size: 16px; letter-spacing: 1px; user-select: none;
-    }
-    .row-menu summary::-webkit-details-marker { display: none; }
-    .row-menu summary:hover, .row-menu[open] summary { background: #1c1c21; border-color: var(--border-strong); color: var(--text-main); }
-    .row-menu-list {
-      position: absolute; right: 0; top: calc(100% + 4px); z-index: 30; min-width: 180px; padding: 6px; border-radius: 10px;
-      background: #17171b; border: 1px solid var(--border-strong); box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
-    }
-    .row-menu-danger { width: 100%; text-align: left; background: none; border: 0; border-radius: 7px; padding: 8px 10px; color: #fca5a5; font-size: 13px; cursor: pointer; }
-    .row-menu-danger:hover { background: rgba(239, 68, 68, 0.1); }
-    .table-note { font-size: 12.5px; color: var(--text-muted); margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); line-height: 1.5; }
-    .muted { color: var(--text-muted); }
-    .att-rate { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
-    .att-bar { width: 64px; height: 6px; border-radius: 4px; background: #232328; overflow: hidden; }
-    .att-bar span { display: block; height: 100%; border-radius: 4px; background: var(--green); }
-    .att-rate[data-level="ok"] .att-bar span { background: var(--amber); }
-    .att-rate[data-level="low"] .att-bar span { background: var(--red); }
-    .att-rate[data-level="low"] { color: #fca5a5; }
-
-    /* Attendance (teacher-attendance.js) */
-    .attendance-status { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
-    .att-students { min-width: 560px; }
-    .data-table .num { text-align: right; font-variant-numeric: tabular-nums; width: 80px; }
-    .left-tag, .edited-tag { margin-left: 8px; font-size: 11px; color: var(--text-muted); border: 1px solid var(--border-strong); border-radius: 999px; padding: 0 7px; vertical-align: 1px; }
-    .att-session-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
-    .att-session { border: 1px solid var(--border); border-radius: 12px; background: #0f0f12; overflow: hidden; }
-    .att-session[data-open="true"] { border-color: var(--border-strong); }
-    .att-session-row {
-      width: 100%; display: grid; grid-template-columns: minmax(170px, 1fr) auto auto 18px; align-items: center; gap: 16px;
-      padding: 12px 14px; background: none; border: 0; text-align: left; cursor: pointer; color: inherit;
-    }
-    .att-session-row:hover { background: #141418; }
-    .att-when b { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; }
-    .att-when small { display: block; font-size: 12px; color: var(--text-muted); margin-top: 2px; }
-    .att-chips { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
-    .att-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-muted); padding: 3px 9px; border-radius: 999px; background: #17171b; border: 1px solid var(--border); white-space: nowrap; }
-    .att-chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #4a4a52; }
-    .att-chip b { color: var(--text-main); font-weight: 650; font-variant-numeric: tabular-nums; }
-    .att-chip.present::before { background: var(--green); }
-    .att-chip.late::before { background: var(--amber); }
-    .att-chip.absent::before { background: var(--red); }
-    .att-chip.excused::before { background: var(--cyan); }
-    .att-chip.invited::before { background: #6b6b75; }
-    .att-chevron { font-size: 20px; color: var(--text-muted); transition: transform 0.2s ease; text-align: center; }
-    .att-session[data-open="true"] .att-chevron { transform: rotate(90deg); }
-    .att-detail { padding: 4px 14px 14px; border-top: 1px solid var(--border); }
-    .att-table td { white-space: nowrap; }
-    .field-select { background: #101013; color: var(--text-main); border: 1px solid var(--border-strong); border-radius: 8px; padding: 6px 9px; font-size: 12.5px; cursor: pointer; }
-    .att-mark[data-status="present"] { border-color: rgba(34, 197, 94, 0.4); }
-    .att-mark[data-status="late"] { border-color: rgba(245, 183, 72, 0.45); }
-    .att-mark[data-status="absent"] { border-color: rgba(239, 68, 68, 0.45); }
-    .att-mark[data-status="excused"] { border-color: rgba(0, 217, 255, 0.4); }
-    .att-detail-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 12px; font-size: 12.5px; }
-    .att-more { align-self: center; margin-top: 12px; }
-    .late-field { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13.5px; color: var(--text-soft); }
-    .late-field .field-input { width: 84px; text-align: center; }
-
-    /* Settings */
-    .settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
-    .settings-card { gap: 14px; }
-    .settings-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; margin-top: auto; }
-    .switch { display: flex; align-items: center; gap: 12px; font-size: 13.5px; color: var(--text-soft); cursor: pointer; }
-    .switch input {
-      appearance: none; -webkit-appearance: none; width: 38px; height: 22px; border-radius: 999px; background: #2a2a30; position: relative;
-      cursor: pointer; flex: none; transition: background 0.2s ease; border: 1px solid #34343b;
-    }
-    .switch input::after {
-      content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #d4d4d8;
-      transition: transform 0.2s ease;
-    }
-    .switch input:checked { background: rgba(34, 197, 94, 0.45); border-color: rgba(34, 197, 94, 0.6); }
-    .switch input:checked::after { transform: translateX(16px); background: #fff; }
-    .switch input:disabled { opacity: 0.5; cursor: not-allowed; }
-    .danger-card { border-color: rgba(239, 68, 68, 0.3); background: linear-gradient(180deg, rgba(239, 68, 68, 0.05), #111114); }
-
-    @media (prefers-reduced-motion: reduce) {
-      .stack, .row-new td { animation: none; }
-      .class-card, .switch input::after { transition: none; }
-    }
-    @media (max-width: 1100px) {
-      .stat-grid { grid-template-columns: repeat(2, 1fr); }
-      .analytics-grid { grid-template-columns: 1fr; }
-    }
-    @media (max-width: 760px) {
-      .portal-main { padding: 20px 16px 32px; }
-      .page-title, .class-hero h1 { font-size: 23px; }
-      .session-control { align-items: stretch; width: 100%; }
-      .session-control small { text-align: left; max-width: none; }
-      .class-hero { padding: 18px; }
-    }
-    @media (max-width: 520px) {
-      .stat-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
-      .stat-card { padding: 14px; grid-template-columns: 1fr; }
-      .stat-card strong { font-size: 24px; }
-      .stat-card .chip-icon { display: none; }
-      .class-hero .class-initial { display: none; }
-      .settings-grid { grid-template-columns: 1fr; }
-      .att-session-row { grid-template-columns: 1fr 18px; }
-      .att-session-row .att-chips, .att-session-row .att-rate { grid-column: 1; justify-content: flex-start; }
-    }
-  </style>
-  <link rel="stylesheet" href="../styles/dashboard-layout.css?v=3">
-  <link rel="stylesheet" href="../styles/home.css?v=1">
+  <link rel="stylesheet" href="../styles/teacher.css?v=4">
+  <link rel="stylesheet" href="../styles/dashboard-layout.css?v=4">
+  <link rel="stylesheet" href="../styles/home.css?v=2">
+  <link rel="stylesheet" href="../styles/account.css?v=1">
 </head>
 <body data-required-role="teacher">
   <svg width="0" height="0" style="position: absolute" aria-hidden="true">
     <symbol id="i-brain" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M12 5v13"/></symbol>
     <symbol id="i-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
     <symbol id="i-live" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.9 19.1a10 10 0 0 1 0-14.2M19.1 4.9a10 10 0 0 1 0 14.2M7.8 16.2a6 6 0 0 1 0-8.4M16.2 7.8a6 6 0 0 1 0 8.4"/><circle cx="12" cy="12" r="2"/></symbol>
     <symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5"/></symbol>
     <symbol id="i-history" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></symbol>
@@ -490,6 +77,11 @@
     <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
     <symbol id="i-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></symbol>
     <symbol id="i-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16Z"/><path d="m13.5 6.5 4 4"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></symbol>
+    <symbol id="i-palette" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.3A4.7 4.7 0 0 0 21 9.7C21 6 17 3 12 3Z"/><circle cx="7.5" cy="10.5" r="1"/><circle cx="10.5" cy="7" r="1"/><circle cx="15" cy="7.5" r="1"/></symbol>
+    <symbol id="i-chevron-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></symbol>
   </svg>
 
   <aside id="sidebar" aria-label="Teacher navigation">
@@ -499,14 +91,24 @@
         <span class="brand-text"><b>Neuro-Focus</b><small>Teacher dashboard</small></span>
       </a>
 
-      <div class="nav-group">
+      <nav class="nav-group" aria-label="Teaching">
         <div class="nav-label">Teaching</div>
         <button class="nav-item" type="button" data-nav="classes"><svg class="icon"><use href="#i-home"/></svg>Home</button>
+        <!-- Shown while a live session is running (teacher-classes.js) -->
+        <button class="nav-item nav-live-now" type="button" id="navLiveNow" hidden><svg class="icon"><use href="#i-live"/></svg><span class="name">Live now · <span id="navLiveClass"></span></span><span class="nav-live"><span class="live-dot"></span></span></button>
+        <button class="nav-item" type="button" data-nav="all-students"><svg class="icon"><use href="#i-users"/></svg>All students</button>
+        <button class="nav-item" type="button" data-nav="attendance-report"><svg class="icon"><use href="#i-attendance"/></svg>Attendance report</button>
         <button class="nav-item" type="button" data-nav="new-class"><svg class="icon"><use href="#i-plus"/></svg>New class</button>
-      </div>
+      </nav>
 
-      <div class="nav-group" id="classNav" hidden>
-        <div class="nav-label" id="classNavLabel">Class</div>
+      <!-- Every class (teacher-classes.js). The open class's pages unfold under it. -->
+      <nav class="nav-group" aria-labelledby="sidebarClassesLabel">
+        <div class="nav-label"><span id="sidebarClassesLabel">My classes</span><button class="nav-add" type="button" data-nav="new-class" aria-label="New class">+</button></div>
+        <div id="sidebarClassList" class="sidebar-classes"><p class="sidebar-empty">Loading…</p></div>
+      </nav>
+
+      <div class="nav-group class-subnav" id="classNav" role="group" aria-labelledby="classNavLabel" hidden>
+        <div class="sr-only" id="classNavLabel">Class</div>
         <button class="nav-item" type="button" data-nav="live"><svg class="icon"><use href="#i-live"/></svg>Live monitor <span class="nav-live" id="navLiveDot" hidden><span class="live-dot"></span></span></button>
         <button class="nav-item" type="button" data-nav="students"><svg class="icon"><use href="#i-users"/></svg>Master list <span class="nav-count" id="navStudentCount"></span></button>
         <button class="nav-item" type="button" data-nav="attendance"><svg class="icon"><use href="#i-attendance"/></svg>Attendance</button>
@@ -515,25 +117,43 @@
       </div>
     </div>
 
-    <div class="user-card">
-      <span class="avatar" id="userInitials">T</span>
+    <button class="user-card" type="button" data-nav="profile">
+      <span class="nf-avatar" data-profile-avatar></span>
       <div>
         <b data-profile-name>Teacher</b>
-        <small>Teacher account</small>
+        <small>My profile</small>
       </div>
-    </div>
+    </button>
   </aside>
 
   <main>
     <header>
       <div class="header-lead">
         <button id="navToggle" class="nav-toggle" type="button" aria-label="Open navigation" aria-controls="sidebar" aria-expanded="false">☰</button>
-        <div class="breadcrumbs"><span>Teacher</span><span>/</span><b id="crumbCurrent">Home</b></div>
+        <nav class="breadcrumbs" id="crumbs" aria-label="Breadcrumb"><button class="crumb-link" type="button" data-nav="classes">Teacher</button><span class="crumb-sep" aria-hidden="true">/</span><span class="crumb-current" aria-current="page">Home</span></nav>
       </div>
       <div class="header-actions">
-        <a class="btn-action" href="../index.html"><svg class="icon"><use href="#i-brain"/></svg><span class="label-long">Website</span></a>
         <button class="btn-action" type="button" data-export-report="roster"><svg class="icon"><use href="#i-download"/></svg><span class="label-long">Export CSV</span><span class="label-short">CSV</span></button>
-        <button id="signOutButton" class="btn-action" type="button"><svg class="icon"><use href="#i-logout"/></svg><span class="label-long">Sign out</span></button>
+        <!-- Account menu (scripts/shared/profile.js), the same as in the student workspace -->
+        <div class="account-menu">
+          <button id="accountButton" class="account-button" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="accountMenu">
+            <span class="nf-avatar sm" data-profile-avatar></span>
+            <span class="sr-only">Account menu for <span data-profile-name>Teacher</span></span>
+            <svg class="icon" aria-hidden="true"><use href="#i-chevron-down"/></svg>
+          </button>
+          <div class="account-dropdown" id="accountMenu" role="menu" aria-labelledby="accountButton" hidden>
+            <div class="account-head" role="presentation">
+              <span class="nf-avatar" data-profile-avatar></span>
+              <div><b data-profile-name>Teacher</b><small id="accountMenuEmail"></small></div>
+            </div>
+            <button role="menuitem" type="button" data-nav="profile"><svg class="icon" aria-hidden="true"><use href="#i-user"/></svg>My profile</button>
+            <button role="menuitem" type="button" data-nav="profile-appearance"><svg class="icon" aria-hidden="true"><use href="#i-palette"/></svg>Theme and accent</button>
+            <button role="menuitem" type="button" data-nav="classes"><svg class="icon" aria-hidden="true"><use href="#i-home"/></svg>Teacher Home</button>
+            <a role="menuitem" href="../index.html"><svg class="icon" aria-hidden="true"><use href="#i-brain"/></svg>Neuro-Focus home page</a>
+            <div role="separator"></div>
+            <button role="menuitem" id="signOutButton" type="button"><svg class="icon" aria-hidden="true"><use href="#i-logout"/></svg>Sign out</button>
+          </div>
+        </div>
       </div>
     </header>
 
@@ -564,7 +184,11 @@
           </div>
           <div class="home-hero-inner">
             <div class="home-hero-hello">
-              <span class="hero-avatar"><span class="nf-avatar xl" id="teacherAvatar"></span></span>
+              <button class="hero-avatar" type="button" data-nav="profile" title="Open My profile">
+                <span class="nf-avatar xl" data-profile-avatar></span>
+                <span class="hero-avatar-edit" aria-hidden="true"><svg class="icon"><use href="#i-pencil"/></svg></span>
+                <span class="sr-only">Open My profile</span>
+              </button>
               <div class="hero-copy">
                 <p class="eyebrow-pill"><span class="tag">Today</span><span id="todayLabel">Today</span></p>
                 <h1 class="welcome-title" id="classesTitle">Welcome back</h1>
@@ -682,6 +306,331 @@
             </div>
           </section>
         </div>
+      </section>
+
+      <!-- ================= All students (teacher-overview.js) ================= -->
+      <section class="stack view overview-view" id="allStudentsView" hidden aria-labelledby="allStudentsTitle">
+        <section class="home-hero page-hero" aria-labelledby="allStudentsTitle">
+          <div class="home-hero-art" aria-hidden="true">
+            <svg viewBox="0 0 560 200" fill="none">
+              <g stroke="currentColor" stroke-width="1.2">
+                <circle cx="400" cy="70" r="22" stroke-opacity="0.32"/><path d="M362 140a38 38 0 0 1 76 0" stroke-opacity="0.32"/>
+                <circle cx="470" cy="84" r="17" stroke-opacity="0.22"/><path d="M440 142a30 30 0 0 1 60 0" stroke-opacity="0.22"/>
+                <circle cx="334" cy="88" r="15" stroke-opacity="0.18"/><path d="M308 142a26 26 0 0 1 52 0" stroke-opacity="0.18"/>
+              </g>
+              <path d="M520 36l3 8 8 3-8 3-3 8-3-8-8-3 8-3Z" fill="currentColor" fill-opacity="0.45"/>
+            </svg>
+          </div>
+          <div class="page-hero-inner">
+            <div class="hero-copy">
+              <p class="eyebrow-pill"><span class="tag">All classes</span><span id="allStudentsCount">Loading…</span></p>
+              <h1 class="welcome-title" id="allStudentsTitle">All students</h1>
+              <p class="hero-lead">Everyone on your master lists in one place, with their attendance and focus over the last 30 days.</p>
+            </div>
+            <div class="page-hero-actions">
+              <button class="btn-action" type="button" id="allStudentsDownload"><svg class="icon"><use href="#i-download"/></svg>Download spreadsheet</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="glance page-glance" aria-label="All students at a glance" aria-live="polite">
+          <div class="glance-tile home-card" style="--d: 1">
+            <span class="glance-label"><svg class="icon" aria-hidden="true"><use href="#i-users"/></svg>Students</span>
+            <b class="glance-value" id="osTotal">—</b>
+            <small class="glance-note" id="osTotalNote">&nbsp;</small>
+          </div>
+          <div class="glance-tile home-card" style="--d: 2">
+            <span class="glance-label"><svg class="icon green" aria-hidden="true"><use href="#i-attendance"/></svg>Attendance</span>
+            <b class="glance-value" id="osRate">—</b>
+            <small class="glance-note" id="osRateNote">&nbsp;</small>
+          </div>
+          <div class="glance-tile home-card" style="--d: 3">
+            <span class="glance-label"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg>Average focus</span>
+            <b class="glance-value" id="osFocus">—</b>
+            <small class="glance-note" id="osFocusNote">&nbsp;</small>
+          </div>
+          <div class="glance-tile home-card" style="--d: 4">
+            <span class="glance-label"><svg class="icon red" aria-hidden="true"><use href="#i-flag"/></svg>Need a check-in</span>
+            <b class="glance-value" id="osLow">—</b>
+            <small class="glance-note" id="osLowNote">&nbsp;</small>
+          </div>
+        </section>
+
+        <section style="--d: 5" class="panel-card home-card" aria-labelledby="allStudentsListTitle">
+          <div class="panel-head list-head">
+            <div>
+              <h2 class="panel-title" id="allStudentsListTitle"><span class="chip-icon"><svg><use href="#i-users"/></svg></span>Students</h2>
+              <p class="panel-sub">Attendance counts finished live sessions; excused sessions don’t count against anyone.</p>
+            </div>
+            <div class="list-tools">
+              <label class="search-field">
+                <svg class="icon"><use href="#i-search"/></svg>
+                <input id="allStudentsSearch" type="search" placeholder="Search students" aria-label="Search students" autocomplete="off">
+              </label>
+              <select id="allStudentsSort" class="field-select" aria-label="Sort students">
+                <option value="attention">Needs a check-in first</option>
+                <option value="name">Name (A–Z)</option>
+                <option value="attendance">Attendance (lowest first)</option>
+                <option value="focus">Focus (lowest first)</option>
+                <option value="recent">Last attended (longest ago first)</option>
+              </select>
+            </div>
+          </div>
+          <div class="filter-chips" id="allStudentsChips" role="group" aria-label="Show students from"></div>
+          <div class="table-scroll overview-scroll">
+            <table class="data-table overview-table">
+              <thead><tr><th>Student</th><th>Classes</th><th>Attendance</th><th class="num">Late</th><th>Focus</th><th>Last attended</th></tr></thead>
+              <tbody id="allStudentsRows"></tbody>
+            </table>
+          </div>
+          <p class="panel-sub overview-status" id="allStudentsStatus" aria-live="polite"></p>
+        </section>
+      </section>
+
+      <!-- ================= Attendance report (teacher-overview.js) ================= -->
+      <section class="stack view overview-view" id="reportView" hidden aria-labelledby="reportTitle">
+        <section class="home-hero page-hero" aria-labelledby="reportTitle">
+          <div class="home-hero-art" aria-hidden="true">
+            <svg viewBox="0 0 560 200" fill="none">
+              <g stroke="currentColor" stroke-width="1.2">
+                <rect x="320" y="30" width="200" height="140" rx="16" stroke-opacity="0.26"/>
+                <path d="M320 66h200M370 30v140M420 30v140M470 30v140" stroke-opacity="0.16"/>
+              </g>
+              <g fill="currentColor">
+                <circle cx="345" cy="92" r="6" fill-opacity="0.45"/><circle cx="395" cy="92" r="6" fill-opacity="0.45"/><circle cx="445" cy="92" r="6" fill-opacity="0.2"/><circle cx="495" cy="92" r="6" fill-opacity="0.45"/>
+                <circle cx="345" cy="132" r="6" fill-opacity="0.45"/><circle cx="395" cy="132" r="6" fill-opacity="0.2"/><circle cx="445" cy="132" r="6" fill-opacity="0.45"/><circle cx="495" cy="132" r="6" fill-opacity="0.45"/>
+              </g>
+            </svg>
+          </div>
+          <div class="page-hero-inner">
+            <div class="hero-copy">
+              <p class="eyebrow-pill"><span class="tag">All classes</span><span id="reportRangeLabel">Last 30 days</span></p>
+              <h1 class="welcome-title" id="reportTitle">Attendance report</h1>
+              <p class="hero-lead">Every finished live session across your classes: who came, who was late and who missed out.</p>
+            </div>
+            <div class="page-hero-actions">
+              <div class="range-switch" role="group" aria-label="Time range">
+                <button type="button" data-report-range="7" aria-pressed="false">7 days</button>
+                <button type="button" data-report-range="30" aria-pressed="true">30 days</button>
+                <button type="button" data-report-range="90" aria-pressed="false">90 days</button>
+              </div>
+              <button class="btn-action" type="button" id="reportDownload"><svg class="icon"><use href="#i-download"/></svg>Download spreadsheet</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="glance page-glance" aria-label="Attendance at a glance" aria-live="polite">
+          <div class="glance-tile home-card" style="--d: 1">
+            <span class="glance-label"><svg class="icon green" aria-hidden="true"><use href="#i-attendance"/></svg>Attendance rate</span>
+            <b class="glance-value" id="rpRate">—</b>
+            <span class="glance-meter green" aria-hidden="true"><span id="rpRateMeter"></span></span>
+            <small class="glance-note" id="rpRateNote">&nbsp;</small>
+          </div>
+          <div class="glance-tile home-card" style="--d: 2">
+            <span class="glance-label"><svg class="icon amber" aria-hidden="true"><use href="#i-timer"/></svg>Arrived late</span>
+            <b class="glance-value" id="rpLate">—</b>
+            <small class="glance-note" id="rpLateNote">&nbsp;</small>
+          </div>
+          <div class="glance-tile home-card" style="--d: 3">
+            <span class="glance-label"><svg class="icon" aria-hidden="true"><use href="#i-live"/></svg>Sessions held</span>
+            <b class="glance-value" id="rpSessions">—</b>
+            <small class="glance-note" id="rpSessionsNote">&nbsp;</small>
+          </div>
+          <div class="glance-tile home-card" style="--d: 4">
+            <span class="glance-label"><svg class="icon red" aria-hidden="true"><use href="#i-flag"/></svg>Absences</span>
+            <b class="glance-value" id="rpAbsent">—</b>
+            <small class="glance-note" id="rpAbsentNote">&nbsp;</small>
+          </div>
+        </section>
+
+        <div class="home-pair">
+          <section style="--d: 5" class="panel-card home-card" aria-labelledby="reportTrendTitle">
+            <div class="panel-head">
+              <div>
+                <h2 class="panel-title" id="reportTrendTitle"><span class="chip-icon"><svg><use href="#i-chart"/></svg></span>Attendance over time</h2>
+                <p class="panel-sub">Share of invited students who came, per day with a live session.</p>
+              </div>
+            </div>
+            <div class="chart-box report-chart">
+              <canvas id="reportChart" role="img" aria-label="Attendance rate per day"></canvas>
+              <div class="chart-empty" id="reportChartEmpty">No finished sessions in this range.</div>
+            </div>
+          </section>
+
+          <section style="--d: 6" class="panel-card home-card" aria-labelledby="reportMissedTitle">
+            <div class="panel-head">
+              <div>
+                <h2 class="panel-title" id="reportMissedTitle"><span class="chip-icon red"><svg><use href="#i-flag"/></svg></span>Missed the most</h2>
+                <p class="panel-sub">Students with the most absences in this range.</p>
+              </div>
+            </div>
+            <ul class="continue-list" id="reportMissed"><li class="empty-state">Loading…</li></ul>
+          </section>
+        </div>
+
+        <section style="--d: 7" class="panel-card home-card" aria-labelledby="reportClassesTitle">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title" id="reportClassesTitle"><span class="chip-icon"><svg><use href="#i-attendance"/></svg></span>By class</h2>
+              <p class="panel-sub">Open a class to see each session and change any mark.</p>
+            </div>
+          </div>
+          <div class="table-scroll overview-scroll">
+            <table class="data-table overview-table">
+              <thead><tr><th>Class</th><th class="num">Sessions</th><th class="num">Present</th><th class="num">Late</th><th class="num">Absent</th><th class="num">Excused</th><th>Attendance</th></tr></thead>
+              <tbody id="reportClassRows"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section style="--d: 8" class="panel-card home-card" aria-labelledby="reportSessionsTitle">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title" id="reportSessionsTitle"><span class="chip-icon"><svg><use href="#i-history"/></svg></span>Sessions</h2>
+              <p class="panel-sub" id="reportSessionsSub">Newest first.</p>
+            </div>
+          </div>
+          <ul class="continue-list report-sessions" id="reportSessions"><li class="empty-state">Loading…</li></ul>
+          <button class="btn-action overview-more" type="button" id="reportMore" hidden>Show older sessions</button>
+          <p class="panel-sub overview-status" id="reportStatus" aria-live="polite"></p>
+        </section>
+      </section>
+
+      <!-- ================= My profile (scripts/shared/profile.js) ================= -->
+      <section class="stack view" id="profileView" hidden aria-labelledby="profilePageTitle">
+        <div class="page-head">
+          <div>
+            <div class="page-kicker">Your account</div>
+            <h1 class="page-title" id="profilePageTitle">My profile</h1>
+            <p class="page-sub">Choose how you appear and how Neuro-Focus looks. Changes are saved to your account, so they follow you to any device.</p>
+          </div>
+        </div>
+
+        <form id="profileForm" novalidate>
+          <div class="profile-grid">
+            <section class="panel-card" aria-labelledby="identityTitle">
+              <div class="panel-head">
+                <div>
+                  <h2 class="panel-title" id="identityTitle"><span class="chip-icon"><svg><use href="#i-user"/></svg></span>Picture and name</h2>
+                  <p class="panel-sub">Your students see your name and picture on their class cards.</p>
+                </div>
+              </div>
+
+              <div class="identity-row">
+                <div class="identity-preview">
+                  <span class="nf-avatar xxl" id="profileAvatarPreview"></span>
+                  <span class="identity-caption" id="avatarCaption">Your initials</span>
+                </div>
+                <div class="identity-fields">
+                  <label class="field-label" for="displayNameInput">Display name</label>
+                  <input id="displayNameInput" class="field-input" type="text" autocomplete="nickname" spellcheck="false" required aria-describedby="displayNameHelp displayNameError">
+                  <div class="field-foot">
+                    <span class="field-help" id="displayNameHelp">Shown in your greeting and on your students’ class cards.</span>
+                    <span class="char-count" id="displayNameCount" aria-hidden="true">0 / 40</span>
+                  </div>
+                  <p class="field-error" id="displayNameError" aria-live="polite"></p>
+                </div>
+              </div>
+
+              <fieldset class="avatar-picker">
+                <legend class="field-label">Built-in avatars</legend>
+                <div class="avatar-options" id="avatarOptions"></div>
+              </fieldset>
+
+              <div class="upload-box">
+                <div class="upload-actions">
+                  <input type="file" id="avatarFile" class="sr-only" accept="image/jpeg,image/png,image/webp" tabindex="-1" aria-hidden="true">
+                  <button type="button" class="btn-action" id="avatarUploadButton"><svg class="icon"><use href="#i-upload"/></svg><span id="avatarUploadLabel">Upload a picture</span></button>
+                  <button type="button" class="btn-action btn-danger-soft" id="avatarRemoveButton" hidden><svg class="icon"><use href="#i-trash"/></svg>Remove picture</button>
+                </div>
+                <p class="field-help">JPG, PNG or WebP up to 5 MB. Only you and your students can see an uploaded picture.</p>
+                <div class="crop-panel" id="cropPanel" hidden>
+                  <div class="crop-stage" id="cropStage" tabindex="0" role="group" aria-roledescription="picture cropper" aria-label="Picture position. Drag the picture, or use the arrow keys to move it and + or − to zoom." aria-describedby="cropHelp">
+                    <canvas id="cropCanvas" width="440" height="440"></canvas>
+                    <span class="crop-ring" aria-hidden="true"></span>
+                  </div>
+                  <div class="crop-controls">
+                    <label class="field-label" for="cropZoom">Zoom</label>
+                    <input type="range" id="cropZoom" min="1" max="4" step="0.01" value="1">
+                    <p class="field-help" id="cropHelp">The square is what gets saved; the circle shows how it appears. Your picture is only uploaded when you press Save changes.</p>
+                    <div class="crop-buttons">
+                      <button type="button" class="btn-action" id="cropReset">Reset position</button>
+                      <button type="button" class="btn-action" id="cropDiscard">Don’t use this picture</button>
+                    </div>
+                  </div>
+                </div>
+                <p class="field-error" id="avatarError" aria-live="polite"></p>
+              </div>
+
+              <dl class="account-facts">
+                <div><dt>Login email</dt><dd id="factEmail">—</dd></div>
+                <div><dt>Account ID</dt><dd><code id="factAccountId">—</code></dd></div>
+                <div><dt>Role</dt><dd id="factRole">Teacher</dd></div>
+              </dl>
+              <p class="field-help account-note">Your login email, account ID and role are separate from your profile and can’t be changed here.</p>
+            </section>
+
+            <section class="panel-card" id="profile-appearance" aria-labelledby="appearanceTitle">
+              <div class="panel-head">
+                <div>
+                  <h2 class="panel-title" id="appearanceTitle"><span class="chip-icon"><svg><use href="#i-palette"/></svg></span>Theme and accent</h2>
+                  <p class="panel-sub">Pick one to preview it on the whole page. It’s only kept when you save.</p>
+                </div>
+              </div>
+
+              <fieldset>
+                <legend class="field-label">Theme</legend>
+                <div class="theme-options">
+                  <label class="theme-option">
+                    <input type="radio" name="theme" value="default">
+                    <span class="theme-swatch" data-swatch="default" aria-hidden="true"><i></i><i></i><i></i></span>
+                    <span class="theme-text"><span class="theme-name">Neuro-Focus</span><span class="theme-desc">The original dark look with a cyan glow</span></span>
+                  </label>
+                  <label class="theme-option">
+                    <input type="radio" name="theme" value="light">
+                    <span class="theme-swatch" data-swatch="light" aria-hidden="true"><i></i><i></i><i></i></span>
+                    <span class="theme-text"><span class="theme-name">Light</span><span class="theme-desc">Bright and easy to read in daylight</span></span>
+                  </label>
+                  <label class="theme-option">
+                    <input type="radio" name="theme" value="dark">
+                    <span class="theme-swatch" data-swatch="dark" aria-hidden="true"><i></i><i></i><i></i></span>
+                    <span class="theme-text"><span class="theme-name">Calm dark</span><span class="theme-desc">Soft slate tones with gentler contrast</span></span>
+                  </label>
+                </div>
+              </fieldset>
+
+              <fieldset class="accent-picker">
+                <legend class="field-label">Accent colour</legend>
+                <div class="accent-options">
+                  <label class="accent-option"><input type="radio" name="accent" value="default"><span class="accent-dot" data-accent="default" aria-hidden="true"></span>Theme colour</label>
+                  <label class="accent-option"><input type="radio" name="accent" value="blue"><span class="accent-dot" data-accent="blue" aria-hidden="true"></span>Blue</label>
+                  <label class="accent-option"><input type="radio" name="accent" value="purple"><span class="accent-dot" data-accent="purple" aria-hidden="true"></span>Purple</label>
+                  <label class="accent-option"><input type="radio" name="accent" value="green"><span class="accent-dot" data-accent="green" aria-hidden="true"></span>Green</label>
+                  <label class="accent-option"><input type="radio" name="accent" value="orange"><span class="accent-dot" data-accent="orange" aria-hidden="true"></span>Orange</label>
+                </div>
+              </fieldset>
+
+              <div class="appearance-sample" aria-hidden="true">
+                <div class="sample-head"><span class="chip-icon"><svg><use href="#i-spark"/></svg></span><b>Preview</b></div>
+                <p class="sample-text">This is how text, <a>links</a>, buttons and status labels look. Status colours stay the same with every accent.</p>
+                <div class="sample-row">
+                  <span class="btn-primary">Save note</span>
+                  <span class="btn-action">Cancel</span>
+                  <span class="status-chip ok">Focused</span>
+                  <span class="status-chip warn">Looked away</span>
+                  <span class="status-chip live">Live</span>
+                </div>
+                <div class="sample-chart"><i style="height: 40%"></i><i style="height: 65%"></i><i style="height: 30%"></i><i style="height: 85%"></i><i style="height: 55%"></i><i style="height: 75%"></i><i style="height: 45%"></i></div>
+              </div>
+            </section>
+          </div>
+
+          <div class="profile-actions">
+            <p class="profile-status" id="profileStatus" role="status" aria-live="polite">Loading your profile…</p>
+            <button type="button" class="btn-action" id="profileCancel">Cancel</button>
+            <button type="submit" class="btn-primary" id="profileSave">Save changes</button>
+          </div>
+        </form>
       </section>
 
       <!-- ================= One class ================= -->
@@ -837,8 +786,8 @@
               <div class="panel-card">
                 <div class="panel-head">
                   <div>
-                    <div class="panel-title"><span class="chip-icon red"><svg><use href="#i-bell"/></svg></span>Distraction alerts</div>
-                    <div class="panel-sub">Automated flags raised by the attention model.</div>
+                    <div class="panel-title"><span class="chip-icon red"><svg><use href="#i-bell"/></svg></span>Check-in alerts</div>
+                    <div class="panel-sub">Raised when measured estimates stay low. An estimate, not proof of distraction.</div>
                   </div>
                 </div>
                 <ul class="alert-feed" id="alertFeed"></ul>
@@ -855,9 +804,10 @@
               </div>
               <div class="heatmap-scroll"><div class="heatmap" id="engagementHeatmap"></div></div>
               <div class="heat-legend">
-                <span class="lg-focused">Focused (70%+)</span>
-                <span class="lg-drifting">Drifting (45–69%)</span>
-                <span class="lg-distracted">Distracted (&lt;45%)</span>
+                <span class="lg-focused">Mostly on screen (70%+)</span>
+                <span class="lg-drifting">Mixed (45–69%)</span>
+                <span class="lg-distracted">Mostly looking away (&lt;45%)</span>
+                <span class="lg-empty">Empty: not measured</span>
               </div>
             </div>
           </section>
@@ -1039,14 +989,16 @@
     </dialog>
   </main>
 
-  <script src="../scripts/shared/app.js?v=3"></script>
+  <script src="../scripts/shared/app.js?v=4"></script>
   <script src="../scripts/shared/dashboard-nav.js?v=3"></script>
-  <script src="../scripts/teacher/teacher-ui.js?v=2"></script>
-  <script type="module" src="../scripts/auth/auth-guard.js?v=3"></script>
-  <script type="module" src="../scripts/teacher/teacher-classes.js?v=11"></script>
+  <script src="../scripts/teacher/teacher-ui.js?v=3"></script>
+  <script type="module" src="../scripts/auth/auth-guard.js?v=4"></script>
+  <script type="module" src="../scripts/teacher/teacher-classes.js?v=15"></script>
   <script type="module" src="../scripts/teacher/teacher-attendance.js?v=4"></script>
-  <script type="module" src="../scripts/teacher/teacher-analytics.js?v=5"></script>
-  <script type="module" src="../scripts/teacher/teacher-home.js?v=1"></script>
+  <script type="module" src="../scripts/teacher/teacher-analytics.js?v=7"></script>
+  <script type="module" src="../scripts/shared/profile.js?v=1"></script>
+  <script type="module" src="../scripts/teacher/teacher-home.js?v=4"></script>
+  <script type="module" src="../scripts/teacher/teacher-overview.js?v=2"></script>
   <script type="module" src="../scripts/shared/home-background.js?v=1"></script>
 </body>
 </html>

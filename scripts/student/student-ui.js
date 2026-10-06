@@ -63,6 +63,7 @@
   // attention tracker and show it, or stop it if it is already running. The camera never
   // starts on its own when a page opens.
   const quickLabel = document.querySelector("#quickStart span");
+  const quickIcon = document.querySelector("#quickStart use");
   let tracking = false;
   document.addEventListener("click", (event) => {
     const button = event.target.closest("[data-start-focus]");
@@ -77,9 +78,11 @@
   window.addEventListener("neurofocus:tracking-started", () => {
     tracking = true;
     if (quickLabel) quickLabel.textContent = "End focus session";
+    quickIcon?.setAttribute("href", "#i-stop");
   });
   window.addEventListener("neurofocus:tracking-stopped", () => {
     tracking = false;
     if (quickLabel) quickLabel.textContent = "Start focus session";
+    quickIcon?.setAttribute("href", "#i-play");
   });
 })();

@@ -41,7 +41,7 @@
 .home-hero-art svg { position: absolute; right: -40px; top: -30px; width: min(560px, 70%); height: auto; }
 .home-hero-inner { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; align-items: center; padding: 30px; }
 .home-hero-hello { display: flex; gap: 22px; align-items: center; min-width: 0; }
-.hero-avatar { position: relative; flex: none; border-radius: 50%; text-decoration: none; }
+.hero-avatar { position: relative; flex: none; border-radius: 50%; text-decoration: none; padding: 0; border: 0; background: none; cursor: pointer; }
 .hero-avatar .nf-avatar { box-shadow: 0 0 0 4px var(--surface), 0 0 0 5px color-mix(in srgb, var(--accent) 45%, transparent), 0 12px 30px var(--glow); transition: transform 0.2s ease; }
 .hero-avatar:hover .nf-avatar { transform: scale(1.03); }
 .hero-avatar-edit {
@@ -301,4 +301,75 @@ button.text-link { border: 0; background: none; padding: 0; font: inherit; font-
 }
 @media (max-width: 640px) {
   .home-hero-hello { flex-direction: column; align-items: flex-start; }
+}
+
+/* =====================================================================
+   Shared page parts: the other pages of both dashboards (student Focus session, NeuroBuddy,
+   Class notes, My progress; teacher All students and Attendance report) open with a page header
+   built on .home-hero, use plain "at a glance" tiles (.page-glance), and share the range switch,
+   class filter chips and search box.
+   ===================================================================== */
+.page-hero .hero-lead { max-width: 520px; }
+.page-hero .hero-lead .text-link { font-size: inherit; }
+.page-hero .home-hero-art svg { right: -60px; top: -10px; }
+.page-hero-inner { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 18px 28px; padding: 26px 30px; }
+.page-hero-inner .home-hero-hello { gap: 18px; }
+.page-hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.page-hero-actions .btn-primary { padding: 11px 18px; font-size: 14px; }
+.page-hero-actions .btn-action { padding: 10px 14px; font-size: 13.5px; }
+.hero-face { width: 64px; height: 64px; border-radius: 20px; box-shadow: 0 0 0 4px var(--surface), 0 12px 30px var(--glow); }
+.hero-face svg { width: 28px; height: 28px; }
+
+:is(.page-glance, .focus-glance, .progress-glance) .glance-tile { background: linear-gradient(180deg, var(--surface), var(--surface-2)); }
+:is(.page-glance, .focus-glance, .progress-glance) .glance-tile:hover { transform: none; box-shadow: none; border-color: var(--border); }
+.glance-label .icon.amber { color: var(--amber); }
+.glance-label .icon.green { color: var(--green); }
+.glance-label .icon.red { color: var(--danger-text); }
+.glance-meter { display: block; height: 6px; border-radius: 999px; background: var(--track); overflow: hidden; margin: 4px 0 2px; }
+.glance-meter span { display: block; height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, var(--accent-strong), var(--accent)); transition: width 0.4s ease, background 0.4s ease; }
+.glance-meter.green span { background: linear-gradient(90deg, color-mix(in srgb, var(--green) 60%, var(--accent)), var(--green)); }
+@media (prefers-reduced-motion: reduce) { .glance-meter span { transition: none; } }
+
+.range-switch { display: inline-flex; gap: 3px; padding: 3px; background: var(--surface-sunken); border: 1px solid var(--border); border-radius: 10px; }
+.range-switch button {
+  background: transparent; border: 0; border-radius: 7px; padding: 6px 12px; font-size: 12.5px; font-weight: 500; color: var(--text-muted);
+  cursor: pointer; white-space: nowrap; transition: background 0.15s ease, color 0.15s ease;
+}
+.range-switch button:hover { color: var(--text-main); }
+.range-switch button[aria-pressed="true"] { background: var(--surface-hover); color: var(--text-main); box-shadow: inset 0 0 0 1px var(--border-strong); }
+.page-hero .range-switch { background: var(--surface-glass); border-color: var(--border-strong); backdrop-filter: blur(8px); }
+.page-hero .range-switch button { padding: 8px 14px; font-size: 13px; }
+
+.search-field { position: relative; display: flex; align-items: center; }
+.search-field .icon { position: absolute; left: 11px; width: 15px; height: 15px; color: var(--text-muted); pointer-events: none; }
+.search-field input {
+  width: 100%; background: var(--surface-sunken); border: 1px solid var(--border-strong); border-radius: 9px; padding: 9px 12px 9px 34px;
+  font-size: 13px; outline: none; transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.search-field input:focus { border-color: color-mix(in srgb, var(--accent) 45%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 8%, transparent); }
+
+/* Class filter chips (student Class notes, teacher All students) */
+.filter-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.filter-chip {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 5px 6px 5px 10px; border-radius: 999px; cursor: pointer;
+  font-size: 12.5px; font-weight: 550; color: var(--text-soft); background: var(--surface-sunken); border: 1px solid var(--border);
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.filter-chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--class-color, var(--text-faint)); }
+.filter-chip[data-value="all"]::before { display: none; }
+.filter-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.filter-chip small { font-size: 11px; font-weight: 650; color: var(--text-muted); background: var(--surface-hover); border-radius: 999px; padding: 1px 7px; font-variant-numeric: tabular-nums; }
+.filter-chip:hover { color: var(--text-main); border-color: var(--border-hover); }
+.filter-chip[aria-pressed="true"] { color: var(--text-main); border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); background: color-mix(in srgb, var(--accent) 9%, var(--surface-sunken)); }
+.filter-chip[aria-pressed="true"] small { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+
+@keyframes list-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (max-width: 760px) {
+  .page-hero-inner { padding: 22px 18px; }
+  .hero-face { width: 52px; height: 52px; border-radius: 16px; }
+}
+@media (max-width: 520px) {
+  .page-hero-actions > * { flex: 1; }
+  .range-switch { width: 100%; }
+  .range-switch button { flex: 1; }
 }

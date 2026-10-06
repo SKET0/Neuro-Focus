@@ -4,6 +4,8 @@
 import {
   openClassChannel, teacherStatus, confirmAction, notify, showMessage, missingDatabaseUpdates, showSetupBanner, isMissingSql
 } from "../shared/class-live.js?v=9";
+import { paintAvatar, avatarUrls } from "../shared/avatars.js?v=1";
+import { normalizeReading, legacyState } from "../shared/tracking-states.js?v=1";
 
 const app = await window.neuroFocusReady;
 
@@ -19,6 +21,7 @@ if (app) {
   let announcedId;
   let tracking = false;
   let lastSentAt = 0;
+  let lastSentTracking = null;
   const blockedClasses = new Set(); // classes whose live channel is currently refused
   let sharingClassId = null;       // class whose teacher currently receives this student's scores
   let sharingSessionId = null;     // the live session (class_sessions id) being shared with
@@ -33,7 +36,9 @@ if (app) {
   const invitePings = new Map();   // classId -> last "please join" ping seen from the teacher
   const myAttendance = new Map();  // classId -> { attended, counted } over finished sessions
   let joinedSessionId = null;      // session the student pressed "Join session" for
-  const teacherNames = new Map();  // classId -> the teacher's display name (my_class_teachers)
+  const lastLiveSession = new Map(); // classId -> key of the live session last seen (sessionId, or "local")
+  let focusInSession = null;       // { classId, key } live session the student's focus session is part of
+  const teacherNames = new Map();  // classId -> { name, preset, path, url } of the class's teacher (my_class_teachers)
   let teacherNamesFor = "";
   let teacherNamesAt = 0;
   let checkIn = { sessionId: null, timer: null, status: "" };
@@ -130,8 +135,10 @@ if (app) {
     void loadTeacherNames();
   }
 
-  // Teacher names for the class cards, refreshed when the class list changes or every few minutes.
-  // Before the student profiles database update this function doesn't exist: cards leave the name out.
+  // Teacher names and pictures for the class cards, refreshed when the class list changes or every
+  // few minutes. Pictures come with the teacher avatars database update (signed links that only the
+  // teacher's own students can get); before it, cards show the name with initials, and before the
+  // student profiles update, cards leave the teacher out.
   async function loadTeacherNames() {
     const key = classes.map((item) => item.id).sort().join(",");
     if (!key || (key === teacherNamesFor && Date.now() - teacherNamesAt < 180000)) return;
@@ -139,8 +146,12 @@ if (app) {
     teacherNamesAt = Date.now();
     const { data, error } = await supabase.rpc("my_class_teachers");
     if (error) return;
+    const urls = await avatarUrls(supabase, (data || []).map((row) => row.teacher_avatar_path).filter(Boolean));
     teacherNames.clear();
-    (data || []).forEach((row) => teacherNames.set(row.class_id, row.teacher_name));
+    (data || []).forEach((row) => teacherNames.set(row.class_id, {
+      name: row.teacher_name, preset: row.teacher_avatar_preset || null, path: row.teacher_avatar_path || null,
+      url: urls.get(row.teacher_avatar_path) || null
+    }));
     renderCards();
     publishStatus();
   }
@@ -234,6 +245,48 @@ if (app) {
     });
   }
 
+  const sessionKey = (status) => status.sessionId || "local";
+
+  // Which live session the student's focus session is part of, so it can end with that session.
+  // Kept while the teacher's dashboard is briefly disconnected; cleared when the student stops
+  // tracking, stops sharing, switches class or is removed from the session.
+  function noteFocusSession() {
+    if (!tracking) focusInSession = null;
+    else if (sharingClassId) focusInSession = { classId: sharingClassId, key: sharingSessionId || "local" };
+    else if (focusInSession && (focusInSession.classId !== currentId || !shareToggle?.checked || removedFromSession(currentId))) focusInSession = null;
+  }
+
+  // The teacher ended a live session: end the focus session that was part of it (stop the timer,
+  // turn the camera off and save it to My progress) and tell the student. A saved session is
+  // checked first: a teacher dashboard opening on another device can briefly look "not live"
+  // before it finds the open session, and that must not end anyone's focus session.
+  async function endFocusWithSession(item, key) {
+    if (joinedSessionId === key) joinedSessionId = null;
+    const mine = () => tracking && focusInSession?.classId === item.id && focusInSession.key === key;
+    if (!mine()) return;
+    if (key !== "local") {
+      const { data, error } = await supabase.from("class_sessions").select("ended_at").eq("id", key).maybeSingle();
+      if (!error && data && !data.ended_at) return; // still open: the dashboard is just reconnecting
+    } else {
+      // Sessions aren't saved before the attendance database update: wait a moment instead.
+      await new Promise((resolve) => window.setTimeout(resolve, 4000));
+      const status = teacher.get(item.id);
+      if (status?.live && sessionKey(status) === key) return;
+    }
+    if (!mine()) return;
+    focusInSession = null;
+    liveNotices.get(item.id)?.();
+    liveNotices.delete(item.id);
+    window.dispatchEvent(new CustomEvent("neurofocus:end-focus-session", { detail: { classId: item.id } }));
+    notify({
+      title: `The live session in ${item.name} has ended`,
+      text: "Your teacher ended the session, so your focus session has ended too and your camera is off. It’s saved in My progress.",
+      kind: "info",
+      timeoutMs: 15000,
+      actions: [{ label: "See my progress", onClick: () => window.neuroFocusNavigate?.("progress") }]
+    });
+  }
+
   function onTeacherStatus(classId, status) {
     const item = classes.find((entry) => entry.id === classId);
     if (!item) return;
@@ -246,6 +299,12 @@ if (app) {
       void handleRemoved(item);
       return;
     }
+    // The teacher ended the live session: their dashboard is online and that session is no longer
+    // the live one. (A dashboard that disconnected only pauses the session, so nothing ends then.)
+    const lastLive = lastLiveSession.get(classId);
+    if (status.live) lastLiveSession.set(classId, sessionKey(status));
+    else if (status.online) lastLiveSession.delete(classId);
+    if (lastLive && status.online && (!status.live || sessionKey(status) !== lastLive)) void endFocusWithSession(item, lastLive);
     const listed = listedAsRemoved(status);
     const removalKey = status.sessionId || "local";
     if (listed && !sessionRemovalChecks.has(removalKey)) void checkSessionRemoval(classId, status.sessionId);
@@ -282,7 +341,7 @@ if (app) {
           actions: [{ label: "Join session", primary: true, onClick: () => joinSession(classId) }]
         }));
       }
-    } else if (!status.live && previous.live) {
+    } else if (!status.live && previous.live && !(status.online && tracking && focusInSession?.classId === classId)) {
       notify({
         title: status.online ? `Live session ended in ${item.name}` : `Live session paused in ${item.name}`,
         text: status.online ? "Your teacher can no longer see your focus." : "Your teacher’s dashboard disconnected. Sharing resumes if they come back.",
@@ -425,6 +484,7 @@ if (app) {
 
   // ---------- Rendering ----------
   function render() {
+    noteFocusSession();
     updateCheckIn();
     renderSidebar();
     renderCards();
@@ -446,7 +506,8 @@ if (app) {
         return {
           id: item.id,
           name: item.name,
-          teacherName: teacherNames.get(item.id) || "",
+          teacherName: teacherNames.get(item.id)?.name || "",
+          teacherAvatar: teacherNames.get(item.id) ? { preset: teacherNames.get(item.id).preset, url: teacherNames.get(item.id).url } : null,
           live: Boolean(status?.live),
           since: status?.live ? status.since || null : null,
           online: Boolean(status?.online),
@@ -514,9 +575,18 @@ if (app) {
       if (item.id === currentId) card.setAttribute("aria-current", "true");
       const title = document.createElement("h3");
       title.textContent = item.name;
+      // The class's teacher, with their picture or built-in avatar.
+      const teacherInfo = teacherNames.get(item.id);
       const teacherLine = document.createElement("div");
       teacherLine.className = "my-class-teacher";
-      teacherLine.textContent = teacherNames.get(item.id) ? `Teacher: ${teacherNames.get(item.id)}` : "";
+      if (teacherInfo) {
+        const face = document.createElement("span");
+        face.className = "nf-avatar sm";
+        paintAvatar(face, { name: teacherInfo.name, preset: teacherInfo.preset, url: teacherInfo.url });
+        const label = document.createElement("span");
+        label.textContent = teacherInfo.name;
+        teacherLine.append(face, label);
+      }
       const code = document.createElement("span");
       code.className = "code";
       code.textContent = item.join_code;
@@ -564,7 +634,7 @@ if (app) {
       leave.addEventListener("click", () => leaveClass(item));
       actions.append(leave);
 
-      card.append(title, ...(teacherLine.textContent ? [teacherLine] : []), code, state, attendanceLine, actions);
+      card.append(title, ...(teacherInfo ? [teacherLine] : []), code, state, attendanceLine, actions);
       grid.append(card);
     });
   }
@@ -642,6 +712,7 @@ if (app) {
     let text;
     let state = "";
     if (item && blockedClasses.has(item.id)) text = `Live sharing is unavailable. ${SETUP_TEXT}`;
+    else if (navigator.onLine === false) text = "Connection lost · your teacher isn’t receiving updates until you’re back online.";
     else if (!item) text = "Not shared · join a class to share your focus with a teacher.";
     else if (live && removedFromSession(item.id)) text = "Not shared · your teacher removed you from this live session.";
     else if (!shareToggle?.checked) text = "Sharing paused · your teacher can’t see your focus.";
@@ -737,13 +808,21 @@ if (app) {
     }
     if (!sharingClassId) return;
     const now = Date.now();
-    if (now - lastSentAt < 1000) return;
+    // The shared reading shape (tracking-states.js): an unavailable or break reading is sent with
+    // no score, so the teacher never sees it as 0. "state" is kept for older teacher dashboards.
+    // One reading a second, but a change (e.g. tracking became unavailable) goes straight away.
+    const reading = normalizeReading(event.detail);
+    if (now - lastSentAt < 1000 && reading.tracking === lastSentTracking) return;
     lastSentAt = now;
-    const { score, state, cumulativeFocus } = event.detail;
-    sendAttention(sharingClassId, { score, state, cumulativeFocus });
+    lastSentTracking = reading.tracking;
+    sendAttention(sharingClassId, {
+      tracking: reading.tracking, score: reading.score, engagement: reading.engagement, reason: reading.reason,
+      state: legacyState(reading), cumulativeFocus: window.neuroFocusSessionStats?.focusPercent ?? null
+    });
   });
   window.addEventListener("neurofocus:tracking-stopped", () => {
     tracking = false;
+    lastSentTracking = null;
     if (sharingClassId) sendAttention(sharingClassId, { state: "Stopped" });
     render();
   });
@@ -751,6 +830,9 @@ if (app) {
     updateSharing();
     render();
   });
+  // Connection lost or back: the share status says whether the teacher is receiving updates.
+  window.addEventListener("offline", () => render());
+  window.addEventListener("online", () => render());
 
   // A new display name or picture (student-profile.js): tell each class's teacher so their lists refresh.
   window.addEventListener("neurofocus:profile-updated", () => {

@@ -99,8 +99,8 @@ window.neuroFocusReady = (async () => {
       return null;
     }
 
-    // A student's saved look applies to student pages only; teacher pages always keep the default.
-    if (requiredRole === "student") {
+    // Each account's saved look (My profile → Theme and accent) applies to its own dashboard only.
+    if (requiredRole) {
       applyAppearance(profile);
       cacheAppearance(session.user.id, profile);
     }
@@ -124,7 +124,7 @@ window.neuroFocusReady = (async () => {
       if (signingOut || event === "INITIAL_SESSION") return;
       if (!nextSession || nextSession.user.id !== session.user.id) {
         // This page belongs to the previous account: stop showing its appearance.
-        if (requiredRole === "student") applyAppearance({});
+        if (requiredRole) applyAppearance({});
         showAccountChangedNotice();
       }
     });

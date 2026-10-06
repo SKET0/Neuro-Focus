@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node access-rules.test.mjs"
+    "test": "node tracking.test.mjs && node access-rules.test.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.2.17"

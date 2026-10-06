@@ -6,14 +6,14 @@
 // Saving happens in student-focus.js, which fires "neurofocus:history-saved" afterwards.
 // Shown in the My progress view; colours follow the student's theme.
 import { themeColor, withAlpha } from "../shared/appearance.js?v=1";
-import { hasFocus, focusedSeconds, sum, averageFocus, levelFor, buildInsights } from "./focus-analysis.js?v=1";
+import { hasFocus, hasQualityInfo, measuredSeconds, focusedSeconds, sum, averageFocus, levelFor, buildInsights, COACH_MINIMUM, EVIDENCE_RULE } from "./focus-analysis.js?v=2";
+import { sampleRuns, selectWithQuality } from "../shared/tracking-states.js?v=1";
 
 const app = await window.neuroFocusReady;
 
 if (app) {
   const $ = (selector) => document.querySelector(selector);
   const PAGE_SIZE = 12;
-  const MIN_SESSIONS_FOR_INSIGHTS = 3;
   const SAMPLE_SECONDS = 5; // attention_samples are 5-second windows
   const rangeKey = `neuroFocusHistoryRange:${app.user.id}`;
   const missingTables = (error) => error && (error.code === "PGRST205" || error.code === "42P01" || /attention_sessions|attention_samples/.test(error.message || ""));
@@ -23,6 +23,7 @@ if (app) {
   let range = "7";
   let shown = PAGE_SIZE;
   let chart = null;
+  let refreshTimer = 0;
   const openSessions = new Set();
   const sampleCache = new Map();
   try { if (["7", "30", "all"].includes(localStorage.getItem(rangeKey))) range = localStorage.getItem(rangeKey); } catch { /* storage unavailable */ }
@@ -122,7 +123,7 @@ if (app) {
     const avgNote = $("#hsAverageNote");
     const prevAvg = hasPrev ? averageFocus(previous) : null;
     if (avg !== null && prevAvg !== null) avgNote.replaceChildren(delta(avg - prevAvg, (n) => `${n} pts`, info.compare));
-    else avgNote.textContent = avg === null ? "Time spent looking at your work" : levelFor(avg).label;
+    else avgNote.textContent = avg === null ? "Share of measured time on screen" : `${levelFor(avg).label} · share of measured time`;
 
     const best = current.reduce((top, s) => (!top || s.best_streak_seconds > top.best_streak_seconds ? s : top), null);
     $("#hsStreak").textContent = best && best.best_streak_seconds ? clock(best.best_streak_seconds) : "—";
@@ -226,28 +227,34 @@ if (app) {
   // ---------- Insights ----------
   function renderInsights(current, info) {
     const list = $("#insightList");
-    const counted = current.filter(hasFocus).length;
-    if (counted < MIN_SESSIONS_FOR_INSIGHTS) {
+    const { evidence, insights } = buildInsights(current);
+    if (!evidence.enough) {
+      // Not enough measured data for patterns: say exactly what's still needed.
       const item = el("li", "insight");
       const icon = el("span", "chip-icon");
       icon.append(svgUse("i-spark", ""));
       const body = el("div");
+      const still = [
+        evidence.sessions < COACH_MINIMUM.sessions ? plural(COACH_MINIMUM.sessions - evidence.sessions, "more session") : "",
+        evidence.days < COACH_MINIMUM.days ? plural(COACH_MINIMUM.days - evidence.days, "more day") : "",
+        evidence.minutes < COACH_MINIMUM.minutes ? `${COACH_MINIMUM.minutes - evidence.minutes} more measured minutes` : ""
+      ].filter(Boolean).join(", ");
       body.append(
-        el("b", "", `Complete ${MIN_SESSIONS_FOR_INSIGHTS} sessions to unlock insights`),
-        el("p", "", `You have ${counted} ${info.phrase}. Once there's enough to compare, this shows when and how you focus best.`)
+        el("b", "", "Not enough measured data for patterns yet"),
+        el("p", "", `Patterns need ${EVIDENCE_RULE} ${info.phrase}. Still needed: ${still}.${evidence.older ? ` Older sessions without tracking-quality information aren’t used.` : ""}`)
       );
       const meter = el("div", "unlock-meter");
       const fill = el("span");
-      fill.style.width = `${Math.round((counted / MIN_SESSIONS_FOR_INSIGHTS) * 100)}%`;
+      const share = Math.min(evidence.sessions / COACH_MINIMUM.sessions, evidence.days / COACH_MINIMUM.days, evidence.minutes / COACH_MINIMUM.minutes);
+      fill.style.width = `${Math.round(Math.min(1, share) * 100)}%`;
       meter.append(fill);
       body.append(meter);
       item.append(icon, body);
       list.replaceChildren(item);
       return;
     }
-    const insights = buildInsights(current);
     if (!insights.length) {
-      list.replaceChildren(el("li", "empty-state", "Keep going: a few more sessions at different times will reveal your patterns."));
+      list.replaceChildren(el("li", "empty-state", "No clear pattern stands out in this range."));
       return;
     }
     list.replaceChildren(...insights.map(({ tone, icon, title, text }) => {
@@ -291,13 +298,16 @@ if (app) {
     // Never stopped (e.g. the page was closed while tracking): shown, but clearly marked.
     const unfinished = !session.ended_at;
     if (unfinished) title.append(el("span", "class-tag unfinished-tag", "Unfinished"));
-    const lapses = session.lapses ? plural(session.lapses, "distraction") : "no distractions";
-    main.append(title, el("span", "session-meta", `${duration(focusedSeconds(session))} focused · ${lapses}`));
+    const lapses = session.lapses ? `looked away 4s+ ${plural(session.lapses, "time")}` : "no 4s look-aways recorded";
+    if (!hasQualityInfo(session)) title.append(el("span", "class-tag", "Older method"));
+    main.append(title, el("span", "session-meta", hasQualityInfo(session)
+      ? `${duration(session.usable_seconds)} measured · about ${duration(focusedSeconds(session))} on screen · ${lapses}`
+      : `${duration(focusedSeconds(session))} on screen (older method) · ${lapses}`));
 
     const verdict = pct === null ? el("span") : el("span", "verdict", levelFor(pct).label);
     if (pct !== null) verdict.dataset.level = levelFor(pct).key;
     row.append(focusRing(pct), main, verdict, svgUse("i-chevron", "chevron"));
-    row.setAttribute("aria-label", `${dayTitle(session.started_at)} at ${time(session.started_at)}, ${duration(session.tracked_seconds)}${unfinished ? ", unfinished" : ""}, ${pct === null ? "no focus score" : `${pct}% focus, ${levelFor(pct).label}`}. Show details.`);
+    row.setAttribute("aria-label", `${dayTitle(session.started_at)} at ${time(session.started_at)}, ${duration(session.tracked_seconds)}${unfinished ? ", unfinished" : ""}, ${pct === null ? "no estimate" : `estimated ${pct}% of measured time on screen, ${levelFor(pct).label}`}. Show details.`);
 
     const detail = el("div", "session-detail");
     detail.hidden = !openSessions.has(session.id);
@@ -329,17 +339,33 @@ if (app) {
   }
 
   const canHover = window.matchMedia("(hover: hover)").matches;
-  const STATE_INFO = { Focused: { cls: "focused", label: "Focused" }, Distracted: { cls: "distracted", label: "Looked away" }, Away: { cls: "away", label: "Not at screen" } };
+  // Timeline colours (tracking-states.js). Unavailable time, breaks and time with no sample are
+  // shown as gaps, never as a score of 0. Old "no face" samples count as unavailable.
+  const RUN_INFO = {
+    "on-screen": { cls: "focused", label: "Looking at screen (estimate)" },
+    "looking-away": { cls: "distracted", label: "Looking away (estimate)" },
+    unavailable: { cls: "away", label: "Tracking unavailable" },
+    break: { cls: "on-break", label: "Break (not counted)" },
+    gap: { cls: "no-data", label: "No readings saved" }
+  };
 
   async function renderDetail(session, detail) {
     const facts = el("div", "session-facts");
     const fact = (label, value) => { const span = el("span", "", `${label} `); span.append(el("b", "", value)); return span; };
     const end = session.ended_at || session.last_seen_at;
-    facts.append(
-      fact("Time", `${time(session.started_at)} – ${time(end)}`),
-      fact("Focused for", `${duration(focusedSeconds(session))} of ${duration(session.tracked_seconds)}`),
-      fact("Longest streak", clock(session.best_streak_seconds))
-    );
+    facts.append(fact("Time", `${time(session.started_at)} – ${time(end)}`));
+    if (hasQualityInfo(session)) {
+      facts.append(fact("Measured", `${duration(session.usable_seconds)} of ${duration(session.tracked_seconds)}`));
+      if (session.unavailable_seconds) facts.append(fact("Unavailable", duration(session.unavailable_seconds)));
+      if (session.break_seconds) facts.append(fact("Break", duration(session.break_seconds)));
+      facts.append(fact("On screen (estimate)", session.focus_percent === null ? "not enough measured" : `${session.focus_percent}% of measured time`));
+    } else {
+      facts.append(fact("On screen (estimate)", `${duration(focusedSeconds(session))} of ${duration(measuredSeconds(session))}`));
+    }
+    facts.append(fact("Longest on-screen stretch", clock(session.best_streak_seconds)));
+    if (!hasQualityInfo(session)) {
+      facts.append(el("span", "unfinished-note older-note", "Recorded before tracking-quality checks: time with no face in view was counted as not on screen, so this estimate may be lower than the newer method would give. The record itself is unchanged."));
+    }
     if (!session.ended_at) facts.append(el("span", "unfinished-note", `Unfinished: tracking wasn’t stopped, so this shows what was saved up to ${time(session.last_seen_at || session.started_at)}.`));
     const note = el("p", "strip-note", "Loading timeline…");
     detail.replaceChildren(facts, note);
@@ -352,32 +378,28 @@ if (app) {
     }
     if (!samples.length) { note.textContent = "No timeline was saved for this session."; return; }
 
-    // Merge neighbouring samples with the same state into runs.
-    const runs = [];
-    samples.forEach((sample) => {
-      const last = runs[runs.length - 1];
-      if (last && last.state === sample.state) { last.count += 1; last.end = sample.recorded_at; } else runs.push({ state: sample.state, count: 1, start: sample.recorded_at, end: sample.recorded_at });
-    });
+    const runs = sampleRuns(samples, SAMPLE_SECONDS);
     const strip = el("div", "focus-strip");
     runs.forEach((run) => {
-      const info = STATE_INFO[run.state] || STATE_INFO.Away;
+      const info = RUN_INFO[run.kind] || RUN_INFO.unavailable;
       const part = el("span", info.cls);
       part.style.flexGrow = String(run.count);
       const from = new Date(new Date(run.start).getTime() - SAMPLE_SECONDS * 1000);
       part.title = `${time(from)}–${time(run.end)} · ${info.label} (${duration(run.count * SAMPLE_SECONDS)})`;
       strip.append(part);
     });
-    const share = (state) => Math.round(sum(runs.filter((r) => r.state === state), (r) => r.count) / samples.length * 100);
+    const slots = sum(runs, (r) => r.count);
+    const share = (kind) => Math.round(sum(runs.filter((r) => r.kind === kind), (r) => r.count) / slots * 100);
     strip.setAttribute("role", "img");
-    strip.setAttribute("aria-label", `Session timeline: ${share("Focused")}% focused, ${share("Distracted")}% looking away, ${share("Away")}% not at the screen.`);
+    strip.setAttribute("aria-label", `Session timeline: ${share("on-screen")}% looking at the screen and ${share("looking-away")}% looking away (estimates), ${share("unavailable") + share("gap")}% not measured, ${share("break")}% break.`);
 
     const axis = el("div", "strip-axis");
     axis.append(el("span", "", time(new Date(new Date(samples[0].recorded_at).getTime() - SAMPLE_SECONDS * 1000))), el("span", "", time(samples[samples.length - 1].recorded_at)));
 
-    const longest = runs.filter((r) => r.state === "Focused").sort((a, b) => b.count - a.count)[0];
+    const longest = runs.filter((r) => r.kind === "on-screen").sort((a, b) => b.count - a.count)[0];
     note.textContent = longest && longest.count * SAMPLE_SECONDS >= 30
-      ? `Your longest focused stretch started at ${time(new Date(new Date(longest.start).getTime() - SAMPLE_SECONDS * 1000))}.${canHover ? " Hover the bar to see each part." : ""}`
-      : canHover ? "Hover the bar to see when you were focused." : "";
+      ? `The longest stretch estimated as on screen started at ${time(new Date(new Date(longest.start).getTime() - SAMPLE_SECONDS * 1000))}.${canHover ? " Hover the bar to see each part." : ""}`
+      : canHover ? "Hover the bar to see each part." : "";
     detail.replaceChildren(facts, strip, axis, note);
   }
 
@@ -429,13 +451,13 @@ if (app) {
   }
 
   async function load() {
-    const { data, error } = await app.supabase
+    const { data, error } = await selectWithQuality((quality) => app.supabase
       .from("attention_sessions")
-      .select("id, started_at, last_seen_at, ended_at, tracked_seconds, focus_percent, best_streak_seconds, lapses, classes(name)")
+      .select(`id, started_at, last_seen_at, ended_at, tracked_seconds, focus_percent, best_streak_seconds, lapses, classes(name)${quality}`)
       .eq("student_id", app.user.id)
       .gt("tracked_seconds", 4)
       .order("started_at", { ascending: false })
-      .limit(1000);
+      .limit(1000));
     if (error) {
       const status = $("#historyStatus");
       status.textContent = missingTables(error)
@@ -458,6 +480,13 @@ if (app) {
     shown = PAGE_SIZE;
     try { localStorage.setItem(rangeKey, range); } catch { /* storage unavailable */ }
     render();
+    // The session list and numbers settle in again for the new range (styles/student.css).
+    const view = $("#view-progress");
+    view.classList.remove("is-refreshing");
+    void view.offsetWidth;
+    view.classList.add("is-refreshing");
+    window.clearTimeout(refreshTimer);
+    refreshTimer = window.setTimeout(() => view.classList.remove("is-refreshing"), 900);
   }));
   $("#historyMore").addEventListener("click", () => {
     shown += PAGE_SIZE;

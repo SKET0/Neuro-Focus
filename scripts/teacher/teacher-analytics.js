@@ -4,6 +4,9 @@
 // - Simulator: generated attention scores for demonstrations. It only ever uses made-up
 //   "Demo" learners (never the real roster), is labeled DEMO everywhere, saves nothing,
 //   and is never remembered: the dashboard always opens on the live classroom.
+// Chart colours follow the teacher's theme and accent (styles/theme.css).
+import { themeColor, withAlpha } from "../shared/appearance.js?v=1";
+import { normalizeReading, describeReading, sampleKind, selectWithQuality, hasQualityInfo, SCORE_BANDS, BAND_LABELS, scoreBand } from "../shared/tracking-states.js?v=1";
 
 const DEMO_NAMES = [
   "Demo · Ayesha", "Demo · Hamza", "Demo · Fatima", "Demo · Usman",
@@ -11,10 +14,13 @@ const DEMO_NAMES = [
 ];
 const HISTORY = 30;      // points kept on the attention curve
 const HEAT_COLUMNS = 20; // readings shown in the heatmap
-const FOCUSED = 70;
-const DRIFTING = 45;
+// Score bands and reading meanings are shared with the student pages (tracking-states.js).
+// Scores are estimates from face and eye direction; a reading with no usable measurement has no
+// score at all (shown as "Tracking unavailable"), never 0.
+const FOCUSED = SCORE_BANDS.HIGH;
+const DRIFTING = SCORE_BANDS.MIDDLE;
 const LIVE_TICK_MS = 1000;
-const LIVE_STALE_MS = 5000; // no reading for this long = not tracking
+const LIVE_STALE_MS = 5000; // no reading for this long while sharing = no recent data (connection)
 const FLAG_AFTER_TICKS = { sim: 2, live: 3 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -58,13 +64,16 @@ let timer = null;
 let chart = null;
 
 // Live state
-const liveReadings = new Map(); // studentId -> { score, state, cumulativeFocus, lastSeen }
-const liveStudents = new Map(); // studentId -> { name, score, flagged, heat[], distractedTicks }
+const liveReadings = new Map(); // studentId -> { reading (tracking-states.js shape), lastSeen }
+const liveStudents = new Map(); // studentId -> { name, score, status, reason, flagged, heat[], distractedTicks }
 let liveClassId = window.neuroFocusClass?.id || "";
 let liveStartedAt = 0;
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const stateFor = (score) => (score >= FOCUSED ? "Focused" : score >= DRIFTING ? "Drifting" : "Distracted");
+const bandLabel = (score) => BAND_LABELS[scoreBand(score)];
+// What the teacher sees for a student who isn't giving a score right now.
+const STATUS_TEXT = { off: "Not tracking", stale: "No recent data", unavailable: "Tracking unavailable", break: "On a break" };
 const initials = (name) => name.split(/\s+/).filter((part) => /\p{L}/u.test(part)).map((part) => part[0]).join("").slice(0, 2).toUpperCase().padEnd(2, "X");
 const clockLabel = (ms) => {
   const seconds = Math.floor(ms / 1000);
@@ -140,12 +149,16 @@ function liveStep() {
   [...liveStudents.keys()].forEach((id) => { if (!ids.has(id)) liveStudents.delete(id); });
 
   students = roster.map(({ id, name }) => {
-    const student = liveStudents.get(id) || { name, score: null, flagged: false, heat: [], distractedTicks: 0 };
+    const student = liveStudents.get(id) || { name, score: null, status: "off", flagged: false, heat: [], distractedTicks: 0 };
     student.name = name;
-    const reading = liveReadings.get(id);
-    const active = reading && reading.score !== null && now - reading.lastSeen < LIVE_STALE_MS;
-    student.score = active ? reading.score : null;
-    if (active) updateFlagState(student);
+    const entry = liveReadings.get(id);
+    const tracking = entry?.reading.tracking || "off";
+    // Sharing, but nothing arrived for a while: the connection dropped (or the page froze).
+    student.status = tracking !== "off" && now - entry.lastSeen >= LIVE_STALE_MS ? "stale" : tracking === "active" ? "active" : tracking;
+    student.reason = student.status === "unavailable" ? entry.reading.reason : null;
+    student.score = student.status === "active" ? entry.reading.score : null;
+    // Flags only ever come from measured readings; anything else resets the count without a flag.
+    if (student.status === "active") updateFlagState(student);
     else { student.distractedTicks = 0; student.flagged = false; }
     pushHeat(student, student.score);
     liveStudents.set(id, student);
@@ -167,13 +180,9 @@ function resetLive() {
 window.addEventListener("neurofocus:live-attention", (event) => {
   const reading = event.detail || {};
   if (!reading.studentId || reading.classId !== liveClassId) return;
-  const stopped = reading.state === "Stopped";
-  liveReadings.set(reading.studentId, {
-    score: stopped ? null : clamp(Number(reading.score) || 0, 0, 100),
-    state: String(reading.state || ""),
-    cumulativeFocus: Number(reading.cumulativeFocus) || 0,
-    lastSeen: Date.now()
-  });
+  // normalizeReading keeps a missing score missing (an older student page's "Away" reading,
+  // saved as 0, is read as unavailable too).
+  liveReadings.set(reading.studentId, { reading: normalizeReading(reading), lastSeen: Date.now() });
 });
 
 // Classes whose live channel is currently refused (teacher-classes.js); clears when Supabase reconnects.
@@ -237,13 +246,18 @@ async function seedLiveFromSaved(classId, members) {
   if (mode !== "live" || classId !== liveClassId || error || !data?.length) return;
 
   // Attention curve: class average and lowest learner per 5-second slot
+  // Samples without a measurement (tracking unavailable, a break, or an older "no face" sample
+  // saved as 0) are gaps: they never pull the class average down.
   const slots = new Map();
   data.forEach((sample) => {
     const slot = Math.floor(new Date(sample.recorded_at).getTime() / 5000) * 5000;
     const entry = slots.get(slot) || { sum: 0, n: 0, min: 100 };
-    entry.sum += sample.score;
-    entry.n += 1;
-    entry.min = Math.min(entry.min, sample.score);
+    const { score } = sampleKind(sample);
+    if (score !== null) {
+      entry.sum += score;
+      entry.n += 1;
+      entry.min = Math.min(entry.min, score);
+    }
     slots.set(slot, entry);
   });
   const points = [...slots.entries()].sort((a, b) => a[0] - b[0]).slice(-HISTORY);
@@ -251,8 +265,8 @@ async function seedLiveFromSaved(classId, members) {
   lowHistory.length = 0;
   labels.length = 0;
   points.forEach(([slot, entry]) => {
-    classHistory.push(entry.sum / entry.n);
-    lowHistory.push(entry.min);
+    classHistory.push(entry.n ? entry.sum / entry.n : null);
+    lowHistory.push(entry.n ? entry.min : null);
     labels.push(shortTime(new Date(slot)));
   });
   liveStartedAt = new Date(data[0].recorded_at).getTime();
@@ -267,13 +281,15 @@ async function seedLiveFromSaved(classId, members) {
   const alerts = [];
   byStudent.forEach((samples, id) => {
     const name = names.get(id) || "Student";
-    const student = liveStudents.get(id) || { name, score: null, flagged: false, heat: [], distractedTicks: 0 };
-    student.heat = samples.slice(-HEAT_COLUMNS).map((sample) => sample.score);
+    const student = liveStudents.get(id) || { name, score: null, status: "off", flagged: false, heat: [], distractedTicks: 0 };
+    student.heat = samples.slice(-HEAT_COLUMNS).map((sample) => sampleKind(sample).score);
     liveStudents.set(id, student);
+    // Two measured "looking away" samples in a row (10s+). Unavailable or break samples end a run.
     let run = 0;
     samples.forEach((sample) => {
-      run = sample.state === "Focused" ? 0 : run + 1;
-      if (run === 2) alerts.push({ name, score: sample.score, at: new Date(sample.recorded_at) });
+      const { kind, score } = sampleKind(sample);
+      run = kind === "looking-away" ? run + 1 : 0;
+      if (run === 2) alerts.push({ name, score, at: new Date(sample.recorded_at) });
     });
   });
   alerts.sort((a, b) => a.at - b.at).forEach((alert) => {
@@ -291,8 +307,8 @@ async function loadSessionHistory() {
     return;
   }
   const columns = "id, student_id, started_at, last_seen_at, ended_at, tracked_seconds, focus_percent, average_score, lapses, profiles(display_name)";
-  const select = (cols) => app.supabase.from("attention_sessions").select(cols)
-    .eq("class_id", classId).gt("tracked_seconds", 4).order("started_at", { ascending: false }).limit(25);
+  const select = (cols) => selectWithQuality((quality) => app.supabase.from("attention_sessions").select(`${cols}${quality}`)
+    .eq("class_id", classId).gt("tracked_seconds", 4).order("started_at", { ascending: false }).limit(25));
   let { data, error } = await select(`${columns}, class_session_id`);
   if (error && /class_session_id/.test(error.message || "")) ({ data, error } = await select(columns));
   // Which live session each record came from.
@@ -320,7 +336,11 @@ async function loadSessionHistory() {
       liveStart ? new Date(liveStart).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—",
       new Date(session.started_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
       `${minutes}:${String(session.tracked_seconds % 60).padStart(2, "0")}`,
-      session.focus_percent === null ? "—" : `${session.focus_percent}%`,
+      // Estimated share of measured time on screen. Older records (before tracking-quality checks)
+      // counted time with no face in view as not focused, so they're marked.
+      session.focus_percent === null ? (hasQualityInfo(session) ? "Not enough measured" : "—")
+        : hasQualityInfo(session) ? `${session.focus_percent}% of ${Math.round(session.usable_seconds / 60)} min measured`
+          : `${session.focus_percent}% (older method)`,
       session.average_score === null ? "—" : `${session.average_score}%`,
       String(session.lapses)
     ];
@@ -387,9 +407,9 @@ function addAlert(name, score, duration, timeText) {
   dot.className = "alert-dot";
   const body = document.createElement("div");
   const title = document.createElement("strong");
-  title.textContent = `${name} lost focus`;
+  title.textContent = `${name} may need a check-in`;
   const detail = document.createElement("small");
-  detail.textContent = `Attention ${Math.round(score)}% for ${duration} · adaptive prompt suggested`;
+  detail.textContent = `Estimated attention ${Math.round(score)}% for ${duration} · may be looking at notes`;
   body.append(title, detail);
   const time = document.createElement("time");
   time.textContent = timeText;
@@ -416,11 +436,12 @@ function render() {
     els.avgTrend.dataset.trend = "";
   }
   els.focused.textContent = active.length ? `${focusedCount}/${active.length}` : "—";
+  const unmeasured = students.filter((student) => ["unavailable", "stale", "break"].includes(student.status)).length;
   els.focusedSub.textContent = mode === "live"
-    ? `${active.length} of ${students.length} student${students.length === 1 ? "" : "s"} tracking now`
+    ? `${active.length} of ${students.length} measured now${unmeasured ? ` · ${unmeasured} not measurable` : ""}`
     : active.length ? `${Math.round((focusedCount / active.length) * 100)}% of class attentive` : "No learners loaded";
   els.flags.textContent = String(flagCount);
-  els.flagsSub.textContent = `Distracted for ${FLAG_AFTER_TICKS[mode]}+ consecutive readings`;
+  els.flagsSub.textContent = `Estimated below ${DRIFTING}% for ${FLAG_AFTER_TICKS[mode]}+ measured readings in a row`;
   els.time.textContent = elapsedLabel();
   els.timeSub.textContent = mode === "sim" ? "Simulated class time" : "Live session time";
 
@@ -467,7 +488,8 @@ function renderTable() {
     const row = document.createElement("tr");
     row.dataset.rosterRow = "";
     const tracking = student.score !== null;
-    const state = tracking ? stateFor(student.score) : "Offline";
+    const status = mode === "sim" ? (tracking ? "active" : "off") : student.status || "off";
+    const state = tracking ? stateFor(student.score) : status === "unavailable" || status === "stale" ? "Unavailable" : status === "break" ? "Break" : "Offline";
 
     const nameCell = document.createElement("td");
     const avatar = document.createElement("span");
@@ -481,6 +503,7 @@ function renderTable() {
     const value = document.createElement("span");
     value.className = "score-value";
     value.textContent = tracking ? `${Math.round(student.score)}%` : "—";
+    if (tracking) value.title = "Estimate from face and eye direction";
     const bar = document.createElement("span");
     bar.className = "score-bar";
     const fill = document.createElement("span");
@@ -493,7 +516,9 @@ function renderTable() {
     const pill = document.createElement("span");
     pill.className = "state-pill";
     pill.dataset.state = state;
-    pill.textContent = !tracking ? "Not tracking" : student.flagged ? `${state} · Flagged` : state;
+    pill.textContent = !tracking
+      ? (status === "unavailable" && student.reason ? `${STATUS_TEXT.unavailable} · ${describeReading({ tracking: "unavailable", reason: student.reason }).detail}` : STATUS_TEXT[status] || STATUS_TEXT.off)
+      : student.flagged ? `${bandLabel(student.score)} · Check in?` : bandLabel(student.score);
     stateCell.append(pill);
 
     row.append(nameCell, scoreCell, stateCell);
@@ -516,7 +541,7 @@ function renderHeatmap() {
       if (score !== null && score !== undefined) {
         cell.dataset.state = stateFor(score);
         cell.style.setProperty("--level", (0.25 + (score / 100) * 0.75).toFixed(2));
-        cell.title = `${student.name}: ${Math.round(score)}%`;
+        cell.title = `${student.name}: ${Math.round(score)}% (estimate)`;
       }
       els.heatmap.append(cell);
     }
@@ -531,18 +556,17 @@ function setupChart() {
     }));
     return;
   }
-  const muted = "#82828c";
   chart = new window.Chart($("#attentionChart"), {
     type: "line",
     data: {
       labels,
       datasets: [
         {
-          label: "Class average", data: classHistory, borderColor: "#00d9ff", borderWidth: 2, tension: 0.35,
-          pointRadius: 0, fill: true, backgroundColor: "rgba(0, 217, 255, 0.08)"
+          label: "Class average", data: classHistory, borderWidth: 2, tension: 0.35,
+          pointRadius: 0, fill: true
         },
         {
-          label: "Lowest learner", data: lowHistory, borderColor: "#ef4444", borderWidth: 1.5, borderDash: [4, 4],
+          label: "Lowest learner", data: lowHistory, borderWidth: 1.5, borderDash: [4, 4],
           tension: 0.35, pointRadius: 0, fill: false
         }
       ]
@@ -551,15 +575,34 @@ function setupChart() {
       responsive: true, maintainAspectRatio: false, animation: false,
       interaction: { mode: "index", intersect: false },
       scales: {
-        y: { min: 0, max: 100, ticks: { color: muted, callback: (v) => `${v}%`, stepSize: 25 }, grid: { color: "#1c1c20" }, border: { display: false } },
-        x: { ticks: { color: muted, maxTicksLimit: 6 }, grid: { display: false }, border: { color: "#222226" } }
+        y: { min: 0, max: 100, ticks: { callback: (v) => `${v}%`, stepSize: 25 }, grid: {}, border: { display: false } },
+        x: { ticks: { maxTicksLimit: 6 }, grid: { display: false }, border: {} }
       },
       plugins: {
-        legend: { labels: { color: "#f4f4f5", boxWidth: 10, boxHeight: 10, usePointStyle: true } },
+        legend: { labels: { boxWidth: 10, boxHeight: 10, usePointStyle: true } },
         tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${Math.round(ctx.parsed.y)}%` } }
       }
     }
   });
+  paintChart();
+  window.addEventListener("neurofocus:appearance-change", paintChart);
+}
+
+// Colours from the current theme; repainted when the teacher previews or saves a new look.
+function paintChart() {
+  if (!chart) return;
+  const accent = themeColor("--accent", "#00d9ff");
+  const muted = themeColor("--text-muted");
+  const [average, lowest] = chart.data.datasets;
+  average.borderColor = accent;
+  average.backgroundColor = withAlpha(accent, 0.1);
+  lowest.borderColor = themeColor("--red", "#ef4444");
+  chart.options.scales.y.ticks.color = muted;
+  chart.options.scales.x.ticks.color = muted;
+  chart.options.scales.y.grid.color = themeColor("--surface-hover", "#1c1c20");
+  chart.options.scales.x.border.color = themeColor("--border", "#222226");
+  chart.options.plugins.legend.labels.color = themeColor("--text-main", "#f4f4f5");
+  chart.update("none");
 }
 
 function clearData() {
@@ -570,7 +613,7 @@ function clearData() {
   lowHistory.length = 0;
   labels.length = 0;
   els.alerts.replaceChildren(Object.assign(document.createElement("p"), {
-    className: "empty-state", textContent: "No distraction flags yet."
+    className: "empty-state", textContent: "No check-in alerts yet."
   }));
 }
 

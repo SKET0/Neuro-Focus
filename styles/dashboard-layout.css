@@ -4,6 +4,16 @@
    Wide screens: fixed sidebar + scrolling main area.
    1024px and below: the sidebar becomes a slide-out drawer opened from the header. */
 
+/* Header breadcrumb trail: every part but the current page is a link */
+.breadcrumbs .crumb-link {
+  font: inherit; color: inherit; text-decoration: none; background: none; border: 0; cursor: pointer;
+  padding: 3px 6px; margin: -3px -6px; border-radius: 7px; transition: color 0.15s ease, background 0.15s ease;
+}
+.breadcrumbs .crumb-link:hover { color: var(--text-main); background: var(--nf-hover, #17171b); }
+.breadcrumbs .crumb-link:focus-visible { outline: 2px solid var(--accent, #00d9ff); outline-offset: 1px; }
+.breadcrumbs .crumb-sep { opacity: 0.6; }
+.breadcrumbs .crumb-current { color: var(--text-main); font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+
 /* The sidebar brand links back to the home page */
 a.brand-box { color: inherit; text-decoration: none; border-radius: 8px 8px 0 0; transition: background 0.15s ease; }
 a.brand-box:hover { background: var(--nf-hover, #17171b); }

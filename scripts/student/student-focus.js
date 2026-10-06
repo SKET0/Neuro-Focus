@@ -3,6 +3,9 @@
 // "neurofocus:attention-update" events published by eye-analyzer.js. The timer state and
 // micro-goals are also shared with the Home view (student-dashboard.js).
 import { themeColor, withAlpha } from "../shared/appearance.js?v=1";
+import {
+  createSessionAccumulator, createSampleWindow, normalizeReading, describeReading, LEGACY_SAMPLE_STATES, missingQualityColumns
+} from "../shared/tracking-states.js?v=1";
 
 const app = await window.neuroFocusReady;
 
@@ -192,6 +195,26 @@ if (app) {
   const timer = { phase: "focus", remaining: 0, total: 1, running: false, rounds: 0, interval: null };
   const presetMinutes = () => PRESETS[$("#timerPreset").value] || PRESETS["25-5"];
   const timerKey = `neuroFocusTimer:${app.user.id}`;
+  const presetButtons = document.querySelectorAll("[data-timer-preset]");
+  let trackingOn = false;
+  // An intentional break: the timer's break phase once started (running or paused). The tracker
+  // (eye-analyzer.js) marks readings as "break" meanwhile, so they don't count and no nudges show.
+  const isOnBreak = () => timer.phase === "break" && (timer.running || timer.remaining < timer.total);
+
+  // The state pill at the top of the Focus session page and the tracker card's outline.
+  function renderSessionState() {
+    const hero = $("#focusHero");
+    if (!hero) return;
+    const onBreak = isOnBreak();
+    const state = onBreak ? "break" : trackingOn ? "tracking" : timer.running ? "timer" : "idle";
+    hero.dataset.state = state;
+    $("#focusStateTag").textContent = { idle: "Ready", tracking: "Tracking", timer: "Timer on", break: "Break" }[state];
+    $("#focusStateText").textContent = onBreak ? (trackingOn ? "Camera on · rest your eyes" : "Stand up, stretch, drink some water")
+      : trackingOn ? "Camera on · only numbers are kept"
+      : timer.running ? "Camera off · timer running"
+      : "Camera off";
+    $("#focus-session")?.setAttribute("data-tracking", String(trackingOn));
+  }
 
   function saveTimer() {
     try {
@@ -213,7 +236,14 @@ if (app) {
       ? "Pause"
       : timer.remaining < timer.total ? "Resume" : timer.phase === "focus" ? "Start focus" : "Start break";
     $("#timerRounds").textContent = String(timer.rounds);
+    presetButtons.forEach((button) => {
+      const chosen = button.dataset.timerPreset === $("#timerPreset").value;
+      button.setAttribute("aria-checked", String(chosen));
+      button.tabIndex = chosen ? 0 : -1;
+    });
     saveTimer();
+    window.neuroFocusOnBreak = isOnBreak();
+    renderSessionState();
     // The header's focus pill and the Home view show the timer from any page.
     window.neuroFocusTimerState = { phase: timer.phase, remaining: timer.remaining, total: timer.total, running: timer.running, rounds: timer.rounds };
     window.dispatchEvent(new CustomEvent("neurofocus:timer-change", { detail: window.neuroFocusTimerState }));
@@ -267,6 +297,24 @@ if (app) {
     }
   }
 
+  // The length buttons set the hidden #timerPreset list, which Home's focus coach also reads and sets.
+  presetButtons.forEach((button) => button.addEventListener("click", () => {
+    const select = $("#timerPreset");
+    if (select.value === button.dataset.timerPreset) return;
+    select.value = button.dataset.timerPreset;
+    select.dispatchEvent(new Event("change"));
+  }));
+  // Arrow keys move between the length buttons, like a radio group.
+  $("#timerPresetButtons")?.addEventListener("keydown", (event) => {
+    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
+    if (!step) return;
+    event.preventDefault();
+    const list = [...presetButtons];
+    const next = list[(list.findIndex((button) => button.getAttribute("aria-checked") === "true") + step + list.length) % list.length];
+    next.click();
+    next.focus();
+  });
+
   $("#timerToggle").addEventListener("click", () => setTimerRunning(!timer.running));
   $("#timerReset").addEventListener("click", () => { setTimerRunning(false); setPhase("focus"); });
   $("#timerSkip").addEventListener("click", () => { setTimerRunning(false); setPhase(timer.phase === "focus" ? "break" : "focus"); });
@@ -300,25 +348,33 @@ if (app) {
   }
   restoreTimer();
 
+  // The teacher ended the live session this focus session was part of (student-classes.js): the
+  // timer stops and the camera turns off. Turning it off saves the session to My progress.
+  window.addEventListener("neurofocus:end-focus-session", () => {
+    if (timer.running || timer.remaining < timer.total) {
+      setTimerRunning(false);
+      setPhase("focus");
+    }
+    window.dispatchEvent(new CustomEvent("neurofocus:stop-camera"));
+  });
+
   // ---------- Live attention stats, nudges and timeline ----------
+  // The numbers follow scripts/shared/tracking-states.js. Only usable readings count towards the
+  // estimated score, on-screen share and looking-away count. Time when tracking was unavailable,
+  // or the student was on a break, is kept separately and shown as gaps on the timeline.
   const stats = {
     live: $("#statLiveScore"), liveState: $("#statLiveState"), focus: $("#statSessionFocus"), tracked: $("#statTracked"),
-    streak: $("#statStreak"), best: $("#statBestStreak"), lapses: $("#statLapses"), nudges: $("#statNudges")
+    streak: $("#statStreak"), best: $("#statBestStreak"), lapses: $("#statLapses"), nudges: $("#statNudges"),
+    liveTile: $("#liveScoreTile"), liveMeter: $("#statLiveMeter"), focusMeter: $("#statFocusMeter")
   };
   const timelineLabels = [];
   const timelineScores = [];
+  let session = createSessionAccumulator({ lookAwayMs: NUDGE_AFTER_MS });
   let startedAt = 0;
-  let lastEventAt = 0;
-  let trackedMs = 0;
-  let streakStart = null;
-  let bestStreakMs = 0;
-  let distractedSince = null;
-  let lapseActive = false;
-  let lapses = 0;
   let nudgesShown = 0;
   let snoozeUntil = 0;
-  let bucket = null;
-  let lastFocus = null;
+  let bucket = null;        // this second's usable scores: { sec, sum, n }
+  let lastBucketSec = -1;
 
   const clock = (ms) => {
     const total = Math.floor(ms / 1000);
@@ -349,8 +405,9 @@ if (app) {
       data: {
         labels: timelineLabels,
         datasets: [
-          { label: "Attention score", data: timelineScores, borderWidth: 2, tension: 0.35, pointRadius: 0, fill: true },
-          { label: "Focus threshold", data: [], borderWidth: 1, borderDash: [4, 4], pointRadius: 0, fill: false }
+          // Seconds with no usable reading are null: drawn as a gap, never as 0.
+          { label: "Estimated attention", data: timelineScores, borderWidth: 2, tension: 0.35, pointRadius: 0, fill: true, spanGaps: false },
+          { label: "70% line", data: [], borderWidth: 1, borderDash: [4, 4], pointRadius: 0, fill: false }
         ]
       },
       options: {
@@ -362,7 +419,7 @@ if (app) {
         },
         plugins: {
           legend: { labels: { boxWidth: 10, boxHeight: 10, usePointStyle: true } },
-          tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${Math.round(ctx.parsed.y)}%` } }
+          tooltip: { filter: (item) => item.parsed.y !== null, callbacks: { label: (ctx) => `${ctx.dataset.label}: ${Math.round(ctx.parsed.y)}%` } }
         }
       }
     });
@@ -377,12 +434,19 @@ if (app) {
     $("#timelineEmpty").textContent = "Chart library could not load. Check your internet connection and refresh.";
   }
 
+  function pushTimeline(sec, value) {
+    timelineLabels.push(`${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`);
+    timelineScores.push(value);
+    if (timelineLabels.length > TIMELINE_SECONDS) { timelineLabels.shift(); timelineScores.shift(); }
+  }
+
   function flushBucket() {
     if (!bucket) return;
-    const s = bucket.sec;
-    timelineLabels.push(`${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
-    timelineScores.push(Math.round(bucket.sum / bucket.n));
-    if (timelineLabels.length > TIMELINE_SECONDS) { timelineLabels.shift(); timelineScores.shift(); }
+    // Seconds with no reading at all (the page was in the background, say) are gaps too.
+    for (let sec = Math.max(lastBucketSec + 1, bucket.sec - TIMELINE_SECONDS); sec < bucket.sec; sec += 1) pushTimeline(sec, null);
+    pushTimeline(bucket.sec, bucket.n ? Math.round(bucket.sum / bucket.n) : null);
+    lastBucketSec = bucket.sec;
+    bucket = null;
     $("#timelineEmpty").hidden = true;
     if (chart) {
       chart.data.datasets[1].data = timelineLabels.map(() => 70);
@@ -390,44 +454,41 @@ if (app) {
     }
   }
 
-  function addToTimeline(now, score) {
+  function addToTimeline(now, reading) {
     const sec = Math.floor((now - startedAt) / 1000);
-    if (bucket?.sec !== sec) {
-      flushBucket();
-      bucket = { sec, sum: 0, n: 0 };
+    if (bucket && bucket.sec !== sec) flushBucket();
+    bucket ??= { sec, sum: 0, n: 0 };
+    if (reading.tracking === "active") {
+      bucket.sum += reading.score;
+      bucket.n += 1;
     }
-    bucket.sum += score;
-    bucket.n += 1;
   }
 
   function resetSession() {
+    session = createSessionAccumulator({ lookAwayMs: NUDGE_AFTER_MS });
     startedAt = Date.now();
-    lastEventAt = 0;
-    trackedMs = 0;
-    streakStart = null;
-    bestStreakMs = 0;
-    distractedSince = null;
-    lapseActive = false;
-    lapses = 0;
     nudgesShown = 0;
     bucket = null;
-    lastFocus = null;
+    lastBucketSec = -1;
     timelineLabels.length = 0;
     timelineScores.length = 0;
+    stats.focusMeter.style.width = "0%";
     chart?.update("none");
     $("#timelineEmpty").hidden = false;
+    window.neuroFocusSessionStats = null;
   }
 
-  function onLapse(state) {
-    const onBreak = timer.phase === "break" && timer.running;
-    if (!$("#nudgeToggle").checked || Date.now() < snoozeUntil || onBreak) return;
+  // A gentle nudge only when the tracker estimates the student has looked away for a few seconds
+  // while it could measure. Never because tracking is unavailable, and never during a break.
+  function onLookingAway() {
+    if (!$("#nudgeToggle").checked || Date.now() < snoozeUntil || isOnBreak()) return;
     nudgesShown += 1;
     const task = MICRO_TASKS[Math.floor(Math.random() * MICRO_TASKS.length)];
     const goal = nextGoal();
     showToast({
       icon: "🌱", kind: "nudge",
-      title: state === "Away" ? "Looks like you stepped away" : "Let’s gently refocus",
-      text: goal ? `${task} Your next step: “${goal}”.` : task,
+      title: "Looked away for a bit?",
+      text: `If you were reading notes or thinking, carry on. Otherwise: ${task}${goal ? ` Your next step: “${goal}”.` : ""}`,
       actions: [
         { label: "I’m back", primary: true },
         { label: "Snooze 5 min", onClick: () => { snoozeUntil = Date.now() + 5 * 60 * 1000; } }
@@ -436,97 +497,130 @@ if (app) {
     chime();
   }
 
-  function onRefocus() {
+  function onReturned() {
     if (!toast.el.hidden && toast.el.dataset.kind === "nudge") {
       showToast({ icon: "🎉", kind: "praise", title: "Welcome back!", text: "Nice job bringing your attention back.", autoHideMs: 2500 });
     }
   }
 
-  window.addEventListener("neurofocus:tracking-started", resetSession);
+  function renderStats(now) {
+    const snap = session.snapshot(now);
+    window.neuroFocusSessionStats = snap;
+    const reading = snap.reading;
+    const described = describeReading(reading);
+    const active = reading.tracking === "active";
+    stats.live.textContent = active ? `${reading.score}%` : "—";
+    stats.liveState.textContent = active ? `${described.label} (estimate)` : described.detail ? `${described.label} · ${described.detail}` : described.label;
+    const tileState = active ? (reading.engagement === "looking-away" ? "Distracted" : "Focused") : reading.tracking === "break" ? "Break" : "Unavailable";
+    stats.liveState.dataset.state = tileState;
+    stats.liveTile.dataset.state = tileState;
+    stats.liveMeter.style.width = active ? `${reading.score}%` : "0%";
+    stats.focus.textContent = snap.focusPercent === null ? "—" : `${snap.focusPercent}%`;
+    stats.focusMeter.style.width = `${snap.focusPercent || 0}%`;
+    stats.tracked.textContent = [
+      `${clock(snap.usableMs)} measured`,
+      snap.unavailableMs >= 1000 ? `${clock(snap.unavailableMs)} unavailable` : "",
+      snap.breakMs >= 1000 ? `${clock(snap.breakMs)} break` : ""
+    ].filter(Boolean).join(" · ");
+    stats.streak.textContent = clock(snap.streakMs);
+    stats.best.textContent = `Best this session: ${clock(snap.bestStreakMs)}`;
+    stats.lapses.textContent = String(snap.episodes);
+    stats.nudges.textContent = `${nudgesShown} nudge${nudgesShown === 1 ? "" : "s"} shown`;
+  }
+
+  window.addEventListener("neurofocus:tracking-started", () => {
+    resetSession();
+    trackingOn = true;
+    renderSessionState();
+  });
 
   window.addEventListener("neurofocus:attention-update", (event) => {
-    const reading = event.detail;
     const now = Date.now();
     if (!startedAt) startedAt = now;
-    if (lastEventAt) trackedMs += Math.min(now - lastEventAt, 1000);
-    lastEventAt = now;
-    lastFocus = reading.cumulativeFocus;
-
-    if (reading.state === "Focused") {
-      streakStart ??= now;
-      distractedSince = null;
-      if (lapseActive) {
-        lapseActive = false;
-        onRefocus();
-      }
-    } else {
-      streakStart = null;
-      distractedSince ??= now;
-      if (!lapseActive && now - distractedSince >= NUDGE_AFTER_MS) {
-        lapseActive = true;
-        lapses += 1;
-        onLapse(reading.state);
-      }
-    }
-    const streakMs = streakStart ? now - streakStart : 0;
-    bestStreakMs = Math.max(bestStreakMs, streakMs);
-
-    stats.live.textContent = `${reading.score}%`;
-    stats.liveState.textContent = reading.state === "Away" ? "Face not detected" : reading.state;
-    stats.liveState.dataset.state = reading.state;
-    stats.focus.textContent = `${reading.cumulativeFocus}%`;
-    stats.tracked.textContent = `${clock(trackedMs)} tracked`;
-    stats.streak.textContent = clock(streakMs);
-    stats.best.textContent = `Best this session: ${clock(bestStreakMs)}`;
-    stats.lapses.textContent = String(lapses);
-    stats.nudges.textContent = `${nudgesShown} nudge${nudgesShown === 1 ? "" : "s"} shown`;
-    addToTimeline(now, reading.score);
+    const reading = normalizeReading(event.detail);
+    const { episodeStarted, returned } = session.add(reading, now);
+    if (episodeStarted) onLookingAway();
+    if (returned) onReturned();
+    // A reminder never stays up once tracking can't measure, or a break starts.
+    if (reading.tracking !== "active" && toast.el.dataset.kind === "nudge") hideToast();
+    addToTimeline(now, reading);
+    renderStats(now);
   });
 
   window.addEventListener("neurofocus:tracking-stopped", () => {
+    const now = Date.now();
     flushBucket();
-    bucket = null;
-    lastEventAt = 0;
-    streakStart = null;
-    distractedSince = null;
-    lapseActive = false;
+    const snap = session.snapshot(now);
     if (toast.el.dataset.kind === "nudge") hideToast();
     stats.live.textContent = "—";
-    stats.liveState.textContent = "Tracking stopped";
+    stats.liveState.textContent = "Camera off";
     stats.liveState.dataset.state = "";
+    stats.liveTile.dataset.state = "";
+    stats.liveMeter.style.width = "0%";
     stats.streak.textContent = "0:00";
-    if (trackedMs >= 10000 && lastFocus !== null) {
+    trackingOn = false;
+    renderSessionState();
+    if (snap.totalMs >= 10000) {
+      const extra = [
+        snap.unavailableMs >= 1000 ? `${clock(snap.unavailableMs)} unavailable` : "",
+        snap.breakMs >= 1000 ? `${clock(snap.breakMs)} break` : ""
+      ].filter(Boolean).join(" · ");
       showToast({
         icon: "📈", kind: "timer", title: "Session summary",
-        text: `${lastFocus}% focus over ${clock(trackedMs)} · best streak ${clock(bestStreakMs)} · ${lapses} lapse${lapses === 1 ? "" : "s"}.`,
+        text: snap.focusPercent === null
+          ? `Not enough usable tracking to estimate attention (${clock(snap.usableMs)} measured${extra ? ` · ${extra}` : ""}). Check that your face is in view and well lit.`
+          : `Estimated ${snap.focusPercent}% of measured time looking at the screen · ${clock(snap.usableMs)} measured${extra ? ` · ${extra}` : ""} · looked away 4s+ ${snap.episodes} time${snap.episodes === 1 ? "" : "s"}.`,
         autoHideMs: 9000
       });
     }
   });
 
   // ---------- Saved attention history (Supabase) ----------
-  // While tracking, one sample is kept per 5 seconds (average score + dominant state) and
-  // saved every 10 seconds together with the session summary. Numbers only, never video.
+  // While tracking, one sample is kept per 5 seconds and saved every 10 seconds together with the
+  // session summary. Numbers only, never video. Samples and summaries follow tracking-states.js:
+  // unavailable or break time is saved as such (no score), never as a score of 0.
+  // Before the tracking-quality database update (supabase/migrations/20261009000000_tracking_quality.sql)
+  // the database can't hold that: unavailable and break samples are then left out (gaps), and the
+  // summary's tracked time is the usable time, so its focus figure still means the same thing.
   const SAMPLE_MS = 5000;
   const SAVE_EVERY_MS = 10000;
+  const MAX_PENDING = 720; // an hour of samples kept while offline
   // A saved session belongs to a class (and that class's live session) only while the student
   // shares with it (student-classes.js); otherwise it is personal history that teachers can't see.
   // The database refuses class-linked history outside an open live session.
-  const saved = { sessionId: null, creating: null, classId: null, classSessionId: null, pending: [], window: null, scoreSum: 0, scoreCount: 0, off: false, timer: null, trackedBase: 0, lapseBase: 0 };
+  const saved = {
+    sessionId: null, creating: null, classId: null, classSessionId: null, pending: [], window: createSampleWindow(),
+    off: false, timer: null, base: null, scoreSum: 0, scoreCount: 0, bestStreakMs: 0, startedAt: 0
+  };
+  let legacySession = false;  // the database doesn't have the tracking-quality columns yet
+  let legacySamples = false;  // ... or doesn't accept unavailable/break samples yet
   const historyStatus = $("#historyStatus");
   const setHistoryStatus = (text, isError = false) => {
     historyStatus.textContent = text;
     historyStatus.dataset.state = isError ? "error" : "";
   };
   const missingTables = (error) => error && (error.code === "PGRST205" || error.code === "42P01" || /attention_sessions|attention_samples/.test(error.message || ""));
+  const refusedSample = (error) => error && (error.code === "23514" || error.code === "23502" || /check constraint|null value/i.test(error.message || ""));
   const SETUP_HINT = "History isn’t being saved yet: run the Phase 2 database update (see README).";
+  const OFFLINE_TEXT = "You’re offline. Readings are kept on this device and saved when you’re back online.";
 
   function startSavedSession() {
     window.clearInterval(saved.timer);
-    Object.assign(saved, { sessionId: null, pending: [], window: null, scoreSum: 0, scoreCount: 0, off: false, trackedBase: trackedMs, lapseBase: lapses });
+    Object.assign(saved, {
+      sessionId: null, pending: [], window: createSampleWindow(), off: false,
+      base: session.snapshot(Date.now()), scoreSum: 0, scoreCount: 0, bestStreakMs: 0, startedAt: Date.now()
+    });
     saved.classId = window.neuroFocusSharingClassId || null;
     saved.classSessionId = saved.classId ? window.neuroFocusSharingSessionId || null : null;
-    const insert = (row) => app.supabase.from("attention_sessions").insert(row).select("id").single();
+    const insert = async (row) => {
+      const full = legacySession ? row : { ...row, tracking_version: 2 };
+      let result = await app.supabase.from("attention_sessions").insert(full).select("id").single();
+      if (!legacySession && missingQualityColumns(result.error)) {
+        legacySession = true;
+        result = await app.supabase.from("attention_sessions").insert(row).select("id").single();
+      }
+      return result;
+    };
     saved.creating = insert({ class_id: saved.classId, class_session_id: saved.classSessionId })
       .then(async (result) => {
         // Before the live-workflow database update there is no class_session_id column.
@@ -548,7 +642,7 @@ if (app) {
       })
       .catch((error) => {
         saved.off = true;
-        setHistoryStatus(missingTables(error) ? SETUP_HINT : "This session couldn’t be saved. Check your connection.", true);
+        setHistoryStatus(missingTables(error) ? SETUP_HINT : navigator.onLine === false ? "You’re offline, so this session couldn’t be saved." : "This session couldn’t be saved. Check your connection.", true);
         console.warn("Could not start a saved attention session", error);
         return null;
       });
@@ -556,25 +650,49 @@ if (app) {
   }
 
   function closeSampleWindow() {
-    const w = saved.window;
-    saved.window = null;
-    if (!w?.n) return;
-    const state = Object.entries(w.states).sort((a, b) => b[1] - a[1])[0][0];
-    saved.pending.push({ recorded_at: new Date(w.end).toISOString(), score: Math.round(w.sum / w.n), state });
-    if (saved.pending.length > 720) saved.pending.splice(0, saved.pending.length - 720);
+    const row = saved.window.close();
+    if (!row) return;
+    saved.pending.push(row);
+    if (saved.pending.length > MAX_PENDING) saved.pending.splice(0, saved.pending.length - MAX_PENDING);
   }
 
-  function recordSample(now, reading) {
+  function recordSample(now, raw) {
     if (!saved.creating || saved.off) return;
-    saved.scoreSum += reading.score;
-    saved.scoreCount += 1;
-    saved.window ??= { start: now, end: now, sum: 0, n: 0, states: { Focused: 0, Distracted: 0, Away: 0 } };
-    const w = saved.window;
-    w.sum += reading.score;
-    w.n += 1;
-    w.end = now;
-    if (w.states[reading.state] !== undefined) w.states[reading.state] += 1;
-    if (now - w.start >= SAMPLE_MS) closeSampleWindow();
+    const reading = normalizeReading(raw);
+    if (reading.tracking === "active") {
+      saved.scoreSum += reading.score;
+      saved.scoreCount += 1;
+    }
+    saved.bestStreakMs = Math.max(saved.bestStreakMs, session.snapshot(now).streakMs);
+    saved.window.add(reading, now);
+    if (now - saved.window.start >= SAMPLE_MS) closeSampleWindow();
+  }
+
+  // This saved part's numbers: the session's numbers since this part started.
+  function partSummary(now) {
+    const snap = session.snapshot(now);
+    const base = saved.base || { usableMs: 0, unavailableMs: 0, breakMs: 0, onScreenMs: 0, episodes: 0 };
+    const usableMs = Math.max(0, snap.usableMs - base.usableMs);
+    const onScreenMs = Math.max(0, snap.onScreenMs - base.onScreenMs);
+    return {
+      totalMs: Math.max(0, now - saved.startedAt),
+      usableMs,
+      unavailableMs: Math.max(0, snap.unavailableMs - base.unavailableMs),
+      breakMs: Math.max(0, snap.breakMs - base.breakMs),
+      focusPercent: usableMs >= 10000 ? Math.round((onScreenMs / usableMs) * 100) : null,
+      episodes: Math.max(0, snap.episodes - base.episodes)
+    };
+  }
+
+  async function insertSamples(rows) {
+    const usable = legacySamples ? rows.filter((row) => LEGACY_SAMPLE_STATES.has(row.state) && row.score !== null) : rows;
+    if (!usable.length) return null;
+    const { error } = await app.supabase.from("attention_samples").insert(usable);
+    if (error && !legacySamples && refusedSample(error)) {
+      legacySamples = true;
+      return insertSamples(rows);
+    }
+    return error;
   }
 
   async function saveProgress(final = false) {
@@ -584,23 +702,31 @@ if (app) {
     if (!sessionId) return;
     const rows = saved.pending.splice(0).map((row) => ({ ...row, session_id: sessionId, class_id: saved.classId }));
     if (rows.length) {
-      const { error } = await app.supabase.from("attention_samples").insert(rows);
+      const error = await insertSamples(rows);
       if (error) {
         saved.pending.unshift(...rows.map(({ recorded_at, score, state }) => ({ recorded_at, score, state })));
-        setHistoryStatus("Couldn’t save the latest readings. Retrying…", true);
+        setHistoryStatus(navigator.onLine === false ? OFFLINE_TEXT : "Couldn’t save the latest readings. Retrying…", true);
         return;
       }
     }
-    const { error } = await app.supabase.from("attention_sessions").update({
+    const part = partSummary(Date.now());
+    const seconds = (ms) => Math.min(86400, Math.round(ms / 1000));
+    const summary = {
       last_seen_at: new Date().toISOString(),
-      tracked_seconds: Math.min(86400, Math.round((trackedMs - saved.trackedBase) / 1000)),
       average_score: saved.scoreCount ? Math.round(saved.scoreSum / saved.scoreCount) : null,
-      focus_percent: lastFocus,
-      lapses: lapses - saved.lapseBase,
-      best_streak_seconds: Math.min(86400, Math.round(bestStreakMs / 1000)),
+      focus_percent: part.focusPercent,
+      lapses: part.episodes,
+      best_streak_seconds: seconds(saved.bestStreakMs),
       ...(final ? { ended_at: new Date().toISOString() } : {})
-    }).eq("id", sessionId);
-    if (error) setHistoryStatus("Couldn’t update the session summary. Retrying…", true);
+    };
+    const quality = { tracked_seconds: seconds(part.totalMs), usable_seconds: seconds(part.usableMs), unavailable_seconds: seconds(part.unavailableMs), break_seconds: seconds(part.breakMs) };
+    const update = (fields) => app.supabase.from("attention_sessions").update(fields).eq("id", sessionId);
+    let { error } = await update(legacySession ? { ...summary, tracked_seconds: seconds(part.usableMs) } : { ...summary, ...quality });
+    if (error && !legacySession && missingQualityColumns(error)) {
+      legacySession = true;
+      ({ error } = await update({ ...summary, tracked_seconds: seconds(part.usableMs) }));
+    }
+    if (error) setHistoryStatus(navigator.onLine === false ? OFFLINE_TEXT : "Couldn’t update the session summary. Retrying…", true);
     else setHistoryStatus(final ? "Latest session saved." : "Recording this session. It appears here when you stop tracking.");
   }
 
@@ -632,6 +758,9 @@ if (app) {
     // student-history.js reloads the Focus history view.
     window.dispatchEvent(new CustomEvent("neurofocus:history-saved"));
   });
+  // Back online: save what was kept meanwhile.
+  window.addEventListener("online", () => { void saveProgress(); });
+  window.addEventListener("offline", () => { if (saved.creating) setHistoryStatus(OFFLINE_TEXT, true); });
 
   // ---------- Study assistant quick prompts ----------
   document.querySelectorAll("[data-tutor-prompt]").forEach((chip) => {

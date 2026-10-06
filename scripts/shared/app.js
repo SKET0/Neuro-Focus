@@ -5,20 +5,29 @@ const sessionLogKey = () => `neuroFocusSessionLogs:${window.neuroFocus?.user?.id
 try { localStorage.removeItem("neuroFocusSessionLogs"); } catch { /* storage unavailable */ }
 const defaultMeetingLinks = { zoom: "", meet: "" };
 
-// Capture live attention events and maintain a stored session log
+// Capture live attention events and maintain a stored session log. Readings follow
+// scripts/shared/tracking-states.js: a reading with no usable measurement (or during a break) has
+// no score, and is logged with an empty score rather than 0.
 let lastLoggedAt = 0;
+let lastLoggedTracking = "";
+const trackingLabel = ({ tracking, engagement, reason }) => (tracking === "active"
+  ? (engagement === "looking-away" ? "Looking away (estimate)" : "Looking at screen (estimate)")
+  : tracking === "break" ? "Break (not counted)" : `Tracking unavailable${reason ? ` (${reason})` : ""}`);
 window.addEventListener("neurofocus:attention-update", (event) => {
-  const { timestamp, attentionScore, cumulativeFocus, state, gazeRatio } = event.detail;
-  // The tracker reports ~8 times a second; one reading per second is enough for reports
-  if (timestamp - lastLoggedAt < 1000) return;
+  const { timestamp, score, tracking, gazeRatio } = event.detail;
+  // The tracker reports ~8 times a second; one reading per second is enough for reports (but a
+  // change of tracking state is always logged).
+  if (timestamp - lastLoggedAt < 1000 && tracking === lastLoggedTracking) return;
   lastLoggedAt = timestamp;
+  lastLoggedTracking = tracking;
+  const share = window.neuroFocusSessionStats?.focusPercent;
   try {
     const existing = JSON.parse(localStorage.getItem(sessionLogKey()) || "[]");
     existing.push({
       timestamp: new Date(timestamp).toLocaleTimeString(),
-      attentionScore: Math.round(attentionScore * 100),
-      cumulativeFocus: `${cumulativeFocus}%`,
-      state,
+      attentionScore: tracking === "active" && Number.isFinite(score) ? score : "",
+      cumulativeFocus: Number.isFinite(share) ? `${share}%` : "",
+      state: trackingLabel(event.detail),
       gazeRatio: Number.isFinite(gazeRatio) ? gazeRatio.toFixed(3) : ""
     });
     // Keep the most recent 15 minutes of readings
@@ -111,7 +120,7 @@ document.querySelectorAll("[data-export-report]").forEach((button) => {
     }
 
     if (sessionLogs.length > 0) {
-      const headers = ["Timestamp", "Instant Attention Score", "Cumulative Focus", "Engagement State", "Gaze Ratio"];
+      const headers = ["Timestamp", "Estimated attention score (blank = not measured)", "Estimated on-screen share of measured time", "Tracking", "Gaze ratio"];
       const rows = sessionLogs.map((log) => [
         log.timestamp,
         log.attentionScore,

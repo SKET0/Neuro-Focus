@@ -43,12 +43,16 @@ await db.exec(`
   alter default privileges in schema public grant all on sequences to anon, authenticated;
 `);
 
+// The tracking-quality update is applied later, after some records are saved the old way, to
+// check that it leaves existing history exactly as it was.
+const TRACKING_QUALITY = "20261009000000_tracking_quality.sql";
 const files = readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();
-for (const file of files) {
+async function runMigration(file) {
   const sql = readFileSync(join(dir, file), "utf8").replace(/create extension if not exists pgcrypto[^;]*;/i, "");
   try { await db.exec(sql); await db.exec(sql); } catch (e) { console.log(`✗ migration ${file} failed: ${e.message}`); process.exit(1); }
 }
-console.log(`ran ${files.length} migrations twice each ✓\n`);
+for (const file of files.filter((f) => f !== TRACKING_QUALITY)) await runMigration(file);
+console.log(`ran ${files.length - (files.includes(TRACKING_QUALITY) ? 1 : 0)} migrations twice each ✓\n`);
 
 // ---------- People ----------
 const id = (n) => `00000000-0000-0000-0000-${String(n).padStart(12, "0")}`;
@@ -91,6 +95,28 @@ ok("student can't add themselves to a class directly", !(await tryQ(S1, "insert 
 ok("student can't remove a classmate", (await tryQ(S1, "delete from public.class_members where student_id = $1", [S2])).affected === 0);
 ok("other teacher can't remove Biology students", (await tryQ(T2, "delete from public.class_members where class_id = $1", [C1.id])).affected === 0);
 ok("AI usage counters are unreadable", !(await tryQ(S1, "select * from public.ai_usage_limits")).ok);
+
+console.log("\n— Tracking quality update keeps old history —");
+// Saved the old way: a personal session whose no-face time is an 'Away' sample with score 0.
+const oldSession = (await rows(S1, "insert into public.attention_sessions (student_id, tracked_seconds, focus_percent, average_score, lapses) values ($1, 300, 62, 70, 3) returning *", [S1]))[0];
+await rows(S1, "insert into public.attention_samples (session_id, student_id, score, state) values ($1, $2, 80, 'Focused'), ($1, $2, 0, 'Away')", [oldSession.id, S1]);
+const oldBefore = JSON.stringify([(await db.query("select * from public.attention_sessions where id = $1", [oldSession.id])).rows, (await db.query("select * from public.attention_samples where session_id = $1 order by state", [oldSession.id])).rows]);
+ok("before the update, an unavailable sample with no score is refused", !(await tryQ(S1, "insert into public.attention_samples (session_id, student_id, score, state) values ($1, $2, null, 'Unavailable')", [oldSession.id, S1])).ok);
+if (files.includes(TRACKING_QUALITY)) await runMigration(TRACKING_QUALITY);
+const oldAfter = (await db.query("select * from public.attention_sessions where id = $1", [oldSession.id])).rows;
+ok("old session and samples are unchanged by the update (run twice)", JSON.stringify([oldAfter.map(({ usable_seconds, unavailable_seconds, break_seconds, tracking_version, ...rest }) => rest), (await db.query("select * from public.attention_samples where session_id = $1 order by state", [oldSession.id])).rows]) === oldBefore);
+ok("old session has no tracking-quality information (shown as the older method)", oldAfter[0].usable_seconds === null && oldAfter[0].tracking_version === null);
+ok("old 'Away' sample keeps its stored 0 (the app reads it as not measured)", (await db.query("select score from public.attention_samples where session_id = $1 and state = 'Away'", [oldSession.id])).rows[0]?.score === 0);
+const quality = await tryQ(S1, "insert into public.attention_sessions (student_id, tracking_version) values ($1, 2) returning id", [S1]);
+ok("student saves a session with tracking_version 2", quality.ok, quality.error || "");
+const qid = quality.rows?.[0]?.id;
+ok("student records measured, unavailable and break time", (await tryQ(S1, "update public.attention_sessions set tracked_seconds = 600, usable_seconds = 420, unavailable_seconds = 120, break_seconds = 60, focus_percent = 71 where id = $1", [qid])).affected === 1);
+ok("unavailable sample with no score is saved", (await tryQ(S1, "insert into public.attention_samples (session_id, student_id, score, state) values ($1, $2, null, 'Unavailable')", [qid, S1])).ok);
+ok("break sample with no score is saved", (await tryQ(S1, "insert into public.attention_samples (session_id, student_id, score, state) values ($1, $2, null, 'Break')", [qid, S1])).ok);
+ok("an unavailable sample can't carry a score", !(await tryQ(S1, "insert into public.attention_samples (session_id, student_id, score, state) values ($1, $2, 0, 'Unavailable')", [qid, S1])).ok);
+ok("a measured sample must have a score", !(await tryQ(S1, "insert into public.attention_samples (session_id, student_id, score, state) values ($1, $2, null, 'Focused')", [qid, S1])).ok);
+ok("unknown sample states are still refused", !(await tryQ(S1, "insert into public.attention_samples (session_id, student_id, score, state) values ($1, $2, 50, 'Bored')", [qid, S1])).ok);
+ok("a classmate can't change someone's measured time", (await tryQ(S2, "update public.attention_sessions set usable_seconds = 1 where id = $1", [qid])).affected === 0);
 
 console.log("\n— Attention history —");
 const personal = await tryQ(S1, "insert into public.attention_sessions (student_id) values ($1) returning id", [S1]);
@@ -137,6 +163,11 @@ const marks = Object.fromEntries((await rows(T1, "select student_id, status from
 ok("after ending: joined student present, never-joined absent", marks[S1] === "present" && marks[S2] === "absent", JSON.stringify(marks));
 ok("no shared history after the session ended", !(await tryQ(S1, "insert into public.attention_sessions (student_id, class_id, class_session_id) values ($1, $2, $3)", [S1, C1.id, live.id])).ok);
 ok("shared history can still be finalized after the end", (await tryQ(S1, "update public.attention_sessions set ended_at = now(), tracked_seconds = 60 where id = $1", [sharedId])).affected === 1);
+// The student page checks this before ending a focus session with the teacher's (student-classes.js).
+const endedRow = await rows(S1, "select ended_at from public.class_sessions where id = $1", [live.id]);
+ok("class member sees the session has ended", endedRow.length === 1 && endedRow[0].ended_at !== null);
+ok("even a student removed from it can see it ended", (await rows(S2, "select ended_at from public.class_sessions where id = $1", [live.id]))[0]?.ended_at != null);
+ok("students of other classes can't see it", (await rows(S3, "select 1 from public.class_sessions where id = $1", [live.id])).length === 0);
 
 console.log("\n— Abandoned sessions —");
 const stale = (await rows(T1, "select public.start_class_session($1) as r", [C1.id]))[0].r;
@@ -207,9 +238,24 @@ ok("owner can't move a picture into someone else's folder", !(await tryQ(S1, "up
 ok("removing the picture from the profile works", (await saveProfile(S1, "Sam Rivera", null, null)).ok && (await profileOf(S1)).avatar_path === null);
 ok("owner deletes their old picture", (await tryQ(S1, "delete from storage.objects where name = $1", [s1Pic])).affected === 1);
 
+console.log("\n— Teacher profiles —");
+const teacherSave = await saveProfile(T1, "Ms Rivera", "star", null, "dark", "blue");
+ok("teacher saves their own name, avatar and look", teacherSave.ok, teacherSave.error || "");
+ok("teacher keeps the teacher role", (await profileOf(T1)).role === "teacher" && (await profileOf(T1)).theme === "dark");
+const t1Pic = `${T1}/me.webp`;
+ok("teacher uploads a picture into their own folder", (await putPicture(T1, t1Pic)).ok && (await saveProfile(T1, "Ms Rivera", null, t1Pic, "dark", "blue")).ok);
+const seesTeacherPic = async (uid) => (await rows(uid, "select name from storage.objects where bucket_id = 'avatars'")).some((r) => r.name === t1Pic);
+ok("teacher's picture: the teacher and their own students see it", (await seesTeacherPic(T1)) && (await seesTeacherPic(S1)) && (await seesTeacherPic(S2)));
+ok("teacher's picture: other teachers and students of other classes don't", !(await seesTeacherPic(T2)) && !(await seesTeacherPic(S3)));
+ok("a student can't put a picture in a teacher's folder", !(await putPicture(S1, `${T1}/fake.webp`)).ok);
+ok("students see the new teacher name on class cards", (await rows(S1, "select teacher_name from public.my_class_teachers()"))[0]?.teacher_name === "Ms Rivera");
+const cardTeacher = (await rows(S1, "select teacher_name, teacher_avatar_preset, teacher_avatar_path from public.my_class_teachers()"))[0];
+ok("class cards also get the teacher's avatar and picture", cardTeacher?.teacher_avatar_path === t1Pic && cardTeacher?.teacher_avatar_preset === null);
+ok("a student still can't see a classmate's picture", !(await rows(S2, "select name from storage.objects")).some((r) => r.name.startsWith(S1)));
+
 console.log("\n— Teacher names on class cards —");
 const teachersFor = async (uid) => (await rows(uid, "select class_id, teacher_name from public.my_class_teachers()")).map((r) => `${r.class_id === C1.id ? "Biology" : "History"}:${r.teacher_name}`).sort();
-ok("student sees their class's teacher name", JSON.stringify(await teachersFor(S1)) === JSON.stringify(["Biology:Teacher One"]));
+ok("student sees their class's teacher name", JSON.stringify(await teachersFor(S1)) === JSON.stringify(["Biology:Ms Rivera"]));
 ok("another student sees only their own classes' teachers", JSON.stringify(await teachersFor(S3)) === JSON.stringify(["History:Teacher Two"]));
 ok("students still can't read teacher profile rows", (await rows(S1, "select 1 from public.profiles where id = $1", [T1])).length === 0);
 ok("signed-out visitors can't list teachers", !(await tryQ(null, "select * from public.my_class_teachers()")).ok);

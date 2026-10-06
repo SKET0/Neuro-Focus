@@ -24,7 +24,10 @@ if (app) {
   let roster = [];                 // members of the open class: { id, name, joinedAt }
   let rosterLoadedFor = "";
   let selectedId = "";
-  let view = "classes";
+  let view = "classes";             // "classes" (Home), "class" (one class), "profile" (My profile),
+                                   // "all-students" or "report" (attendance across classes, teacher-overview.js)
+  const OVERVIEWS = { "all-students": { address: "#students", label: "All students" }, report: { address: "#attendance-report", label: "Attendance report" } };
+  const NAV_FOR_VIEW = { "all-students": "all-students", report: "attendance-report" };
   let tab = "live";
   let hasClassSettings = true;     // false until the class management SQL has been run
   let newIds = new Set();          // roster rows to highlight once
@@ -407,10 +410,71 @@ if (app) {
     }
   }
 
+  // Sidebar: every class, with its live dot or student count. The open class's pages
+  // (#classNav: Live monitor, Master list, ...) unfold right under it; a running session also
+  // gets a "Live now" shortcut at the top.
+  const classSubnav = $("#classNav"); // kept here: it moves in and out of the class list
+  function renderSidebarClasses() {
+    const list = $("#sidebarClassList");
+    const subnav = classSubnav;
+    const inClass = view === "class" && Boolean(selected());
+    const liveClass = live ? classes.find((item) => item.id === live.classId) : null;
+    $("#navLiveNow").hidden = !liveClass;
+    $("#navLiveClass").textContent = liveClass?.name || "";
+    // Out of the list while it is rebuilt; back under the open class afterwards.
+    subnav.hidden = true;
+    list.closest(".nav-group").after(subnav);
+    if (!classes.length) {
+      const empty = document.createElement("p");
+      empty.className = "sidebar-empty";
+      empty.textContent = "No classes yet.";
+      list.replaceChildren(empty);
+      return;
+    }
+    list.replaceChildren(...classes.map((item) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "nav-item sidebar-class";
+      button.dataset.classId = item.id;
+      const open = inClass && item.id === selectedId;
+      button.dataset.open = String(open);
+      if (open) button.setAttribute("aria-expanded", "true");
+      const tile = document.createElement("span");
+      tile.className = "class-initial";
+      tile.setAttribute("aria-hidden", "true");
+      tile.textContent = initialOf(item.name);
+      const name = document.createElement("span");
+      name.className = "name";
+      name.textContent = item.name;
+      button.append(tile, name);
+      if (live?.classId === item.id) {
+        const dot = document.createElement("span");
+        dot.className = "nav-live";
+        dot.innerHTML = '<span class="live-dot"></span>';
+        button.append(dot);
+        button.setAttribute("aria-label", `${item.name}, live now`);
+      } else {
+        const count = document.createElement("span");
+        count.className = "nav-count";
+        count.textContent = item.memberCount ? String(item.memberCount) : "";
+        button.append(count);
+        button.setAttribute("aria-label", `${item.name}, ${plural(item.memberCount, "student")}`);
+      }
+      button.addEventListener("click", () => {
+        if (open) return; // its pages are already listed under it
+        openClass(item.id, live?.classId === item.id ? "live" : "students");
+      });
+      return button;
+    }));
+    subnav.hidden = !inClass;
+    if (inClass) list.querySelector(`[data-class-id="${CSS.escape(selectedId)}"]`)?.after(subnav);
+  }
+
   function renderClassGrid() {
     const grid = $("#classGrid");
     grid.replaceChildren();
     renderSummary();
+    renderSidebarClasses();
     if (!classes.length) {
       const empty = document.createElement("div");
       empty.className = "empty-state";
@@ -675,23 +739,134 @@ if (app) {
     });
   }
 
+  let shownView = null;
   function renderView() {
     const inClass = view === "class" && Boolean(selected());
-    $("#classesView").hidden = inClass;
+    const inProfile = view === "profile";
+    const overview = OVERVIEWS[view] ? view : null;
+    $("#classesView").hidden = inClass || inProfile || Boolean(overview);
     $("#classView").hidden = !inClass;
-    $("#classNav").hidden = !selected();
+    $("#profileView").hidden = !inProfile;
+    $("#allStudentsView").hidden = overview !== "all-students";
+    $("#reportView").hidden = overview !== "report";
+    renderSidebarClasses();
+    syncAddress();
     document.querySelectorAll("[data-nav]").forEach((button) => {
       const target = button.dataset.nav;
-      const current = inClass ? target === tab : target === "classes";
-      if (button.classList.contains("nav-item")) {
+      const current = inProfile ? target === "profile" : inClass ? target === tab : overview ? target === NAV_FOR_VIEW[overview] : target === "classes";
+      if (button.classList.contains("nav-item") || button.classList.contains("user-card")) {
         if (current) button.setAttribute("aria-current", "page");
         else button.removeAttribute("aria-current");
       }
     });
     const names = { live: "Live monitor", students: "Master list", attendance: "Attendance", history: "History", settings: "Settings" };
-    $("#crumbCurrent").textContent = inClass ? `${selected().name} · ${names[tab]}` : "Home";
+    renderCrumbs(overview ? [{ label: OVERVIEWS[overview].label }]
+      : inProfile ? [{ label: "My profile" }]
+      : inClass ? [{ label: selected().name, go: () => openClass(selectedId, "live") }, { label: names[tab] }]
+      : [{ label: "Home" }]);
     if (inClass) renderClassHeader();
+    // The shared My profile page (profile.js) ends a theme preview when it is left.
+    const name = overview || (inProfile ? "profile" : inClass ? "class" : "dashboard");
+    if (name !== shownView) {
+      const previous = shownView;
+      shownView = name;
+      window.neuroFocusView = name;
+      window.dispatchEvent(new CustomEvent("neurofocus:viewchange", { detail: { name, previous } }));
+    }
   }
+
+  // Breadcrumb trail in the header: every part but the last is a link ("Teacher" goes Home).
+  function renderCrumbs(trail) {
+    const nav = $("#crumbs");
+    const focusedLabel = nav.contains(document.activeElement) ? document.activeElement.textContent : null;
+    const parts = [{ label: "Teacher", go: showClasses }, ...trail];
+    nav.replaceChildren(...parts.flatMap((part, index) => {
+      const last = index === parts.length - 1;
+      let node;
+      if (last) {
+        node = document.createElement("span");
+        node.className = "crumb-current";
+        node.setAttribute("aria-current", "page");
+      } else {
+        node = document.createElement("button");
+        node.type = "button";
+        node.className = "crumb-link";
+        node.addEventListener("click", part.go);
+      }
+      node.textContent = part.label;
+      if (!index) return [node];
+      const sep = document.createElement("span");
+      sep.className = "crumb-sep";
+      sep.setAttribute("aria-hidden", "true");
+      sep.textContent = "/";
+      return [sep, node];
+    }));
+    // Keep keyboard focus in the trail after using it (on the same part if it's still a link).
+    if (focusedLabel !== null) {
+      const links = [...nav.querySelectorAll(".crumb-link")];
+      (links.find((link) => link.textContent === focusedLabel) || links[0])?.focus();
+    }
+  }
+
+  // ---------- Page addresses ----------
+  // Each page has its own address (#home, #class/<id>/<tab>, #profile), so the browser's Back and
+  // Forward buttons move between pages and a refresh reopens the same page. Other hashes (the Home
+  // tiles jump to cards on the page) are left alone.
+  let lastAddress = "";
+  let routing = false;
+  const currentAddress = () => (OVERVIEWS[view] ? OVERVIEWS[view].address : view === "profile" ? "#profile"
+    : view === "class" && selected() ? `#class/${selectedId}/${tab}` : "#home");
+  function syncAddress() {
+    const next = currentAddress();
+    if (routing || next === lastAddress) { lastAddress = next; return; }
+    // The first page shown replaces the address instead of adding a step to Back.
+    if (lastAddress) window.history.pushState(null, "", next);
+    else window.history.replaceState(null, "", next);
+    lastAddress = next;
+  }
+  function routeTo(hash) {
+    const [kind, id, part] = hash.replace(/^#/, "").split("/");
+    if (kind === "profile" || kind === "profile-appearance") { showProfile(kind === "profile" ? "" : kind); return true; }
+    if (kind === "class") {
+      // A class that no longer exists (deleted, or a stale link) goes Home.
+      if (classes.some((item) => item.id === id)) openClass(id, TABS.includes(part) ? part : "live");
+      else showClasses();
+      return true;
+    }
+    if (kind === "home" || kind === "") { showClasses(); return true; }
+    const overview = Object.keys(OVERVIEWS).find((key) => OVERVIEWS[key].address === `#${kind}`);
+    if (overview) { showOverview(overview); return true; }
+    return false;
+  }
+  window.addEventListener("popstate", () => {
+    routing = true;
+    try { routeTo(window.location.hash); } finally { routing = false; }
+  });
+
+  // All students and the attendance report (teacher-overview.js fills them in when shown).
+  function showOverview(name) {
+    view = name;
+    renderView();
+    window.scrollTo({ top: 0 });
+    document.querySelector("main")?.scrollTo({ top: 0 });
+  }
+
+  function showProfile(section = "") {
+    view = "profile";
+    renderView();
+    const main = document.querySelector("main");
+    const target = section ? document.getElementById(section) : null;
+    if (target) target.scrollIntoView({ block: "start" });
+    else { window.scrollTo({ top: 0 }); main?.scrollTo({ top: 0 }); }
+  }
+
+  // Shared pages call this to move around ("profile", "profile-appearance", "dashboard").
+  window.neuroFocusNavigate = (hash) => {
+    if (hash === "profile" || hash === "profile-appearance") showProfile(hash === "profile" ? "" : hash);
+    else if (hash === "all-students") showOverview("all-students");
+    else if (hash === "attendance-report") showOverview("report");
+    else showClasses();
+  };
 
   function setTab(next) {
     tab = TABS.includes(next) ? next : "live";
@@ -952,12 +1127,16 @@ if (app) {
       const target = button.dataset.nav;
       if (target === "classes") showClasses();
       else if (target === "new-class") openNewClass();
+      else if (target === "profile" || target === "profile-appearance") window.neuroFocusNavigate(target);
+      else if (target === "all-students") showOverview("all-students");
+      else if (target === "attendance-report") showOverview("report");
       else if (selected()) openClass(selectedId, target);
     });
   });
   document.querySelectorAll(".class-tabs [data-tab]").forEach((button) => {
     button.addEventListener("click", () => setTab(button.dataset.tab));
   });
+  $("#navLiveNow").addEventListener("click", () => { if (live) openClass(live.classId, "live"); });
   $("#sessionToggle").addEventListener("click", () => { void toggleSession(); });
   $("#classCode").addEventListener("click", () => { void copyCode(); });
   $("#copyInvite").addEventListener("click", () => { void copyCode(); });
@@ -1082,7 +1261,7 @@ if (app) {
   window.addEventListener("pagehide", () => supabase.removeAllChannels());
 
   // Actions for the teacher Home (teacher-home.js), with the same behaviour as the buttons here.
-  window.neuroFocusTeacherActions = { openClass, showClasses, openNewClass, copyCode };
+  window.neuroFocusTeacherActions = { openClass, showClasses, openNewClass, copyCode, showOverview };
   // Refresh the "students sharing" count on Home while a session is live.
   window.setInterval(() => { if (live && view === "classes") publishStatus(); }, 5000);
 
@@ -1093,8 +1272,11 @@ if (app) {
     await closeStaleSessions();
     await loadOpenSession();
     void keepSessionAlive();
-    // Land on the live monitor if a session is running; otherwise on Home.
-    if (live && classes.some((item) => item.id === live.classId)) openClass(live.classId, "live");
+    // Reopen the page in the address (after a refresh or from a link); otherwise land on the live
+    // monitor if a session is running, or on Home.
+    const linked = /^#(class|profile|students|attendance-report)/.test(window.location.hash) && routeTo(window.location.hash);
+    if (linked) { /* done */ }
+    else if (live && classes.some((item) => item.id === live.classId)) openClass(live.classId, "live");
     else showClasses();
   } catch (error) {
     console.error("Class loading failed", error);

@@ -17,7 +17,7 @@ if (toggle && sidebar) {
   toggle.addEventListener("click", () => setOpen(!isOpen()));
   backdrop.addEventListener("click", () => setOpen(false));
   sidebar.addEventListener("click", (event) => {
-    if (event.target.closest(".nav-item, a.user-card")) setOpen(false);
+    if (event.target.closest(".nav-item, .user-card")) setOpen(false);
   });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && isOpen()) {

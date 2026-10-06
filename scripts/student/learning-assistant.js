@@ -28,6 +28,34 @@ if (app) {
     try { localStorage.setItem(chatKey(currentClass?.id || "open-tutor"), JSON.stringify(currentHistory())); } catch { /* storage unavailable */ }
   };
 
+  // Explanation style: the choices on the page set the hidden #supportStyle list, which is sent
+  // with each question. The choice is remembered on this device, per account.
+  const styleSelect = document.querySelector("#supportStyle");
+  const styleButtons = [...document.querySelectorAll("[data-style]")];
+  const styleKey = `neuroFocusBuddyStyle:${app.user.id}`;
+  function setStyle(value, { remember = false } = {}) {
+    if (![...styleSelect.options].some((option) => option.value === value)) return;
+    styleSelect.value = value;
+    styleButtons.forEach((button) => {
+      const chosen = button.dataset.style === value;
+      button.setAttribute("aria-checked", String(chosen));
+      button.tabIndex = chosen ? 0 : -1;
+    });
+    if (remember) { try { localStorage.setItem(styleKey, value); } catch { /* storage unavailable */ } }
+  }
+  styleButtons.forEach((button) => button.addEventListener("click", () => setStyle(button.dataset.style, { remember: true })));
+  document.querySelector("#styleOptions")?.addEventListener("keydown", (event) => {
+    const step = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[event.key];
+    if (!step) return;
+    event.preventDefault();
+    const next = styleButtons[(styleButtons.findIndex((button) => button.dataset.style === styleSelect.value) + step + styleButtons.length) % styleButtons.length];
+    setStyle(next.dataset.style, { remember: true });
+    next.focus();
+  });
+  let savedStyle = null;
+  try { savedStyle = localStorage.getItem(styleKey); } catch { /* storage unavailable */ }
+  setStyle(savedStyle || styleSelect.value);
+
   function showGreeting(classInfo) {
     conversation.replaceChildren();
     const greeting = document.createElement("p");
@@ -70,6 +98,8 @@ if (app) {
       currentHistory().forEach((message) => addBubble(message.content, message.role === "user" ? "student" : "assistant"));
     }
     currentClass = classInfo;
+    const context = document.querySelector("#buddyContext");
+    if (context) context.textContent = classInfo ? `Helping with ${classInfo.name}` : "No class picked · general help";
     status("#tutorMessage", classInfo
       ? `NeuroBuddy is using ${classInfo.name} for context. Your question and class name go to the AI service when you ask; avoid personal details.`
       : "No class needed to chat. Pick a class any time to give NeuroBuddy context.");

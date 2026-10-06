@@ -1,11 +1,12 @@
-// My profile: display name, profile picture (a built-in avatar or an uploaded photo cropped to a
-// square), theme and accent colour. Saved to the student's account with update_my_profile() and
-// the private "avatars" storage bucket (supabase/migrations/20261007000000_student_profiles.sql),
-// so they follow the student to any device. Also keeps every avatar and name on the page up to
-// date and runs the header's account menu.
-import { AVATAR_PRESETS, avatarPreset, paintAvatar, avatarUrl, forgetAvatarUrl } from "../shared/avatars.js?v=1";
-import { applyAppearance, cacheAppearance, normalizeAppearance } from "../shared/appearance.js?v=1";
-import { notify } from "../shared/class-live.js?v=9";
+// My profile, shared by the student workspace and the teacher dashboard: display name, profile
+// picture (a built-in avatar or an uploaded photo cropped to a square), theme and accent colour.
+// Saved to the signed-in account with update_my_profile() and the private "avatars" storage
+// bucket (supabase/migrations/20261007000000_student_profiles.sql), so they follow the person to
+// any device. Also keeps every avatar and name on the page up to date and runs the header's
+// account menu. Each page provides window.neuroFocusNavigate and "neurofocus:viewchange" events.
+import { AVATAR_PRESETS, avatarPreset, paintAvatar, avatarUrl, forgetAvatarUrl } from "./avatars.js?v=1";
+import { applyAppearance, cacheAppearance, normalizeAppearance } from "./appearance.js?v=1";
+import { notify } from "./class-live.js?v=9";
 
 const app = await window.neuroFocusReady;
 
@@ -474,7 +475,7 @@ if (app) {
       applyAppearance(saved);
       resetDraft();
       paintEverywhere();
-      // Home's greeting, and the teachers' class lists (student-classes.js tells them).
+      // Home's greeting, and (for students) their teachers' class lists via student-classes.js.
       window.dispatchEvent(new CustomEvent("neurofocus:profile-updated", { detail: { ...saved, avatarUrl: savedUrl } }));
       setStatus("Saved. Your profile and look are updated on every device.", "success");
     } catch (error) {
