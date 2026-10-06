@@ -294,7 +294,8 @@ if (app) {
 
     const main = el("span", "session-main");
     const title = el("span", "session-title", `${time(session.started_at)} · ${duration(session.tracked_seconds)}`);
-    if (session.classes?.name) title.append(el("span", "class-tag", session.classes.name));
+    // Classroom sessions carry their class; everything else is a personal (Solo focus) session.
+    title.append(session.classes?.name ? el("span", "class-tag", `Class · ${session.classes.name}`) : el("span", "class-tag personal-tag", "Personal"));
     // Never stopped (e.g. the page was closed while tracking): shown, but clearly marked.
     const unfinished = !session.ended_at;
     if (unfinished) title.append(el("span", "class-tag unfinished-tag", "Unfinished"));
@@ -409,8 +410,8 @@ if (app) {
     $("#historyCount").textContent = [current.length ? `${plural(current.length, "session")} ${info.phrase}` : "", ongoing].filter(Boolean).join(" · ");
     if (!current.length) {
       const empty = el("div", "empty-state");
-      const link = el("a", "", "Open Focus session");
-      link.href = "#focus-session";
+      const link = el("a", "", "Open Solo focus");
+      link.href = "#focus";
       empty.append(`${sessions.length ? `No sessions ${info.phrase}.` : "No saved sessions yet."} Start attention tracking in Focus session and your session shows up here when you stop. `, link);
       days.replaceChildren(empty);
       $("#historyMore").hidden = true;

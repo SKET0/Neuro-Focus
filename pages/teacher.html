@@ -37,13 +37,17 @@
   </script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <link rel="stylesheet" href="../styles/theme.css?v=1">
-  <link rel="stylesheet" href="../styles/teacher.css?v=4">
+  <link rel="stylesheet" href="../styles/teacher.css?v=5">
   <link rel="stylesheet" href="../styles/dashboard-layout.css?v=4">
-  <link rel="stylesheet" href="../styles/home.css?v=2">
+  <link rel="stylesheet" href="../styles/home.css?v=4">
   <link rel="stylesheet" href="../styles/account.css?v=1">
 </head>
 <body data-required-role="teacher">
   <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+    <symbol id="i-quiz" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 4.9.7c0 1.7-2.4 2.3-2.4 3.8M12 17h.01"/></symbol>
+    <symbol id="i-megaphone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11v2a1 1 0 0 0 1 1h2l6 4V6L6 10H4a1 1 0 0 0-1 1Z"/><path d="M16 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></symbol>
+    <symbol id="i-assignment" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h3"/></symbol>
+    <symbol id="i-paperclip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21 11-8.5 8.5a5 5 0 0 1-7-7L14 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 7"/></symbol>
     <symbol id="i-brain" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M12 5v13"/></symbol>
     <symbol id="i-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
@@ -107,9 +111,18 @@
         <div id="sidebarClassList" class="sidebar-classes"><p class="sidebar-empty">Loading…</p></div>
       </nav>
 
+      <!-- The demo: sample data only (teacher-demo.js). Kept apart from real classes. -->
+      <nav class="nav-group" aria-label="Try it">
+        <div class="nav-label">Try it</div>
+        <button class="nav-item nav-demo" type="button" data-nav="demo"><svg class="icon"><use href="#i-grid4"/></svg>Demo<span class="nav-demo-tag">Sample data</span></button>
+      </nav>
+
       <div class="nav-group class-subnav" id="classNav" role="group" aria-labelledby="classNavLabel" hidden>
         <div class="sr-only" id="classNavLabel">Class</div>
         <button class="nav-item" type="button" data-nav="live"><svg class="icon"><use href="#i-live"/></svg>Live monitor <span class="nav-live" id="navLiveDot" hidden><span class="live-dot"></span></span></button>
+        <button class="nav-item" type="button" data-nav="posts"><svg class="icon"><use href="#i-megaphone"/></svg>Posts</button>
+        <button class="nav-item" type="button" data-nav="assignments"><svg class="icon"><use href="#i-assignment"/></svg>Assignments</button>
+        <button class="nav-item" type="button" data-nav="quizzes"><svg class="icon"><use href="#i-quiz"/></svg>Quizzes</button>
         <button class="nav-item" type="button" data-nav="students"><svg class="icon"><use href="#i-users"/></svg>Master list <span class="nav-count" id="navStudentCount"></span></button>
         <button class="nav-item" type="button" data-nav="attendance"><svg class="icon"><use href="#i-attendance"/></svg>Attendance</button>
         <button class="nav-item" type="button" data-nav="history"><svg class="icon"><use href="#i-history"/></svg>History</button>
@@ -496,6 +509,108 @@
         </section>
       </section>
 
+      <!-- ================= Demo (teacher-demo.js) =================
+           Sample students and generated readings, to show how the live monitor works. It has no
+           database access and sends nothing: no attendance, history or class records, ever. -->
+      <section class="stack view demo-view" id="demoView" hidden aria-labelledby="demoTitle">
+        <div class="demo-ribbon" role="note"><span class="demo-tag">Demo — sample data</span><span>Sample students and generated readings. Nothing here is real, saved, exported or sent.</span></div>
+
+        <section class="home-hero page-hero demo-hero" aria-labelledby="demoTitle">
+          <div class="page-hero-inner">
+            <div class="hero-copy">
+              <p class="eyebrow-pill"><span class="tag demo-pill">Demo</span><span>Not connected to any class</span></p>
+              <h1 class="welcome-title" id="demoTitle">Live monitor demo</h1>
+              <p class="hero-lead">See how the live monitor shows a class: estimates, check-in alerts and the tracking states (unavailable, on a break) with eight sample students.</p>
+            </div>
+            <div class="page-hero-actions">
+              <button id="demoToggle" class="btn-primary" type="button">Start demo</button>
+              <button id="demoLookAway" class="btn-action" type="button">Sample look-away</button>
+              <button id="demoReset" class="btn-action" type="button">Reset</button>
+              <label class="demo-speed">Speed
+                <select id="demoSpeed" class="field-select">
+                  <option value="1000">1 reading / s</option>
+                  <option value="2000" selected>1 reading / 2 s</option>
+                  <option value="500">2 readings / s</option>
+                </select>
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <div class="stat-grid">
+          <article class="stat-card">
+            <span class="stat-label">Class average (sample)</span>
+            <span class="chip-icon"><svg><use href="#i-eye"/></svg></span>
+            <strong id="demoAverage">—</strong>
+            <small id="demoAverageNote">Press Start demo</small>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">Mostly on screen</span>
+            <span class="chip-icon green"><svg><use href="#i-users"/></svg></span>
+            <strong id="demoFocused">—</strong>
+            <small id="demoFocusedNote">&nbsp;</small>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">Check-in alerts</span>
+            <span class="chip-icon red"><svg><use href="#i-flag"/></svg></span>
+            <strong id="demoFlags">0</strong>
+            <small>Estimated below 45% for 2+ readings</small>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">Demo time</span>
+            <span class="chip-icon amber"><svg><use href="#i-timer"/></svg></span>
+            <strong id="demoTime">00:00</strong>
+            <small>Generated, not a real session</small>
+          </article>
+        </div>
+
+        <div class="analytics-grid">
+          <div class="panel-card">
+            <div class="panel-head">
+              <div>
+                <div class="panel-title"><span class="chip-icon"><svg><use href="#i-chart"/></svg></span>Attention curve (sample)</div>
+                <div class="panel-sub">Sample class average vs. lowest sample student. Gaps are times no sample student could be measured.</div>
+              </div>
+            </div>
+            <div class="chart-box"><canvas id="demoChart" aria-label="Sample class attention over time" role="img"></canvas></div>
+          </div>
+          <div class="panel-card">
+            <div class="panel-head">
+              <div>
+                <div class="panel-title"><span class="chip-icon red"><svg><use href="#i-bell"/></svg></span>Check-in alerts (sample)</div>
+                <div class="panel-sub">How alerts look when estimates stay low.</div>
+              </div>
+            </div>
+            <ul class="alert-feed" id="demoAlerts"><li class="empty-state">No sample alerts yet.</li></ul>
+          </div>
+        </div>
+
+        <div class="panel-card">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title"><span class="chip-icon"><svg><use href="#i-users"/></svg></span>Sample students</div>
+              <div class="panel-sub">Lowest estimate first. These are made-up students, not anyone in your classes.</div>
+            </div>
+          </div>
+          <div class="table-scroll">
+            <table class="data-table">
+              <thead><tr><th>Sample student</th><th>Attention (estimate)</th><th>Status</th></tr></thead>
+              <tbody id="demoRows"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel-card">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title"><span class="chip-icon"><svg><use href="#i-grid4"/></svg></span>Engagement heatmap (sample)</div>
+              <div class="panel-sub">Each cell is one sample reading, oldest to newest. Empty cells: not measured.</div>
+            </div>
+          </div>
+          <div class="heatmap-scroll"><div class="heatmap" id="demoHeatmap"></div></div>
+        </div>
+      </section>
+
       <!-- ================= My profile (scripts/shared/profile.js) ================= -->
       <section class="stack view" id="profileView" hidden aria-labelledby="profilePageTitle">
         <div class="page-head">
@@ -657,6 +772,9 @@
 
         <div class="class-tabs" role="tablist" aria-label="Class sections">
           <button role="tab" type="button" data-tab="live" aria-selected="true"><svg class="icon"><use href="#i-live"/></svg>Live monitor</button>
+          <button role="tab" type="button" data-tab="posts" aria-selected="false"><svg class="icon"><use href="#i-megaphone"/></svg>Posts</button>
+          <button role="tab" type="button" data-tab="assignments" aria-selected="false"><svg class="icon"><use href="#i-assignment"/></svg>Assignments</button>
+          <button role="tab" type="button" data-tab="quizzes" aria-selected="false"><svg class="icon"><use href="#i-quiz"/></svg>Quizzes</button>
           <button role="tab" type="button" data-tab="students" aria-selected="false"><svg class="icon"><use href="#i-users"/></svg>Master list <span class="tab-count" id="tabStudentCount"></span></button>
           <button role="tab" type="button" data-tab="attendance" aria-selected="false"><svg class="icon"><use href="#i-attendance"/></svg>Attendance</button>
           <button role="tab" type="button" data-tab="history" aria-selected="false"><svg class="icon"><use href="#i-history"/></svg>History</button>
@@ -669,21 +787,12 @@
             <div class="section-head">
               <div>
                 <h2 id="overviewTitle">Session analytics</h2>
-                <p id="analyticsSource">Real-time attention scores from students in this class.</p>
+                <p id="analyticsSource">Real-time attention estimates from students in this class (numbers only, never video).</p>
               </div>
               <div class="mode-row">
-                <div class="mode-switch" role="group" aria-label="Analytics data source">
-                  <button type="button" id="modeLive" class="active" aria-pressed="true">● Live classroom</button>
-                  <button type="button" id="modeSim" aria-pressed="false">Simulator (demo)</button>
-                </div>
-                <span class="sim-badge" id="simStatus">Idle</span>
+                <span class="sim-badge" id="liveStatusBadge">Not live</span>
+                <button class="text-link" type="button" data-nav="demo">Try the demo with sample data</button>
               </div>
-            </div>
-
-            <div class="demo-banner" id="demoBanner" role="status" hidden>
-              <span class="demo-tag">DEMO MODE</span>
-              <span>Simulated scores for made-up learners, not your students. Nothing here is saved, exported as real data or sent to anyone.</span>
-              <button class="btn-action" type="button" id="demoExit">Back to live classroom</button>
             </div>
 
             <div class="stat-grid">
@@ -743,28 +852,6 @@
                 <p class="sim-note">Only numbers computed on the student’s device are shared: score, focus state and session focus. Webcam video never leaves their computer.</p>
               </div>
 
-              <div class="panel-card" id="simulatorCard" hidden>
-                <div class="panel-head">
-                  <div>
-                    <div class="panel-title"><span class="chip-icon amber"><svg><use href="#i-grid4"/></svg></span>Classroom simulator</div>
-                    <div class="panel-sub">Generate realistic attention telemetry for a demo session.</div>
-                  </div>
-                </div>
-                <div class="sim-controls">
-                  <button id="simToggle" class="btn-primary" type="button">Start simulation</button>
-                  <button id="simDistract" class="btn-action" type="button">⚡ Trigger a distraction</button>
-                  <button id="simReset" class="btn-action" type="button">↺ Reset session</button>
-                  <label>Reading interval
-                    <select id="simSpeed">
-                      <option value="1000">1 second</option>
-                      <option value="2000" selected>2 seconds</option>
-                      <option value="500">0.5 seconds (fast)</option>
-                    </select>
-                  </label>
-                  <p class="sim-source" id="simSource">Demo learners</p>
-                  <p class="sim-note">Simulated data for demonstrations. Switch to Live classroom to see real students.</p>
-                </div>
-              </div>
             </div>
 
             <div class="analytics-grid">
@@ -811,6 +898,161 @@
               </div>
             </div>
           </section>
+        </div>
+
+        <!-- Posts (teacher-classroom.js): announcements for everyone in this class -->
+        <div class="tab-panel" id="tab-posts" role="tabpanel" hidden>
+          <div class="stack">
+            <p class="classroom-setup" id="teacherPostsSetup" hidden></p>
+            <form class="panel-card classroom-form" id="postForm">
+              <div class="panel-head">
+                <div>
+                  <div class="panel-title"><span class="chip-icon"><svg><use href="#i-megaphone"/></svg></span>New announcement</div>
+                  <div class="panel-sub">Everyone in this class sees it in their Posts tab.</div>
+                </div>
+              </div>
+              <label class="field-label" for="postTitle">Title <span class="optional">(optional)</span></label>
+              <input class="field-input" id="postTitle" type="text" maxlength="200" autocomplete="off">
+              <label class="field-label" for="postBody">Message</label>
+              <textarea class="field-input" id="postBody" rows="4" maxlength="5000" required></textarea>
+              <div class="form-actions">
+                <p class="form-message" id="postMessage" aria-live="polite"></p>
+                <button class="btn-primary" type="submit">Post</button>
+              </div>
+            </form>
+            <section class="panel-card" aria-labelledby="teacherPostsTitle">
+              <div class="panel-head">
+                <div>
+                  <h3 class="panel-title" id="teacherPostsTitle"><span class="chip-icon"><svg><use href="#i-megaphone"/></svg></span>Posts</h3>
+                  <p class="panel-sub">Newest first.</p>
+                </div>
+              </div>
+              <ul class="post-list" id="teacherPostList"><li class="empty-state">Loading…</li></ul>
+            </section>
+          </div>
+        </div>
+
+        <!-- Assignments (teacher-classroom.js) -->
+        <div class="tab-panel" id="tab-assignments" role="tabpanel" hidden>
+          <div class="stack">
+            <p class="classroom-setup" id="teacherAssignmentsSetup" hidden></p>
+            <details class="panel-card classroom-form assignment-composer" id="assignmentComposer">
+              <summary><span class="chip-icon"><svg><use href="#i-plus"/></svg></span>New assignment</summary>
+              <form id="assignmentForm">
+                <label class="field-label" for="assignmentTitle">Title</label>
+                <input class="field-input" id="assignmentTitle" type="text" maxlength="200" required autocomplete="off">
+                <label class="field-label" for="assignmentInstructions">Instructions</label>
+                <textarea class="field-input" id="assignmentInstructions" rows="5" maxlength="10000"></textarea>
+                <div class="form-row">
+                  <div>
+                    <label class="field-label" for="assignmentDue">Deadline <span class="optional">(optional)</span></label>
+                    <input class="field-input" id="assignmentDue" type="datetime-local">
+                  </div>
+                  <div>
+                    <label class="field-label" for="assignmentMax">Marks out of <span class="optional">(optional)</span></label>
+                    <input class="field-input" id="assignmentMax" type="number" min="1" max="1000" step="0.5" inputmode="decimal">
+                  </div>
+                </div>
+                <label class="field-label" for="assignmentFile">Attachment <span class="optional">(optional)</span> <span id="assignmentFileInfo"></span></label>
+                <input class="field-input file-input" id="assignmentFile" type="file">
+                <div class="form-actions">
+                  <p class="form-message" id="assignmentMessage" aria-live="polite"></p>
+                  <button class="btn-primary" type="submit">Create assignment</button>
+                </div>
+              </form>
+            </details>
+            <section class="panel-card" id="assignmentListCard" aria-labelledby="teacherAssignmentsTitle">
+              <div class="panel-head">
+                <div>
+                  <h3 class="panel-title" id="teacherAssignmentsTitle"><span class="chip-icon"><svg><use href="#i-assignment"/></svg></span>Assignments</h3>
+                  <p class="panel-sub">Open one to see who has submitted, download files and add marks or feedback.</p>
+                </div>
+              </div>
+              <ul class="assignment-list" id="teacherAssignmentList"><li class="empty-state">Loading…</li></ul>
+            </section>
+            <section class="panel-card" id="assignmentDetail" hidden aria-labelledby="assignmentDetailTitle">
+              <div class="panel-head">
+                <div>
+                  <button class="text-link back-to-list" type="button" id="assignmentBack"><svg class="icon"><use href="#i-back"/></svg>All assignments</button>
+                  <h3 class="panel-title" id="assignmentDetailTitle">Assignment</h3>
+                  <p class="panel-sub" id="assignmentDetailDue"></p>
+                </div>
+                <button class="btn-action danger-action" type="button" id="assignmentDelete"><svg class="icon"><use href="#i-trash"/></svg>Delete</button>
+              </div>
+              <div class="assignment-body" id="assignmentDetailBody"></div>
+              <div class="table-scroll submissions-scroll">
+                <table class="data-table submissions-table">
+                  <thead><tr><th>Student</th><th>Submission</th><th>Marks</th><th>Feedback</th><th><span class="sr-only">Save</span></th></tr></thead>
+                  <tbody id="submissionRows"></tbody>
+                </table>
+              </div>
+              <p class="form-message" id="submissionMessage" aria-live="polite"></p>
+            </section>
+          </div>
+        </div>
+
+        <!-- Quizzes (teacher-quizzes.js): live multiple-choice quizzes for this class -->
+        <div class="tab-panel" id="tab-quizzes" role="tabpanel" hidden>
+          <div class="stack">
+            <p class="classroom-setup" id="teacherQuizzesSetup" hidden></p>
+            <section class="panel-card" id="quizListCard" aria-labelledby="teacherQuizzesTitle">
+              <div class="panel-head">
+                <div>
+                  <h3 class="panel-title" id="teacherQuizzesTitle"><span class="chip-icon"><svg><use href="#i-quiz"/></svg></span>Quizzes <span id="teacherQuizTips"></span></h3>
+                  <p class="panel-sub">Write a quiz, open the lobby, then run it question by question.</p>
+                </div>
+                <button class="btn-primary" type="button" id="newQuiz"><svg class="icon"><use href="#i-plus"/></svg>New quiz</button>
+              </div>
+              <ul class="assignment-list" id="teacherQuizList"><li class="empty-state">Loading…</li></ul>
+            </section>
+
+            <form class="panel-card classroom-form quiz-editor" id="quizEditor" hidden aria-labelledby="quizEditorTitle">
+              <div class="panel-head">
+                <div>
+                  <h3 class="panel-title" id="quizEditorTitle"><span class="chip-icon"><svg><use href="#i-pencil"/></svg></span>New quiz</h3>
+                  <p class="panel-sub">Students can’t see a quiz until you open its lobby.</p>
+                </div>
+              </div>
+              <label class="field-label" for="quizTitle">Title</label>
+              <input class="field-input" id="quizTitle" type="text" maxlength="200" required autocomplete="off">
+              <div class="form-row">
+                <div>
+                  <label class="field-label" for="quizTimer">Time per question</label>
+                  <select class="field-input" id="quizTimer">
+                    <option value="">No timer</option>
+                    <option value="10">10 seconds</option>
+                    <option value="20">20 seconds</option>
+                    <option value="30">30 seconds</option>
+                    <option value="45">45 seconds</option>
+                    <option value="60">1 minute</option>
+                    <option value="120">2 minutes</option>
+                  </select>
+                </div>
+                <div class="checkbox-field">
+                  <label class="setting-check"><input type="checkbox" id="quizLeaderboard" checked> Show a leaderboard at the end <span id="quizLeaderboardInfo"></span></label>
+                </div>
+              </div>
+              <ol class="quiz-question-list" id="quizQuestions"></ol>
+              <button class="btn-action" type="button" id="addQuizQuestion"><svg class="icon"><use href="#i-plus"/></svg>Add question</button>
+              <div class="form-actions">
+                <p class="form-message" id="quizEditorMessage" aria-live="polite"></p>
+                <button class="btn-action" type="button" id="cancelQuizEdit">Cancel</button>
+                <button class="btn-primary" type="submit">Save draft</button>
+              </div>
+            </form>
+
+            <section class="panel-card quiz-host" id="quizHost" hidden aria-labelledby="quizHostTitle">
+              <div class="panel-head">
+                <div>
+                  <button class="text-link back-to-list" type="button" id="quizHostBack"><svg class="icon"><use href="#i-back"/></svg>All quizzes</button>
+                  <h3 class="panel-title" id="quizHostTitle">Quiz</h3>
+                  <p class="panel-sub" id="quizHostStatus" aria-live="polite"></p>
+                </div>
+              </div>
+              <div id="quizHostBody"></div>
+              <p class="form-message" id="quizHostMessage" aria-live="polite"></p>
+            </section>
+          </div>
         </div>
 
         <!-- Master list (teacher-classes.js) -->
@@ -993,12 +1235,16 @@
   <script src="../scripts/shared/dashboard-nav.js?v=3"></script>
   <script src="../scripts/teacher/teacher-ui.js?v=3"></script>
   <script type="module" src="../scripts/auth/auth-guard.js?v=4"></script>
-  <script type="module" src="../scripts/teacher/teacher-classes.js?v=15"></script>
+  <script type="module" src="../scripts/teacher/teacher-classes.js?v=19"></script>
   <script type="module" src="../scripts/teacher/teacher-attendance.js?v=4"></script>
-  <script type="module" src="../scripts/teacher/teacher-analytics.js?v=7"></script>
+  <script type="module" src="../scripts/teacher/teacher-analytics.js?v=8"></script>
   <script type="module" src="../scripts/shared/profile.js?v=1"></script>
   <script type="module" src="../scripts/teacher/teacher-home.js?v=4"></script>
   <script type="module" src="../scripts/teacher/teacher-overview.js?v=2"></script>
+  <script type="module" src="../scripts/teacher/teacher-demo.js?v=1"></script>
+  <script type="module" src="../scripts/teacher/teacher-classroom.js?v=2"></script>
+  <script type="module" src="../scripts/teacher/teacher-quizzes.js?v=1"></script>
+  <script src="../scripts/shared/info-popover.js?v=1"></script>
   <script type="module" src="../scripts/shared/home-background.js?v=1"></script>
 </body>
 </html>

@@ -1,17 +1,11 @@
-// Teacher analytics with two data sources:
-// - Live classroom: real-time attention readings streamed by students in the selected
-//   class (relayed by teacher-classes.js from Supabase Realtime; numbers only, never video).
-// - Simulator: generated attention scores for demonstrations. It only ever uses made-up
-//   "Demo" learners (never the real roster), is labeled DEMO everywhere, saves nothing,
-//   and is never remembered: the dashboard always opens on the live classroom.
+// Teacher live monitor: real-time attention readings streamed by students in the selected class
+// (relayed by teacher-classes.js from Supabase Realtime; numbers only, never video), and the
+// class's saved sessions. Real data only: the simulator with sample students lives in its own
+// Demo page (teacher-demo.js), which shares nothing with this file.
 // Chart colours follow the teacher's theme and accent (styles/theme.css).
 import { themeColor, withAlpha } from "../shared/appearance.js?v=1";
 import { normalizeReading, describeReading, sampleKind, selectWithQuality, hasQualityInfo, SCORE_BANDS, BAND_LABELS, scoreBand } from "../shared/tracking-states.js?v=1";
 
-const DEMO_NAMES = [
-  "Demo · Ayesha", "Demo · Hamza", "Demo · Fatima", "Demo · Usman",
-  "Demo · Zainab", "Demo · Bilal", "Demo · Hira", "Demo · Saad"
-];
 const HISTORY = 30;      // points kept on the attention curve
 const HEAT_COLUMNS = 20; // readings shown in the heatmap
 // Score bands and reading meanings are shared with the student pages (tracking-states.js).
@@ -21,15 +15,11 @@ const FOCUSED = SCORE_BANDS.HIGH;
 const DRIFTING = SCORE_BANDS.MIDDLE;
 const LIVE_TICK_MS = 1000;
 const LIVE_STALE_MS = 5000; // no reading for this long while sharing = no recent data (connection)
-const FLAG_AFTER_TICKS = { sim: 2, live: 3 };
+const FLAG_AFTER_READINGS = 3;
 
 const $ = (selector) => document.querySelector(selector);
 const els = {
-  toggle: $("#simToggle"),
-  reset: $("#simReset"),
-  distract: $("#simDistract"),
-  speed: $("#simSpeed"),
-  status: $("#simStatus"),
+  status: $("#liveStatusBadge"),
   avg: $("#statAverage"),
   avgTrend: $("#statAverageTrend"),
   focused: $("#statFocused"),
@@ -41,19 +31,11 @@ const els = {
   table: $("#liveStudentRows"),
   heatmap: $("#engagementHeatmap"),
   alerts: $("#alertFeed"),
-  source: $("#simSource"),
-  analyticsSource: $("#analyticsSource"),
-  modeLive: $("#modeLive"),
-  modeSim: $("#modeSim"),
-  liveCard: $("#liveCard"),
-  simCard: $("#simulatorCard"),
   liveClassName: $("#liveClassName"),
   liveCount: $("#liveTrackingCount"),
-  liveLabel: $("#liveTrackingLabel"),
-  demoBanner: $("#demoBanner")
+  liveLabel: $("#liveTrackingLabel")
 };
 
-let mode = "live";
 let students = [];       // rendered rows: { name, score (null = not tracking), flagged, heat[] }
 let classHistory = [];
 let lowHistory = [];
@@ -79,7 +61,7 @@ const clockLabel = (ms) => {
   const seconds = Math.floor(ms / 1000);
   return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 };
-const elapsedLabel = () => (mode === "sim" ? clockLabel(tick * 2000) : clockLabel(liveStartedAt ? Date.now() - liveStartedAt : 0));
+const elapsedLabel = () => clockLabel(liveStartedAt ? Date.now() - liveStartedAt : 0);
 
 function rosterMembers() {
   // The open class's roster, published by teacher-classes.js
@@ -100,9 +82,9 @@ window.addEventListener("neurofocus:live-session", (event) => {
   sessionSince = detail.since || null;
   sessionId = nextId;
   if (newSession) {
-    // A real session takes over from the simulator, and starts with a clean slate.
-    if (mode !== "live") setMode("live");
-    else { clearData(); resetLive(); }
+    // A new live session starts with a clean slate.
+    clearData();
+    resetLive();
     void seedLiveFromSaved(liveClassId, rosterMembers());
   }
   render();
@@ -110,34 +92,6 @@ window.addEventListener("neurofocus:live-session", (event) => {
 
 function selectedClassName() {
   return window.neuroFocusClass?.name || "";
-}
-
-// ---------- Simulator ----------
-function createSimStudents() {
-  // Always made-up learners, so simulated scores can never be mistaken for a real student's.
-  els.source.textContent = `${DEMO_NAMES.length} demo learners (not your students)`;
-  students = DEMO_NAMES.map((name) => {
-    const baseline = 70 + Math.random() * 24;
-    return { name, baseline, score: baseline, lapse: 0, distractedTicks: 0, flagged: false, heat: [] };
-  });
-}
-
-function simStep() {
-  tick += 1;
-  students.forEach((student) => {
-    if (student.lapse > 0) {
-      student.lapse -= 1;
-      student.score = clamp(student.score - 8 - Math.random() * 8, 18, 100);
-    } else {
-      if (Math.random() < 0.02) student.lapse = 2 + Math.floor(Math.random() * 3);
-      const pull = (student.baseline - student.score) * 0.35;
-      student.score = clamp(student.score + pull + (Math.random() - 0.5) * 8, 18, 100);
-    }
-    updateFlagState(student);
-    pushHeat(student, student.score);
-  });
-  pushHistory(students.map((student) => student.score));
-  render();
 }
 
 // ---------- Live classroom ----------
@@ -201,11 +155,9 @@ window.addEventListener("neurofocus:classchange", (event) => {
   if (nextId === liveClassId) return;
   liveClassId = nextId;
   window.neuroFocusRoster = [];
-  if (mode === "live") {
-    clearData();
-    resetLive();
-    render();
-  }
+  clearData();
+  resetLive();
+  render();
 });
 
 // ---------- Saved history (Supabase) ----------
@@ -226,7 +178,7 @@ function setHistoryStatus(text, isError = false) {
 let seededKey = "";
 async function seedLiveFromSaved(classId, members) {
   const app = await appReady;
-  if (!app || mode !== "live" || classId !== liveClassId || !sessionLive) return;
+  if (!app || classId !== liveClassId || !sessionLive) return;
   const key = `${classId}:${sessionId || sessionSince}`;
   if (key === seededKey) return;
   seededKey = key;
@@ -243,7 +195,7 @@ async function seedLiveFromSaved(classId, members) {
     query = query.gte("recorded_at", sessionSince || new Date(Date.now() - 10 * 60 * 1000).toISOString());
   }
   const { data, error } = await query;
-  if (mode !== "live" || classId !== liveClassId || error || !data?.length) return;
+  if (classId !== liveClassId || error || !data?.length) return;
 
   // Attention curve: class average and lowest learner per 5-second slot
   // Samples without a measurement (tracking unavailable, a break, or an older "no face" sample
@@ -377,7 +329,7 @@ window.setInterval(() => { void loadSessionHistory(); }, 60000);
 function updateFlagState(student) {
   const state = stateFor(student.score);
   student.distractedTicks = state === "Distracted" ? student.distractedTicks + 1 : 0;
-  if (student.distractedTicks === FLAG_AFTER_TICKS[mode]) raiseFlag(student);
+  if (student.distractedTicks === FLAG_AFTER_READINGS) raiseFlag(student);
   if (state === "Focused") student.flagged = false;
 }
 
@@ -389,15 +341,14 @@ function pushHeat(student, score) {
 function pushHistory(scores) {
   classHistory.push(scores.length ? scores.reduce((sum, value) => sum + value, 0) / scores.length : null);
   lowHistory.push(scores.length ? Math.min(...scores) : null);
-  labels.push(mode === "sim" ? elapsedLabel() : new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+  labels.push(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
   if (classHistory.length > HISTORY) { classHistory.shift(); lowHistory.shift(); labels.shift(); }
 }
 
 function raiseFlag(student) {
   student.flagged = true;
-  const readings = FLAG_AFTER_TICKS[mode];
-  addAlert(student.name, student.score, `${readings}+ readings`,
-    mode === "sim" ? elapsedLabel() : new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+  addAlert(student.name, student.score, `${FLAG_AFTER_READINGS}+ readings`,
+    new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
 }
 
 function addAlert(name, score, duration, timeText) {
@@ -428,36 +379,32 @@ function render() {
   els.avg.textContent = latest === undefined || !active.length ? "—" : `${Math.round(latest)}%`;
   if (active.length && recent.length > 1) {
     const delta = recent.at(-1) - recent[0];
-    const span = mode === "sim" ? "10s" : `${recent.length - 1}s`;
+    const span = `${recent.length - 1}s`;
     els.avgTrend.textContent = `${delta >= 0 ? "↗" : "↘"} ${Math.abs(delta).toFixed(1)} pts vs. ${span} ago`;
     els.avgTrend.dataset.trend = delta >= 0 ? "up" : "down";
   } else {
-    els.avgTrend.textContent = mode === "sim" ? "Start the simulator" : sessionLive ? "Waiting for students to join" : "Start a live session to see scores";
+    els.avgTrend.textContent = sessionLive ? "Waiting for students to join" : "Start a live session to see scores";
     els.avgTrend.dataset.trend = "";
   }
   els.focused.textContent = active.length ? `${focusedCount}/${active.length}` : "—";
   const unmeasured = students.filter((student) => ["unavailable", "stale", "break"].includes(student.status)).length;
-  els.focusedSub.textContent = mode === "live"
-    ? `${active.length} of ${students.length} measured now${unmeasured ? ` · ${unmeasured} not measurable` : ""}`
-    : active.length ? `${Math.round((focusedCount / active.length) * 100)}% of class attentive` : "No learners loaded";
+  els.focusedSub.textContent = `${active.length} of ${students.length} measured now${unmeasured ? ` · ${unmeasured} not measurable` : ""}`;
   els.flags.textContent = String(flagCount);
-  els.flagsSub.textContent = `Estimated below ${DRIFTING}% for ${FLAG_AFTER_TICKS[mode]}+ measured readings in a row`;
+  els.flagsSub.textContent = `Estimated below ${DRIFTING}% for ${FLAG_AFTER_READINGS}+ measured readings in a row`;
   els.time.textContent = elapsedLabel();
-  els.timeSub.textContent = mode === "sim" ? "Simulated class time" : "Live session time";
+  els.timeSub.textContent = "Live session time";
 
-  if (mode === "live") {
-    const className = selectedClassName();
-    const since = sessionSince ? new Date(sessionSince).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "";
-    els.liveClassName.textContent = blockedClasses.has(liveClassId)
-      ? "Live updates are blocked: run the Phase 2 database updates (see README), then refresh."
-      : !className ? "Open a class to watch it live."
-        : sessionLive ? `Live session in ${className}${since ? ` since ${since}` : ""}.`
-          : `${className} isn’t live. Press Start live session to begin.`;
-    els.liveCount.textContent = String(active.length);
-    els.liveLabel.textContent = `of ${students.length} student${students.length === 1 ? "" : "s"} sharing live attention`;
-    els.status.textContent = !sessionLive ? "Not live" : active.length ? `Live · ${active.length} sharing` : "Live · waiting for students";
-    els.status.dataset.state = sessionLive ? "live" : "";
-  }
+  const className = selectedClassName();
+  const since = sessionSince ? new Date(sessionSince).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "";
+  els.liveClassName.textContent = blockedClasses.has(liveClassId)
+    ? "Live updates are blocked: run the Phase 2 database updates (see README), then refresh."
+    : !className ? "Open a class to watch it live."
+      : sessionLive ? `Live session in ${className}${since ? ` since ${since}` : ""}.`
+        : `${className} isn’t live. Press Start live session to begin.`;
+  els.liveCount.textContent = String(active.length);
+  els.liveLabel.textContent = `of ${students.length} student${students.length === 1 ? "" : "s"} sharing live attention`;
+  els.status.textContent = !sessionLive ? "Not live" : active.length ? `Live · ${active.length} sharing` : "Live · waiting for students";
+  els.status.dataset.state = sessionLive ? "live" : "";
 
   renderTable();
   renderHeatmap();
@@ -471,13 +418,13 @@ function render() {
 
 function renderTable() {
   els.table.replaceChildren();
-  els.table.dataset.source = mode;
+  els.table.dataset.source = "live";
   if (!students.length) {
     const row = document.createElement("tr");
     const cell = document.createElement("td");
     cell.colSpan = 3;
     cell.className = "empty-state";
-    cell.textContent = mode === "live" ? "No students in this class yet. Share its join code from the Master list tab." : "Start the simulator.";
+    cell.textContent = "No students in this class yet. Share its join code from the Master list tab.";
     row.append(cell);
     els.table.append(row);
     return;
@@ -488,7 +435,7 @@ function renderTable() {
     const row = document.createElement("tr");
     row.dataset.rosterRow = "";
     const tracking = student.score !== null;
-    const status = mode === "sim" ? (tracking ? "active" : "off") : student.status || "off";
+    const status = student.status || "off";
     const state = tracking ? stateFor(student.score) : status === "unavailable" || status === "stale" ? "Unavailable" : status === "break" ? "Break" : "Offline";
 
     const nameCell = document.createElement("td");
@@ -617,70 +564,19 @@ function clearData() {
   }));
 }
 
-function setSimRunning(running) {
-  window.clearInterval(timer);
-  timer = running ? window.setInterval(simStep, Number(els.speed.value)) : null;
-  els.toggle.textContent = running ? "Pause simulation" : (tick ? "Resume simulation" : "Start simulation");
-  els.status.textContent = running ? "Simulating" : (tick ? "Paused" : "Idle");
-  els.status.dataset.state = running ? "live" : "";
-}
-
-function resetSim() {
-  setSimRunning(false);
+// Live readings are collected every second while the dashboard is open.
+function startLive() {
   clearData();
-  createSimStudents();
-  setSimRunning(false);
-  render();
-}
-
-function setMode(next) {
-  mode = next;
+  resetLive();
   window.clearInterval(timer);
-  timer = null;
-  const live = mode === "live";
-  els.modeLive.classList.toggle("active", live);
-  els.modeSim.classList.toggle("active", !live);
-  els.modeLive.setAttribute("aria-pressed", String(live));
-  els.modeSim.setAttribute("aria-pressed", String(!live));
-  els.liveCard.hidden = !live;
-  els.simCard.hidden = live;
-  els.analyticsSource.textContent = live
-    ? "Real-time attention scores from students in the selected class (numbers only, never video)."
-    : "DEMO: simulated scores for made-up learners. Nothing here is real, saved or sent.";
-  if (els.demoBanner) els.demoBanner.hidden = live;
-  document.querySelector("#overview")?.setAttribute("data-mode", mode);
-  if (live) {
-    clearData();
-    resetLive();
-    timer = window.setInterval(liveStep, LIVE_TICK_MS);
-    liveStep();
-    seededKey = "";
-    if (liveClassId) void seedLiveFromSaved(liveClassId, rosterMembers());
-  } else {
-    resetSim();
-  }
+  timer = window.setInterval(liveStep, LIVE_TICK_MS);
+  liveStep();
+  seededKey = "";
+  if (liveClassId) void seedLiveFromSaved(liveClassId, rosterMembers());
 }
-
-els.modeLive.addEventListener("click", () => { if (mode !== "live") setMode("live"); });
-els.modeSim.addEventListener("click", () => { if (mode !== "sim") setMode("sim"); });
-$("#demoExit")?.addEventListener("click", () => setMode("live"));
-els.toggle.addEventListener("click", () => {
-  if (!students.length) createSimStudents();
-  setSimRunning(!timer);
-  if (timer && !tick) simStep();
-});
-els.reset.addEventListener("click", resetSim);
-els.speed.addEventListener("change", () => { if (timer && mode === "sim") setSimRunning(true); });
-els.distract.addEventListener("click", () => {
-  if (!students.length) return;
-  const focusedStudents = students.filter((student) => student.lapse === 0);
-  const target = focusedStudents[Math.floor(Math.random() * focusedStudents.length)] || students[0];
-  target.lapse = 4;
-  if (!timer) setSimRunning(true);
-});
 
 setupChart();
 try { localStorage.removeItem("neuroFocusTeacherMode"); } catch { /* storage unavailable */ }
-setMode("live"); // always open on real data; the simulator is opt-in every time
+startLive();
 // teacher-classes.js may have picked a class before this script started listening.
 void loadSessionHistory();

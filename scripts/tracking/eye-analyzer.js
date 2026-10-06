@@ -61,7 +61,7 @@ if (video) {
     if (!landmarker || busy) return;
     const now = Date.now();
     // The focus timer's break (student-focus.js): keep the camera on, but measure nothing.
-    if (window.neuroFocusOnBreak) {
+    if (window.neuroFocusBreakActive ? window.neuroFocusBreakActive() : window.neuroFocusOnBreak) {
       filter.reset();
       const reading = { timestamp: now, tracking: "break", reason: null, score: null, engagement: null, state: "Break", gazeRatio: null };
       showReading(reading);

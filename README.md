@@ -201,6 +201,29 @@ Run `supabase/migrations/20261009000000_tracking_quality.sql` once in **Supabase
 
 Until it is run, the app still works: unavailable and break samples aren't saved (they show as gaps), and a session's tracked time is its measured time, so its percentage keeps the same meaning. Attendance never depends on any of this.
 
+## Class Posts and Assignments update
+
+Run `supabase/migrations/20261010000000_class_posts_assignments.sql` once in **Supabase Dashboard → SQL Editor**, after the tracking quality update. It is safe to run again and doesn't change any existing table or row.
+
+- **Posts:** the class's teacher publishes announcements; the class's students read them.
+- **Assignments:** title, instructions, optional deadline, optional "marks out of" and an optional attachment. Students upload one file each and can replace it until the deadline. The teacher sees every submission, downloads the files and gives optional marks and feedback.
+- **Privacy:** files go in the private `class-files` bucket (20 MB, documents and images only) and are only opened through one-minute signed links. A student sees only their own submission; classmates and other classes see nothing. Submitting and marking go through `submit_assignment()` and `mark_submission()`, which check membership, the deadline, the student's own folder, the file type and size, and the marks range.
+- Personal notes (`student_notes`) are separate and unchanged.
+
+Until it is run, the Posts and Assignments tabs say the update is needed; everything else keeps working.
+
+## Class Quizzes update
+
+Run `supabase/migrations/20261011000000_class_quizzes.sql` once in **Supabase Dashboard → SQL Editor**, after the Posts and Assignments update. It is safe to run again and doesn't change any existing table or row.
+
+- **Writing:** the class's teacher writes multiple-choice quizzes (2–6 choices per question) with an optional timer per question and an optional leaderboard. Drafts are invisible to students.
+- **Running:** the teacher opens a lobby, students join explicitly from the Quizzes tab, then the teacher starts, reveals each answer (or lets the timer run out) and moves on (`quiz_open_lobby`, `quiz_next_question`, `quiz_close_question`, `quiz_finish`).
+- **Answering and scoring:** `join_quiz()` and `submit_quiz_answer()` check class membership, that the question is the open one, the timer and the choice. Each student answers a question once (a repeat is refused, not double-counted). Scoring is done in the database: 1 point per correct answer, no speed bonus. Attention and focus scores are never used.
+- **What students see:** `quiz_state()` only includes the correct answer and the answer counts once a question has closed; the class's answers are only readable by the teacher. Results are saved; `quiz_results()` gives each student their own summary, and the leaderboard only if the teacher left it on.
+- Class Notes "Quiz Me" is separate and unchanged.
+
+Until it is run, the Quizzes tabs say the update is needed; everything else keeps working.
+
 ## The full class workflow
 
 1. **Teacher creates a class** (`create_class`) and shares the join code.

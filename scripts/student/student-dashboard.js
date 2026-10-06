@@ -156,7 +156,7 @@ if (app) {
         title.textContent = next.item.name;
         sub.textContent = "Your teacher sees your attention score, never your video. Keep your focus session open while class is on.";
         buttons.append(
-          button("Open focus session", "btn-primary", () => window.neuroFocusNavigate?.("focus-session"), "i-timer"),
+          button("Open focus session", "btn-primary", () => window.neuroFocusNavigate?.("focus"), "i-timer"),
           button("Leave session", "btn-action", () => actions().leaveSession?.())
         );
       } else if (next.kind === "live") {
@@ -170,7 +170,7 @@ if (app) {
         kicker.textContent = "Focus session in progress";
         title.textContent = "You’re tracking your focus";
         sub.textContent = "Your camera is on for attention tracking. Video never leaves this device.";
-        buttons.append(button("Open focus session", "btn-primary", () => window.neuroFocusNavigate?.("focus-session"), "i-timer"));
+        buttons.append(button("Open focus session", "btn-primary", () => window.neuroFocusNavigate?.("focus"), "i-timer"));
       } else if (next.kind === "continue") {
         setIcon("i-note");
         kicker.textContent = "Continue studying";
@@ -391,7 +391,7 @@ if (app) {
         if (item.id === classStatus.currentId) {
           row.append(el("span", "current-tag", "✓ Working in this class"));
         } else {
-          const work = button("Work in this class", "btn-action", () => actions().selectClass?.(item.id));
+          const work = button("Open class", "btn-action", () => { window.location.hash = `class/${item.id}`; });
           work.dataset.focusKey = `work-${item.id}`;
           work.setAttribute("aria-label", `Work in ${item.name}`);
           row.append(work);

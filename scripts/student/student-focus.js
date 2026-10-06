@@ -200,16 +200,23 @@ if (app) {
   // An intentional break: the timer's break phase once started (running or paused). The tracker
   // (eye-analyzer.js) marks readings as "break" meanwhile, so they don't count and no nudges show.
   const isOnBreak = () => timer.phase === "break" && (timer.running || timer.remaining < timer.total);
+  // The solo timer is personal: its break never touches a class session's tracking. While the
+  // camera serves a class's live session, readings stay measured and reach the teacher as usual.
+  const inClassSession = () => Boolean(window.neuroFocusClassContext?.().joinedClassId);
+  window.neuroFocusBreakActive = () => isOnBreak() && !inClassSession();
 
   // The state pill at the top of the Focus session page and the tracker card's outline.
   function renderSessionState() {
     const hero = $("#focusHero");
     if (!hero) return;
     const onBreak = isOnBreak();
-    const state = onBreak ? "break" : trackingOn ? "tracking" : timer.running ? "timer" : "idle";
+    // The camera may be running for a class's live session; Solo focus doesn't claim that tracking.
+    const soloTracking = trackingOn && !window.neuroFocusClassContext?.().joinedClassId;
+    const state = onBreak ? "break" : soloTracking ? "tracking" : timer.running ? "timer" : "idle";
     hero.dataset.state = state;
     $("#focusStateTag").textContent = { idle: "Ready", tracking: "Tracking", timer: "Timer on", break: "Break" }[state];
-    $("#focusStateText").textContent = onBreak ? (trackingOn ? "Camera on · rest your eyes" : "Stand up, stretch, drink some water")
+    $("#focusStateText").textContent = trackingOn && !soloTracking ? "Camera in use by your class session"
+      : onBreak ? (trackingOn ? "Camera on · rest your eyes" : "Stand up, stretch, drink some water")
       : trackingOn ? "Camera on · only numbers are kept"
       : timer.running ? "Camera off · timer running"
       : "Camera off";
@@ -242,7 +249,7 @@ if (app) {
       button.tabIndex = chosen ? 0 : -1;
     });
     saveTimer();
-    window.neuroFocusOnBreak = isOnBreak();
+    window.neuroFocusOnBreak = window.neuroFocusBreakActive();
     renderSessionState();
     // The header's focus pill and the Home view show the timer from any page.
     window.neuroFocusTimerState = { phase: timer.phase, remaining: timer.remaining, total: timer.total, running: timer.running, rounds: timer.rounds };
@@ -263,7 +270,7 @@ if (app) {
     if (running) {
       timer.interval = window.setInterval(tickTimer, 1000);
       // After a page refresh the camera stays off until the student starts it again.
-      if (!restoring && timer.phase === "focus" && $("#timerWithTracking").checked) {
+      if (!restoring && timer.phase === "focus" && $("#timerWithTracking").checked && !window.neuroFocusClassContext?.().joinedClassId) {
         window.dispatchEvent(new CustomEvent("neurofocus:start-camera"));
       }
     }
@@ -350,11 +357,9 @@ if (app) {
 
   // The teacher ended the live session this focus session was part of (student-classes.js): the
   // timer stops and the camera turns off. Turning it off saves the session to My progress.
+  // The teacher ended the live session this camera session was part of (student-classes.js): the
+  // camera turns off, which saves the session. The solo timer is separate and keeps its state.
   window.addEventListener("neurofocus:end-focus-session", () => {
-    if (timer.running || timer.remaining < timer.total) {
-      setTimerRunning(false);
-      setPhase("focus");
-    }
     window.dispatchEvent(new CustomEvent("neurofocus:stop-camera"));
   });
 
@@ -428,7 +433,7 @@ if (app) {
     // The timeline lives in the Focus session view and may be drawn while that view is hidden:
     // size it to its box whenever the view is shown.
     window.addEventListener("neurofocus:viewchange", (event) => {
-      if (event.detail?.name === "focus") window.requestAnimationFrame(() => chart?.resize());
+      if (event.detail?.name === "focus" || event.detail?.name === "class") window.requestAnimationFrame(() => chart?.resize());
     });
   } else {
     $("#timelineEmpty").textContent = "Chart library could not load. Check your internet connection and refresh.";
@@ -481,7 +486,7 @@ if (app) {
   // A gentle nudge only when the tracker estimates the student has looked away for a few seconds
   // while it could measure. Never because tracking is unavailable, and never during a break.
   function onLookingAway() {
-    if (!$("#nudgeToggle").checked || Date.now() < snoozeUntil || isOnBreak()) return;
+    if (!$("#nudgeToggle").checked || Date.now() < snoozeUntil || window.neuroFocusBreakActive()) return;
     nudgesShown += 1;
     const task = MICRO_TASKS[Math.floor(Math.random() * MICRO_TASKS.length)];
     const goal = nextGoal();
@@ -534,6 +539,26 @@ if (app) {
     renderSessionState();
   });
 
+  // The tiles, tracker and timeline moved between Solo focus and a class page (student-classes.js,
+  // only while the camera is off): clear them, so neither page shows the other session's readings.
+  function clearLiveDisplay() {
+    resetSession();
+    stats.live.textContent = "—";
+    stats.liveState.textContent = "Start tracking to begin";
+    stats.liveState.dataset.state = "";
+    stats.liveTile.dataset.state = "";
+    stats.liveMeter.style.width = "0%";
+    stats.focus.textContent = "—";
+    stats.tracked.textContent = "0:00 measured";
+    stats.streak.textContent = "0:00";
+    stats.best.textContent = "Best this session: 0:00";
+    stats.lapses.textContent = "0";
+    stats.nudges.textContent = "0 nudges shown";
+    if (toast.el.dataset.kind === "nudge") hideToast();
+    renderSessionState();
+  }
+  window.addEventListener("neurofocus:tracker-moved", clearLiveDisplay);
+
   window.addEventListener("neurofocus:attention-update", (event) => {
     const now = Date.now();
     if (!startedAt) startedAt = now;
@@ -582,16 +607,16 @@ if (app) {
   // Before the tracking-quality database update (supabase/migrations/20261009000000_tracking_quality.sql)
   // the database can't hold that: unavailable and break samples are then left out (gaps), and the
   // summary's tracked time is the usable time, so its focus figure still means the same thing.
+  //
+  // Each saved record is a "part" with its own state: a whole tracking session, or the piece of it
+  // shared with one class's live session. Saves run one at a time (a queue), so two saves never
+  // overlap, and a part's final numbers are taken the moment it ends, so a later session can't
+  // change them. window.neuroFocusSavesDone() resolves once everything queued is saved.
   const SAMPLE_MS = 5000;
   const SAVE_EVERY_MS = 10000;
   const MAX_PENDING = 720; // an hour of samples kept while offline
-  // A saved session belongs to a class (and that class's live session) only while the student
-  // shares with it (student-classes.js); otherwise it is personal history that teachers can't see.
-  // The database refuses class-linked history outside an open live session.
-  const saved = {
-    sessionId: null, creating: null, classId: null, classSessionId: null, pending: [], window: createSampleWindow(),
-    off: false, timer: null, base: null, scoreSum: 0, scoreCount: 0, bestStreakMs: 0, startedAt: 0
-  };
+  let part = null;            // the part being recorded now
+  let saveQueue = Promise.resolve();
   let legacySession = false;  // the database doesn't have the tracking-quality columns yet
   let legacySamples = false;  // ... or doesn't accept unavailable/break samples yet
   const historyStatus = $("#historyStatus");
@@ -604,83 +629,110 @@ if (app) {
   const SETUP_HINT = "History isn’t being saved yet: run the Phase 2 database update (see README).";
   const OFFLINE_TEXT = "You’re offline. Readings are kept on this device and saved when you’re back online.";
 
-  function startSavedSession() {
-    window.clearInterval(saved.timer);
-    Object.assign(saved, {
-      sessionId: null, pending: [], window: createSampleWindow(), off: false,
-      base: session.snapshot(Date.now()), scoreSum: 0, scoreCount: 0, bestStreakMs: 0, startedAt: Date.now()
-    });
-    saved.classId = window.neuroFocusSharingClassId || null;
-    saved.classSessionId = saved.classId ? window.neuroFocusSharingSessionId || null : null;
-    const insert = async (row) => {
-      const full = legacySession ? row : { ...row, tracking_version: 2 };
-      let result = await app.supabase.from("attention_sessions").insert(full).select("id").single();
-      if (!legacySession && missingQualityColumns(result.error)) {
-        legacySession = true;
-        result = await app.supabase.from("attention_sessions").insert(row).select("id").single();
-      }
-      return result;
-    };
-    saved.creating = insert({ class_id: saved.classId, class_session_id: saved.classSessionId })
-      .then(async (result) => {
-        // Before the live-workflow database update there is no class_session_id column.
-        if (result.error && /class_session_id/.test(result.error.message || "")) result = await insert({ class_id: saved.classId });
-        // Not allowed to share (the session just ended, or the teacher removed this student):
-        // keep the history, but as personal history.
-        if (result.error && saved.classId && (result.error.code === "42501" || /row-level security/i.test(result.error.message || ""))) {
-          saved.classId = null;
-          saved.classSessionId = null;
-          result = await insert({ class_id: null });
-        }
-        return result;
-      })
-      .then(({ data, error }) => {
-        if (error) throw error;
-        saved.sessionId = data.id;
-        setHistoryStatus("Recording this session. It appears here when you stop tracking.");
-        return data.id;
-      })
-      .catch((error) => {
-        saved.off = true;
-        setHistoryStatus(missingTables(error) ? SETUP_HINT : navigator.onLine === false ? "You’re offline, so this session couldn’t be saved." : "This session couldn’t be saved. Check your connection.", true);
-        console.warn("Could not start a saved attention session", error);
-        return null;
-      });
-    saved.timer = window.setInterval(() => { void saveProgress(); }, SAVE_EVERY_MS);
+  // Runs a save after every save already queued.
+  function enqueue(task) {
+    saveQueue = saveQueue.then(task).catch((error) => console.warn("Saving attention history failed", error));
+    return saveQueue;
+  }
+  window.neuroFocusSavesDone = () => saveQueue;
+
+  async function insertSession(row) {
+    const full = legacySession ? row : { ...row, tracking_version: 2 };
+    let result = await app.supabase.from("attention_sessions").insert(full).select("id").single();
+    if (!legacySession && missingQualityColumns(result.error)) {
+      legacySession = true;
+      result = await app.supabase.from("attention_sessions").insert(row).select("id").single();
+    }
+    return result;
   }
 
-  function closeSampleWindow() {
-    const row = saved.window.close();
+  // A saved part belongs to a class (and that class's live session) only while the student shares
+  // with it (student-classes.js); otherwise it is personal history that teachers can't see.
+  // The database refuses class-linked history outside an open live session.
+  function startPart() {
+    const p = {
+      sessionId: null, creating: null, pending: [], window: createSampleWindow(), off: false, timer: null, ended: false,
+      base: session.snapshot(Date.now()), scoreSum: 0, scoreCount: 0, bestStreakMs: 0, startedAt: Date.now(), final: null,
+      classId: window.neuroFocusSharingClassId || null
+    };
+    p.classSessionId = p.classId ? window.neuroFocusSharingSessionId || null : null;
+    // The record is created after any earlier part has finished saving.
+    p.creating = saveQueue.then(async () => {
+      let result = await insertSession({ class_id: p.classId, class_session_id: p.classSessionId });
+      // Before the live-workflow database update there is no class_session_id column.
+      if (result.error && /class_session_id/.test(result.error.message || "")) result = await insertSession({ class_id: p.classId });
+      // Not allowed to share (the session just ended, or the teacher removed this student):
+      // keep the history, but as personal history.
+      if (result.error && p.classId && (result.error.code === "42501" || /row-level security/i.test(result.error.message || ""))) {
+        p.classId = null;
+        p.classSessionId = null;
+        result = await insertSession({ class_id: null });
+      }
+      if (result.error) throw result.error;
+      p.sessionId = result.data.id;
+      if (!p.ended) setHistoryStatus("Recording this session. It appears here when you stop tracking.");
+      return p.sessionId;
+    }).catch((error) => {
+      p.off = true;
+      setHistoryStatus(missingTables(error) ? SETUP_HINT : navigator.onLine === false ? "You’re offline, so this session couldn’t be saved." : "This session couldn’t be saved. Check your connection.", true);
+      console.warn("Could not start a saved attention session", error);
+      return null;
+    });
+    p.timer = window.setInterval(() => { if (!p.ended) enqueue(() => saveProgress(p)); }, SAVE_EVERY_MS);
+    part = p;
+    return p;
+  }
+
+  // Ends a part: its last sample and final numbers are fixed now, then the final save is queued.
+  function endPart(p) {
+    if (!p || p.ended) return saveQueue;
+    p.ended = true;
+    window.clearInterval(p.timer);
+    closeSampleWindow(p);
+    p.final = partSummary(p, Date.now());
+    if (part === p) part = null;
+    return enqueue(() => saveProgress(p)).then(() => {
+      // student-history.js reloads My progress.
+      window.dispatchEvent(new CustomEvent("neurofocus:history-saved"));
+    });
+  }
+
+  function closeSampleWindow(p) {
+    const row = p.window.close();
     if (!row) return;
-    saved.pending.push(row);
-    if (saved.pending.length > MAX_PENDING) saved.pending.splice(0, saved.pending.length - MAX_PENDING);
+    p.pending.push(row);
+    if (p.pending.length > MAX_PENDING) p.pending.splice(0, p.pending.length - MAX_PENDING);
   }
 
   function recordSample(now, raw) {
-    if (!saved.creating || saved.off) return;
+    const p = part;
+    if (!p || p.off || p.ended) return;
     const reading = normalizeReading(raw);
     if (reading.tracking === "active") {
-      saved.scoreSum += reading.score;
-      saved.scoreCount += 1;
+      p.scoreSum += reading.score;
+      p.scoreCount += 1;
     }
-    saved.bestStreakMs = Math.max(saved.bestStreakMs, session.snapshot(now).streakMs);
-    saved.window.add(reading, now);
-    if (now - saved.window.start >= SAMPLE_MS) closeSampleWindow();
+    p.bestStreakMs = Math.max(p.bestStreakMs, session.snapshot(now).streakMs);
+    p.window.add(reading, now);
+    if (now - p.window.start >= SAMPLE_MS) closeSampleWindow(p);
   }
 
-  // This saved part's numbers: the session's numbers since this part started.
-  function partSummary(now) {
+  // A part's numbers: the session's numbers since the part started.
+  function partSummary(p, now) {
     const snap = session.snapshot(now);
-    const base = saved.base || { usableMs: 0, unavailableMs: 0, breakMs: 0, onScreenMs: 0, episodes: 0 };
+    const base = p.base || { usableMs: 0, unavailableMs: 0, breakMs: 0, onScreenMs: 0, episodes: 0 };
     const usableMs = Math.max(0, snap.usableMs - base.usableMs);
     const onScreenMs = Math.max(0, snap.onScreenMs - base.onScreenMs);
     return {
-      totalMs: Math.max(0, now - saved.startedAt),
+      totalMs: Math.max(0, now - p.startedAt),
       usableMs,
       unavailableMs: Math.max(0, snap.unavailableMs - base.unavailableMs),
       breakMs: Math.max(0, snap.breakMs - base.breakMs),
       focusPercent: usableMs >= 10000 ? Math.round((onScreenMs / usableMs) * 100) : null,
-      episodes: Math.max(0, snap.episodes - base.episodes)
+      episodes: Math.max(0, snap.episodes - base.episodes),
+      averageScore: p.scoreCount ? Math.round(p.scoreSum / p.scoreCount) : null,
+      bestStreakMs: p.bestStreakMs,
+      endedAt: new Date(now).toISOString()
     };
   }
 
@@ -695,72 +747,70 @@ if (app) {
     return error;
   }
 
-  async function saveProgress(final = false) {
-    if (!saved.creating || saved.off) return;
-    if (final) closeSampleWindow();
-    const sessionId = saved.sessionId ?? await saved.creating;
+  // One save of one part (always run through the queue).
+  async function saveProgress(p) {
+    if (!p || p.off) return;
+    const sessionId = p.sessionId ?? await p.creating;
     if (!sessionId) return;
-    const rows = saved.pending.splice(0).map((row) => ({ ...row, session_id: sessionId, class_id: saved.classId }));
+    const rows = p.pending.splice(0).map((row) => ({ ...row, session_id: sessionId, class_id: p.classId }));
     if (rows.length) {
       const error = await insertSamples(rows);
       if (error) {
-        saved.pending.unshift(...rows.map(({ recorded_at, score, state }) => ({ recorded_at, score, state })));
+        p.pending.unshift(...rows.map(({ recorded_at, score, state }) => ({ recorded_at, score, state })));
         setHistoryStatus(navigator.onLine === false ? OFFLINE_TEXT : "Couldn’t save the latest readings. Retrying…", true);
+        if (p.ended) window.setTimeout(() => enqueue(() => saveProgress(p)), SAVE_EVERY_MS); // keep trying the final save
         return;
       }
     }
-    const part = partSummary(Date.now());
+    const numbers = p.final || partSummary(p, Date.now());
     const seconds = (ms) => Math.min(86400, Math.round(ms / 1000));
     const summary = {
-      last_seen_at: new Date().toISOString(),
-      average_score: saved.scoreCount ? Math.round(saved.scoreSum / saved.scoreCount) : null,
-      focus_percent: part.focusPercent,
-      lapses: part.episodes,
-      best_streak_seconds: seconds(saved.bestStreakMs),
-      ...(final ? { ended_at: new Date().toISOString() } : {})
+      last_seen_at: p.final ? p.final.endedAt : new Date().toISOString(),
+      average_score: numbers.averageScore,
+      focus_percent: numbers.focusPercent,
+      lapses: numbers.episodes,
+      best_streak_seconds: seconds(numbers.bestStreakMs),
+      ...(p.final ? { ended_at: p.final.endedAt } : {})
     };
-    const quality = { tracked_seconds: seconds(part.totalMs), usable_seconds: seconds(part.usableMs), unavailable_seconds: seconds(part.unavailableMs), break_seconds: seconds(part.breakMs) };
+    const quality = { tracked_seconds: seconds(numbers.totalMs), usable_seconds: seconds(numbers.usableMs), unavailable_seconds: seconds(numbers.unavailableMs), break_seconds: seconds(numbers.breakMs) };
     const update = (fields) => app.supabase.from("attention_sessions").update(fields).eq("id", sessionId);
-    let { error } = await update(legacySession ? { ...summary, tracked_seconds: seconds(part.usableMs) } : { ...summary, ...quality });
+    let { error } = await update(legacySession ? { ...summary, tracked_seconds: seconds(numbers.usableMs) } : { ...summary, ...quality });
     if (error && !legacySession && missingQualityColumns(error)) {
       legacySession = true;
-      ({ error } = await update({ ...summary, tracked_seconds: seconds(part.usableMs) }));
+      ({ error } = await update({ ...summary, tracked_seconds: seconds(numbers.usableMs) }));
     }
-    if (error) setHistoryStatus(navigator.onLine === false ? OFFLINE_TEXT : "Couldn’t update the session summary. Retrying…", true);
-    else setHistoryStatus(final ? "Latest session saved." : "Recording this session. It appears here when you stop tracking.");
+    if (error) {
+      setHistoryStatus(navigator.onLine === false ? OFFLINE_TEXT : "Couldn’t update the session summary. Retrying…", true);
+      if (p.ended) window.setTimeout(() => enqueue(() => saveProgress(p)), SAVE_EVERY_MS);
+    } else if (p.final) {
+      p.saved = true;
+      if (!part) setHistoryStatus("Latest session saved.");
+    } else setHistoryStatus("Recording this session. It appears here when you stop tracking.");
   }
 
   // A saved session that hasn't finished yet: the one this page is recording right now, or one
   // still being saved from another tab or device (progress is saved every 10 seconds, so it was
   // updated in the last 90). My progress (student-history.js) and Home leave these out of history.
-  window.neuroFocusSessionInProgress = (session) => !session.ended_at && (
-    (saved.creating !== null && session.id === saved.sessionId)
-    || Date.now() - new Date(session.last_seen_at || session.started_at) < 90000
+  window.neuroFocusSessionInProgress = (row) => !row.ended_at && (
+    (part !== null && row.id === part.sessionId)
+    || Date.now() - new Date(row.last_seen_at || row.started_at) < 90000
   );
 
-  window.addEventListener("neurofocus:tracking-started", startSavedSession);
-  // Joining or leaving a live session mid-tracking closes this saved session and starts a new one.
-  window.addEventListener("neurofocus:sharing-change", async (event) => {
+  window.addEventListener("neurofocus:tracking-started", () => { startPart(); });
+  // Joining or leaving a live session mid-tracking ends this part and starts a new one.
+  window.addEventListener("neurofocus:sharing-change", (event) => {
     const next = event.detail?.classId || null;
     const nextSession = event.detail?.sessionId || null;
-    if (!saved.creating || saved.off || (next === saved.classId && nextSession === saved.classSessionId)) return;
-    window.clearInterval(saved.timer);
-    await saveProgress(true);
-    startSavedSession();
-    // The finished part (e.g. a live session that just ended) shows in Focus history right away.
-    window.dispatchEvent(new CustomEvent("neurofocus:history-saved"));
+    if (!part || part.off || (next === part.classId && nextSession === part.classSessionId)) return;
+    endPart(part);
+    startPart();
   });
   window.addEventListener("neurofocus:attention-update", (event) => recordSample(Date.now(), event.detail));
-  window.addEventListener("neurofocus:tracking-stopped", async () => {
-    window.clearInterval(saved.timer);
-    await saveProgress(true);
-    saved.creating = null;
-    // student-history.js reloads the Focus history view.
-    window.dispatchEvent(new CustomEvent("neurofocus:history-saved"));
-  });
+  // The camera stopped: the part's final numbers are fixed right away (synchronously), then saved.
+  window.addEventListener("neurofocus:tracking-stopped", () => { endPart(part); });
   // Back online: save what was kept meanwhile.
-  window.addEventListener("online", () => { void saveProgress(); });
-  window.addEventListener("offline", () => { if (saved.creating) setHistoryStatus(OFFLINE_TEXT, true); });
+  window.addEventListener("online", () => { if (part) enqueue(() => saveProgress(part)); });
+  window.addEventListener("offline", () => { if (part) setHistoryStatus(OFFLINE_TEXT, true); });
 
   // ---------- Study assistant quick prompts ----------
   document.querySelectorAll("[data-tutor-prompt]").forEach((chip) => {

@@ -260,5 +260,176 @@ ok("another student sees only their own classes' teachers", JSON.stringify(await
 ok("students still can't read teacher profile rows", (await rows(S1, "select 1 from public.profiles where id = $1", [T1])).length === 0);
 ok("signed-out visitors can't list teachers", !(await tryQ(null, "select * from public.my_class_teachers()")).ok);
 
+console.log("\n— Class posts —");
+const post = await tryQ(T1, "insert into public.class_posts (class_id, title, body) values ($1, 'Welcome', 'Quiz on Friday') returning id", [C1.id]);
+ok("teacher posts an announcement in their class", post.ok, post.error || "");
+ok("class members read it", (await rows(S1, "select body from public.class_posts")).some((r) => r.body === "Quiz on Friday"));
+ok("students of other classes and other teachers don't", (await rows(S3, "select 1 from public.class_posts")).length === 0 && (await rows(T2, "select 1 from public.class_posts")).length === 0);
+ok("students can't post", !(await tryQ(S1, "insert into public.class_posts (class_id, body) values ($1, 'hi')", [C1.id])).ok);
+ok("another teacher can't post in this class", !(await tryQ(T2, "insert into public.class_posts (class_id, body) values ($1, 'hi')", [C1.id])).ok);
+ok("a post can't be written as someone else", !(await tryQ(T1, "insert into public.class_posts (class_id, author_id, body) values ($1, $2, 'hi')", [C1.id, T2])).ok);
+ok("students can't edit or delete posts", (await tryQ(S1, "update public.class_posts set body = 'x'")).affected === 0 && (await tryQ(S1, "delete from public.class_posts")).affected === 0);
+ok("an empty post is refused", !(await tryQ(T1, "insert into public.class_posts (class_id, body) values ($1, '   ')", [C1.id])).ok);
+ok("students' personal notes stay private (posts are a separate table)", (await rows(T1, "select 1 from public.student_notes")).length === 0);
+
+console.log("\n— Assignments —");
+const newAssignment = async (uid, classId, title, due, max = null) => tryQ(uid, "insert into public.assignments (class_id, title, instructions, due_at, max_marks) values ($1, $2, 'Read chapter 4', $3, $4) returning id", [classId, title, due, max]);
+const open = await newAssignment(T1, C1.id, "Cells essay", new Date(Date.now() + 86400000).toISOString(), 10);
+ok("teacher creates an assignment with a deadline and marks out of 10", open.ok, open.error || "");
+const A1 = open.rows?.[0]?.id;
+const closedA = await newAssignment(T1, C1.id, "Old worksheet", new Date(Date.now() - 3600000).toISOString());
+const A2 = closedA.rows?.[0]?.id;
+ok("students can't create assignments", !(await newAssignment(S1, C1.id, "Mine", null)).ok);
+ok("another teacher can't add one to this class", !(await newAssignment(T2, C1.id, "Theirs", null)).ok);
+ok("class members see the class's assignments", (await rows(S2, "select id from public.assignments")).length === 2);
+ok("students of other classes don't", (await rows(S3, "select id from public.assignments")).length === 0);
+ok("students can't change an assignment", (await tryQ(S1, "update public.assignments set due_at = null")).affected === 0);
+// Attachment: only in that assignment's own folder, uploaded by the teacher.
+const attachPath = `${C1.id}/assignments/${A1}/guide.pdf`;
+const putFile = (uid, name) => tryQ(uid, "insert into storage.objects (bucket_id, name) values ('class-files', $1) returning id", [name]);
+ok("teacher uploads an attachment", (await putFile(T1, attachPath)).ok);
+ok("students can't upload attachments", !(await putFile(S1, `${C1.id}/assignments/${A1}/fake.pdf`)).ok);
+ok("teacher saves the attachment on the assignment", (await tryQ(T1, "update public.assignments set attachment_path = $2, attachment_name = 'guide.pdf', attachment_size = 1000, attachment_type = 'application/pdf' where id = $1", [A1, attachPath])).affected === 1);
+ok("an attachment from another folder is refused", !(await tryQ(T1, "update public.assignments set attachment_path = $2 where id = $1", [A1, `${C1.id}/assignments/${A2}/other.pdf`])).ok);
+const seesFile = async (uid, name) => (await rows(uid, "select name from storage.objects where bucket_id = 'class-files'")).some((r) => r.name === name);
+ok("class members can read the attachment", await seesFile(S1, attachPath));
+ok("students of other classes can't", !(await seesFile(S3, attachPath)) && !(await seesFile(T2, attachPath)));
+
+console.log("\n— Submissions —");
+const subPath = (studentId, assignmentId, file) => `${C1.id}/submissions/${assignmentId}/${studentId}/${file}`;
+const submit = (uid, assignmentId, path, name = "essay.pdf", size = 2048, type = "application/pdf") =>
+  tryQ(uid, "select public.submit_assignment($1, $2, $3, $4, $5) as r", [assignmentId, path, name, size, type]);
+const s1First = subPath(S1, A1, "a-essay.pdf");
+ok("student uploads into their own submission folder", (await putFile(S1, s1First)).ok);
+ok("student can't upload into a classmate's folder", !(await putFile(S1, subPath(S2, A1, "x.pdf"))).ok);
+ok("student of another class can't upload here", !(await putFile(S3, subPath(S3, A1, "x.pdf"))).ok);
+ok("nobody can upload after the deadline", !(await putFile(S1, subPath(S1, A2, "late.pdf"))).ok);
+const first = await submit(S1, A1, s1First);
+ok("student submits their file", first.ok && first.rows[0].r.submission.file_name === "essay.pdf", first.error || "");
+const s1Second = subPath(S1, A1, "b-essay.pdf");
+await putFile(S1, s1Second);
+const second = await submit(S1, A1, s1Second, "essay-v2.pdf");
+ok("replacing before the deadline keeps one submission and returns the old file to remove", second.ok && second.rows[0].r.previous_path === s1First
+  && (await db.query("select count(*)::int n from public.assignment_submissions where assignment_id = $1 and student_id = $2", [A1, S1])).rows[0].n === 1);
+ok("student removes their replaced file", (await tryQ(S1, "delete from storage.objects where name = $1", [s1First])).affected === 1);
+ok("submitting a file that wasn't uploaded is refused", !(await submit(S1, A1, subPath(S1, A1, "missing.pdf"))).ok);
+ok("submitting someone else's file is refused", !(await submit(S2, A1, s1Second)).ok);
+ok("a disallowed file type is refused", !(await submit(S1, A1, s1Second, "virus.exe", 100, "application/x-msdownload")).ok);
+ok("a file over 20 MB is refused", !(await submit(S1, A1, s1Second, "huge.pdf", 30 * 1024 * 1024)).ok);
+ok("submitting after the deadline is refused", !(await submit(S1, A2, subPath(S1, A2, "late.pdf"))).ok);
+ok("teachers can't submit", !(await submit(T1, A1, s1Second)).ok);
+ok("students of other classes can't submit", !(await submit(S3, A1, s1Second)).ok);
+ok("submission rows can't be written directly", !(await tryQ(S1, "insert into public.assignment_submissions (assignment_id, class_id, student_id, file_path, file_name, file_size, file_type) values ($1, $2, $3, 'x', 'x.pdf', 1, 'application/pdf')", [A1, C1.id, S1])).ok
+  && !(await tryQ(S1, "update public.assignment_submissions set marks = 10")).ok);
+const s2Path = subPath(S2, A1, "s2.pdf");
+await putFile(S2, s2Path);
+await submit(S2, A1, s2Path, "mine.pdf");
+ok("a student sees only their own submission", JSON.stringify((await rows(S1, "select student_id from public.assignment_submissions")).map((r) => r.student_id)) === JSON.stringify([S1]));
+ok("a student can't open a classmate's file", !(await seesFile(S2, s1Second)) && await seesFile(S1, s1Second));
+ok("a classmate can't delete someone's file", (await tryQ(S2, "delete from storage.objects where name = $1", [s1Second])).affected === 0);
+ok("the class's teacher sees every submission and file", (await rows(T1, "select 1 from public.assignment_submissions")).length === 2 && await seesFile(T1, s1Second) && await seesFile(T1, s2Path));
+ok("other teachers and other classes see none", (await rows(T2, "select 1 from public.assignment_submissions")).length === 0 && !(await seesFile(T2, s1Second)) && !(await seesFile(S3, s1Second)));
+
+console.log("\n— Marks and feedback —");
+const subId = (await rows(T1, "select id from public.assignment_submissions where student_id = $1", [S1]))[0].id;
+const mark = (uid, marks, feedback) => tryQ(uid, "select public.mark_submission($1, $2, $3) as r", [subId, marks, feedback]);
+ok("teacher gives marks and feedback", (await mark(T1, 8.5, "Clear and well argued.")).ok);
+ok("the student sees their marks and feedback", (await rows(S1, "select marks, feedback from public.assignment_submissions"))[0]?.feedback === "Clear and well argued." && Number((await rows(S1, "select marks from public.assignment_submissions"))[0]?.marks) === 8.5);
+ok("marks above the assignment's maximum are refused", !(await mark(T1, 11, null)).ok);
+ok("negative marks are refused", !(await mark(T1, -1, null)).ok);
+ok("feedback without marks is allowed", (await mark(T1, null, "See me after class.")).ok);
+ok("students can't mark", !(await mark(S1, 10, "self-marked")).ok);
+ok("another teacher can't mark", !(await mark(T2, 10, null)).ok);
+ok("a classmate can't read the feedback", (await rows(S2, "select feedback from public.assignment_submissions where student_id = $1", [S1])).length === 0);
+
+console.log("\n— Quizzes: drafts and questions —");
+const quizIns = await tryQ(T1, "insert into public.quizzes (class_id, title, time_limit_seconds, show_leaderboard) values ($1, 'Cells quiz', 30, true) returning id", [C1.id]);
+ok("teacher creates a quiz draft", quizIns.ok, quizIns.error || "");
+const Q = quizIns.rows?.[0]?.id;
+const addQ = (uid, pos, prompt, options, correct) => tryQ(uid, "insert into public.quiz_questions (quiz_id, position, prompt, options, correct_index) values ($1, $2, $3, $4, $5) returning id", [Q, pos, prompt, options, correct]);
+const q1 = (await addQ(T1, 0, "Powerhouse of the cell?", ["Nucleus", "Mitochondria", "Ribosome"], 1)).rows?.[0]?.id;
+const q2 = (await addQ(T1, 1, "Holds DNA?", ["Nucleus", "Membrane"], 0)).rows?.[0]?.id;
+ok("teacher adds questions", Boolean(q1 && q2));
+ok("a question needs at least two choices", !(await addQ(T1, 2, "Bad", ["Only one"], 0)).ok);
+ok("the correct choice must be one of the choices", !(await addQ(T1, 2, "Bad", ["A", "B"], 5)).ok);
+ok("students can't add questions", !(await addQ(S1, 2, "Mine", ["A", "B"], 0)).ok);
+ok("another teacher can't create a quiz in this class", !(await tryQ(T2, "insert into public.quizzes (class_id, title) values ($1, 'x')", [C1.id])).ok);
+ok("a quiz can't be created already running", !(await tryQ(T1, "insert into public.quizzes (class_id, title, status) values ($1, 'x', 'live')", [C1.id])).ok);
+ok("students can't see a draft", (await rows(S1, "select 1 from public.quizzes")).length === 0);
+ok("students can never read questions or answers directly", (await rows(S1, "select 1 from public.quiz_questions")).length === 0);
+ok("students can't read a draft's state either", !(await tryQ(S1, "select public.quiz_state($1)", [Q])).ok);
+ok("students can't start the quiz", !(await tryQ(S1, "select public.quiz_open_lobby($1)", [Q])).ok);
+ok("another teacher can't start it", !(await tryQ(T2, "select public.quiz_open_lobby($1)", [Q])).ok);
+ok("a teacher can't jump a draft to running directly", (await tryQ(T1, "update public.quizzes set status = 'live' where id = $1", [Q])).ok === false);
+
+console.log("\n— Quizzes: lobby and joining —");
+ok("teacher opens the lobby", (await tryQ(T1, "select public.quiz_open_lobby($1)", [Q])).ok);
+ok("questions can't be changed once opened", (await tryQ(T1, "update public.quiz_questions set correct_index = 0 where id = $1", [q1])).affected === 0);
+ok("class members now see the quiz", (await rows(S1, "select id from public.quizzes")).some((r) => r.id === Q));
+ok("students of other classes don't", (await rows(S3, "select 1 from public.quizzes")).length === 0 && !(await tryQ(S3, "select public.quiz_state($1)", [Q])).ok);
+ok("a student of another class can't join", !(await tryQ(S3, "select public.join_quiz($1)", [Q])).ok);
+ok("teachers can't join as players", !(await tryQ(T1, "select public.join_quiz($1)", [Q])).ok);
+ok("students join explicitly", (await tryQ(S1, "select public.join_quiz($1)", [Q])).ok && (await tryQ(S2, "select public.join_quiz($1)", [Q])).ok);
+ok("joining again (a reconnect) is harmless", (await tryQ(S1, "select public.join_quiz($1)", [Q])).ok
+  && (await db.query("select count(*)::int n from public.quiz_participants where quiz_id = $1", [Q])).rows[0].n === 2);
+ok("students can't add themselves to participants directly", !(await tryQ(S1, "insert into public.quiz_participants (quiz_id, student_id) values ($1, $2)", [Q, S1])).ok);
+const stateOf = async (uid) => (await rows(uid, "select public.quiz_state($1) as s", [Q]))[0].s;
+ok("the teacher sees who joined", JSON.stringify((await stateOf(T1)).participant_names) === JSON.stringify(["Sam Rivera", "Student Two"]), JSON.stringify((await stateOf(T1)).participant_names));
+ok("students don't see the list of who joined", (await stateOf(S1)).participant_names === null);
+
+console.log("\n— Quizzes: answering —");
+ok("answering in the lobby is refused", !(await tryQ(S1, "select public.submit_quiz_answer($1, $2, 1)", [Q, q1])).ok);
+ok("teacher shows the first question", (await tryQ(T1, "select public.quiz_next_question($1)", [Q])).ok);
+const s1Live = await stateOf(S1);
+ok("students see the question and choices", s1Live.question?.prompt === "Powerhouse of the cell?" && s1Live.question.options.length === 3);
+ok("the correct choice is hidden while the question is open", s1Live.question.correct_index === null && s1Live.question.counts === null);
+ok("the teacher sees the correct choice", (await stateOf(T1)).question.correct_index === 1);
+const answer = (uid, qid, choice) => tryQ(uid, "select public.submit_quiz_answer($1, $2, $3) as r", [Q, qid, choice]);
+const a1 = await answer(S1, q1, 1);
+ok("a student answers", a1.ok && a1.rows[0].r.accepted === true);
+const again = await answer(S1, q1, 0);
+ok("a second answer is ignored and the first kept", again.ok && again.rows[0].r.accepted === false && again.rows[0].r.choice === 1
+  && (await db.query("select count(*)::int n from public.quiz_answers where question_id = $1 and student_id = $2", [q1, S1])).rows[0].n === 1);
+ok("an invalid choice is refused", !(await answer(S2, q1, 7)).ok);
+ok("answering a question that isn't showing is refused", !(await answer(S2, q2, 0)).ok);
+ok("a student of another class can't answer", !(await answer(S3, q1, 1)).ok);
+ok("answers can't be written directly", !(await tryQ(S2, "insert into public.quiz_answers (quiz_id, question_id, student_id, choice, is_correct, points) values ($1, $2, $3, 1, true, 100)", [Q, q1, S2])).ok);
+ok("students can't read anyone's answers directly", (await rows(S1, "select 1 from public.quiz_answers")).length === 0);
+// The timer runs out (moved into the past here): answers are refused and the answer is revealed.
+await db.query("update public.quizzes set question_closes_at = now() - interval '1 second' where id = $1", [Q]);
+ok("answering after the timer ran out is refused", !(await answer(S2, q1, 1)).ok);
+const s1Closed = await stateOf(S1);
+ok("once closed, students see the correct choice and how everyone answered", s1Closed.question.correct_index === 1 && JSON.stringify(s1Closed.question.counts) === "[0,1,0]" && s1Closed.question.my_correct === true);
+ok("students can't move the quiz on", !(await tryQ(S1, "select public.quiz_next_question($1)", [Q])).ok);
+ok("teacher shows the next question", (await tryQ(T1, "select public.quiz_next_question($1)", [Q])).ok);
+ok("moving on before revealing is refused", !(await tryQ(T1, "select public.quiz_next_question($1)", [Q])).ok);
+ok("one student answers the second question (wrongly)", (await answer(S1, q2, 1)).ok);
+ok("teacher reveals it", (await tryQ(T1, "select public.quiz_close_question($1)", [Q])).ok);
+ok("a new answer after the reveal is refused", !(await answer(S2, q2, 0)).ok);
+ok("after the last question, Next finishes the quiz", (await tryQ(T1, "select public.quiz_next_question($1)", [Q])).ok && (await stateOf(T1)).quiz.status === "finished");
+
+console.log("\n— Quizzes: results —");
+const resultsOf = async (uid) => (await rows(uid, "select public.quiz_results($1) as r", [Q]))[0].r;
+const r1 = await resultsOf(S1);
+ok("scores are worked out by the database: 1 point per correct answer", r1.mine.score === 1 && r1.mine.answered === 2 && r1.question_count === 2);
+ok("a student's summary shows their answers and the correct ones", r1.mine.questions.length === 2 && r1.mine.questions[0].correct === true && r1.mine.questions[1].correct === false && r1.mine.questions[1].correct_index === 0);
+ok("with the leaderboard on, students see it after the quiz", r1.leaderboard.length === 2 && r1.leaderboard.some((r) => r.is_me) && r1.leaderboard.every((r) => r.student_id === null));
+const r2 = await resultsOf(S2);
+ok("the other student's score is right too (missed by the timer, then too late)", r2.mine.score === 0 && r2.mine.answered === 0);
+ok("the teacher sees every student's score", (await resultsOf(T1)).leaderboard.map((r) => r.score).sort().join() === "0,1");
+ok("students of other classes can't see results", !(await tryQ(S3, "select public.quiz_results($1)", [Q])).ok);
+// Without a leaderboard, students only see their own result.
+const quiet = (await rows(T1, "insert into public.quizzes (class_id, title, show_leaderboard) values ($1, 'Quiet quiz', false) returning id", [C1.id]))[0].id;
+await rows(T1, "insert into public.quiz_questions (quiz_id, position, prompt, options, correct_index) values ($1, 0, 'Q', '{A,B}', 0)", [quiet]);
+await rows(T1, "select public.quiz_open_lobby($1)", [quiet]);
+await rows(S1, "select public.join_quiz($1)", [quiet]);
+await rows(T1, "select public.quiz_next_question($1)", [quiet]);
+const quietQ = (await db.query("select id from public.quiz_questions where quiz_id = $1", [quiet])).rows[0].id;
+ok("a class member who didn't join can't answer", !(await tryQ(S2, "select public.submit_quiz_answer($1, $2, 0)", [quiet, quietQ])).ok);
+await rows(T1, "select public.quiz_close_question($1)", [quiet]);
+await rows(T1, "select public.quiz_finish($1)", [quiet]);
+ok("with the leaderboard off, students see only their own result", (await rows(S1, "select public.quiz_results($1) as r", [quiet]))[0].r.leaderboard === null);
+ok("quiz points have nothing to do with attention: no attention tables are touched", (await db.query("select count(*)::int n from public.quiz_answers where points > 1")).rows[0].n === 0);
+
 console.log(failures ? `\n${failures} CHECK(S) FAILED` : "\nALL CHECKS PASSED");
 process.exitCode = failures ? 1 : 0;

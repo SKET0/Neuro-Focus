@@ -15,7 +15,7 @@ if (app) {
   const $ = (selector) => document.querySelector(selector);
   const selectedKey = "neuroFocusCurrentClassId";
   const liveKey = `neuroFocusLiveSession:${app.user.id}`;
-  const TABS = ["live", "students", "attendance", "history", "settings"];
+  const TABS = ["live", "posts", "assignments", "quizzes", "students", "attendance", "history", "settings"];
   const REMOVED_NOTICE_MS = 2 * 60 * 1000; // removed students are told within this window
   const SHARING_STALE_MS = 6000;
   const SETUP_TEXT = "Run the class management database update first (see README).";
@@ -26,8 +26,13 @@ if (app) {
   let selectedId = "";
   let view = "classes";             // "classes" (Home), "class" (one class), "profile" (My profile),
                                    // "all-students" or "report" (attendance across classes, teacher-overview.js)
-  const OVERVIEWS = { "all-students": { address: "#students", label: "All students" }, report: { address: "#attendance-report", label: "Attendance report" } };
-  const NAV_FOR_VIEW = { "all-students": "all-students", report: "attendance-report" };
+  // The Demo (teacher-demo.js) is a separate page with sample data only.
+  const OVERVIEWS = {
+    "all-students": { address: "#students", label: "All students" },
+    report: { address: "#attendance-report", label: "Attendance report" },
+    demo: { address: "#demo", label: "Demo — sample data" }
+  };
+  const NAV_FOR_VIEW = { "all-students": "all-students", report: "attendance-report", demo: "demo" };
   let tab = "live";
   let hasClassSettings = true;     // false until the class management SQL has been run
   let newIds = new Set();          // roster rows to highlight once
@@ -749,6 +754,9 @@ if (app) {
     $("#profileView").hidden = !inProfile;
     $("#allStudentsView").hidden = overview !== "all-students";
     $("#reportView").hidden = overview !== "report";
+    $("#demoView").hidden = overview !== "demo";
+    // Exports are for real data only: no export button while the Demo is open.
+    document.querySelectorAll("[data-export-report]").forEach((button) => { button.hidden = overview === "demo"; });
     renderSidebarClasses();
     syncAddress();
     document.querySelectorAll("[data-nav]").forEach((button) => {
@@ -759,7 +767,7 @@ if (app) {
         else button.removeAttribute("aria-current");
       }
     });
-    const names = { live: "Live monitor", students: "Master list", attendance: "Attendance", history: "History", settings: "Settings" };
+    const names = { live: "Live monitor", posts: "Posts", assignments: "Assignments", quizzes: "Quizzes", students: "Master list", attendance: "Attendance", history: "History", settings: "Settings" };
     renderCrumbs(overview ? [{ label: OVERVIEWS[overview].label }]
       : inProfile ? [{ label: "My profile" }]
       : inClass ? [{ label: selected().name, go: () => openClass(selectedId, "live") }, { label: names[tab] }]
@@ -865,6 +873,7 @@ if (app) {
     if (hash === "profile" || hash === "profile-appearance") showProfile(hash === "profile" ? "" : hash);
     else if (hash === "all-students") showOverview("all-students");
     else if (hash === "attendance-report") showOverview("report");
+    else if (hash === "demo") showOverview("demo");
     else showClasses();
   };
 
@@ -874,6 +883,7 @@ if (app) {
       button.setAttribute("aria-selected", String(button.dataset.tab === tab));
     });
     TABS.forEach((name) => { $(`#tab-${name}`).hidden = name !== tab; });
+    window.neuroFocusClassTab = tab;
     window.dispatchEvent(new CustomEvent("neurofocus:class-tab", { detail: { tab } }));
     if (tab === "settings") renderSettings();
     if (tab === "students") renderStudents();
@@ -1130,6 +1140,7 @@ if (app) {
       else if (target === "profile" || target === "profile-appearance") window.neuroFocusNavigate(target);
       else if (target === "all-students") showOverview("all-students");
       else if (target === "attendance-report") showOverview("report");
+      else if (target === "demo") showOverview("demo");
       else if (selected()) openClass(selectedId, target);
     });
   });
@@ -1274,7 +1285,7 @@ if (app) {
     void keepSessionAlive();
     // Reopen the page in the address (after a refresh or from a link); otherwise land on the live
     // monitor if a session is running, or on Home.
-    const linked = /^#(class|profile|students|attendance-report)/.test(window.location.hash) && routeTo(window.location.hash);
+    const linked = /^#(class|profile|students|attendance-report|demo)/.test(window.location.hash) && routeTo(window.location.hash);
     if (linked) { /* done */ }
     else if (live && classes.some((item) => item.id === live.classId)) openClass(live.classId, "live");
     else showClasses();

@@ -1,9 +1,10 @@
 // Student workspace shell: view switching (#dashboard, #focus, #buddy, #notes, #progress, #classes,
-// #profile), the header breadcrumb, today's date and the "Start focus session" buttons.
+// #class/<id>, #profile), the header breadcrumb, today's date and the "Start focus session" buttons.
+// #focus is Solo focus (personal, never shared); a class's page (#class/<id>) has its Live focus.
 (function studentWorkspace() {
   const VIEWS = {
-    dashboard: "Home", focus: "Focus session", buddy: "NeuroBuddy", notes: "Class notes",
-    progress: "My progress", classes: "Classes", profile: "My profile"
+    dashboard: "Home", focus: "Solo focus", buddy: "NeuroBuddy", notes: "Class notes",
+    progress: "My progress", classes: "Classes", class: "Class", profile: "My profile"
   };
   const ALIASES = { home: "dashboard" };
   const views = document.querySelectorAll("[data-view]");
@@ -11,15 +12,23 @@
   const crumb = document.querySelector("#pageCrumb");
   const main = document.querySelector("main");
   let currentView = null;
+  let currentClassId = null;
 
   function showView() {
     const raw = window.location.hash.slice(1);
-    const hash = ALIASES[raw] || raw;
+    // A class's page: #class/<id> or #class/<id>/<tab> (student-classes.js and
+    // student-classroom.js fill it in). Tabs: live (Live focus), posts, assignments, quizzes.
+    const classRoute = /^class\/([0-9a-z-]+)(?:\/(live|posts|assignments|quizzes))?/i.exec(raw);
+    const hash = classRoute ? "class" : ALIASES[raw] || raw;
     // Links like #focus-timer or #history point at a card inside a view.
     const target = hash && !VIEWS[hash] ? document.getElementById(hash) : null;
     const name = VIEWS[hash] ? hash : target?.closest("[data-view]")?.dataset.view || "dashboard";
-    const previous = currentView;
+    const classId = name === "class" ? classRoute?.[1] || null : null;
+    const previous = currentView === "class" && currentClassId !== classId ? `class/${currentClassId}` : currentView;
     currentView = name;
+    currentClassId = classId;
+    window.neuroFocusRouteClassId = classId;
+    window.neuroFocusRouteClassTab = classId ? (classRoute?.[2] || "live").toLowerCase() : null;
     views.forEach((view) => {
       view.hidden = view.dataset.view !== name;
       // Cards settle in once when a view opens (styles/student.css; skipped for reduced motion).
@@ -29,7 +38,7 @@
       }
     });
     links.forEach((link) => {
-      if (link.dataset.viewLink === name) link.setAttribute("aria-current", "page");
+      if (link.dataset.viewLink === name && name !== "class") link.setAttribute("aria-current", "page");
       else link.removeAttribute("aria-current");
     });
     if (crumb) crumb.textContent = VIEWS[name];
@@ -45,7 +54,7 @@
       }
     }
     window.neuroFocusView = name;
-    window.dispatchEvent(new CustomEvent("neurofocus:viewchange", { detail: { name, previous } }));
+    window.dispatchEvent(new CustomEvent("neurofocus:viewchange", { detail: { name, previous, classId } }));
   }
   window.addEventListener("hashchange", showView);
   showView();
@@ -65,18 +74,26 @@
   const quickLabel = document.querySelector("#quickStart span");
   const quickIcon = document.querySelector("#quickStart use");
   let tracking = false;
-  document.addEventListener("click", (event) => {
+  document.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-start-focus]");
     if (!button) return;
-    if (tracking) {
+    const inClass = Boolean(window.neuroFocusClassContext?.().joinedClassId);
+    // The button ends a running solo session. A class session's camera is never stopped from here.
+    if (tracking && !inClass) {
       document.querySelector("#stopAnalyzer")?.click();
       return;
     }
+    // A solo session is personal: if the student is in a class's live session, they leave it first
+    // (student-classes.js asks), so nothing from the solo session is ever shared.
+    const ready = window.neuroFocusClassActions?.prepareSolo ? await window.neuroFocusClassActions.prepareSolo() : true;
+    if (!ready) return;
     window.dispatchEvent(new CustomEvent("neurofocus:start-camera"));
-    window.neuroFocusNavigate("focus-session");
+    window.neuroFocusNavigate("solo-tracker");
   });
   window.addEventListener("neurofocus:tracking-started", () => {
     tracking = true;
+    // Only a solo session turns the Solo focus button into "End focus session".
+    if (window.neuroFocusClassContext?.().joinedClassId) return;
     if (quickLabel) quickLabel.textContent = "End focus session";
     quickIcon?.setAttribute("href", "#i-stop");
   });

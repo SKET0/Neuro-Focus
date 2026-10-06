@@ -36,6 +36,10 @@ if (app) {
   const invitePings = new Map();   // classId -> last "please join" ping seen from the teacher
   const myAttendance = new Map();  // classId -> { attended, counted } over finished sessions
   let joinedSessionId = null;      // session the student pressed "Join session" for
+  // The class whose live session the student joined (pressed "Join session"). Only this class's
+  // live session ever receives readings or attendance check-ins; Solo focus is never shared.
+  let joinedClassId = null;
+  let cameraStarting = false;      // Join pressed, camera not running yet
   const lastLiveSession = new Map(); // classId -> key of the live session last seen (sessionId, or "local")
   let focusInSession = null;       // { classId, key } live session the student's focus session is part of
   const teacherNames = new Map();  // classId -> { name, preset, path, url } of the class's teacher (my_class_teachers)
@@ -99,7 +103,7 @@ if (app) {
       });
     } else if (!removed && before && status.live) {
       // Still tracking in this class: sharing resumes by itself.
-      const resumes = classId === currentId && tracking && shareToggle?.checked;
+      const resumes = classId === joinedClassId && tracking && shareToggle?.checked;
       liveNotices.get(classId)?.();
       liveNotices.set(classId, notify({
         title: resumes ? `You’re back in the session in ${item.name}` : `You can rejoin the session in ${item.name}`,
@@ -253,7 +257,7 @@ if (app) {
   function noteFocusSession() {
     if (!tracking) focusInSession = null;
     else if (sharingClassId) focusInSession = { classId: sharingClassId, key: sharingSessionId || "local" };
-    else if (focusInSession && (focusInSession.classId !== currentId || !shareToggle?.checked || removedFromSession(currentId))) focusInSession = null;
+    else if (focusInSession && (focusInSession.classId !== joinedClassId || !shareToggle?.checked || removedFromSession(joinedClassId))) focusInSession = null;
   }
 
   // The teacher ended a live session: end the focus session that was part of it (stop the timer,
@@ -263,7 +267,8 @@ if (app) {
   async function endFocusWithSession(item, key) {
     if (joinedSessionId === key) joinedSessionId = null;
     const mine = () => tracking && focusInSession?.classId === item.id && focusInSession.key === key;
-    if (!mine()) return;
+    const joined = joinedClassId === item.id;
+    if (!mine() && !joined) return;
     if (key !== "local") {
       const { data, error } = await supabase.from("class_sessions").select("ended_at").eq("id", key).maybeSingle();
       if (!error && data && !data.ended_at) return; // still open: the dashboard is just reconnecting
@@ -272,6 +277,11 @@ if (app) {
       await new Promise((resolve) => window.setTimeout(resolve, 4000));
       const status = teacher.get(item.id);
       if (status?.live && sessionKey(status) === key) return;
+    }
+    if (joinedClassId === item.id) {
+      joinedClassId = null;
+      updateSharing();
+      render();
     }
     if (!mine()) return;
     focusInSession = null;
@@ -317,7 +327,7 @@ if (app) {
     const ping = status.live ? status.invites?.[app.user.id] : null;
     const newPing = Boolean(ping && ping !== invitePings.get(classId));
     if (ping) invitePings.set(classId, ping);
-    const alreadyIn = classId === currentId && tracking && !sessionRemovedNow;
+    const alreadyIn = classId === joinedClassId && tracking && !sessionRemovedNow;
 
     if (status.live && previous.live && newPing && !firstSync && !sessionRemovedNow && !alreadyIn) {
       liveNotices.get(classId)?.();
@@ -367,8 +377,9 @@ if (app) {
     removedHandled.add(item.id);
     liveNotices.get(item.id)?.();
     liveNotices.delete(item.id);
-    const wasCurrent = item.id === currentId;
-    const cameraWasOn = wasCurrent && tracking;
+    const cameraWasOn = item.id === joinedClassId && tracking;
+    if (joinedClassId === item.id) { joinedClassId = null; joinedSessionId = null; }
+    if (window.neuroFocusRouteClassId === item.id) window.location.hash = "classes";
     if (sharingClassId === item.id) sendAttention(item.id, { state: "Stopped" });
     if (cameraWasOn) window.dispatchEvent(new CustomEvent("neurofocus:stop-camera"));
     const channelEntry = channels.get(item.id);
@@ -395,9 +406,9 @@ if (app) {
   // Scores go to the teacher only while their live session is on and sharing is allowed.
   // student-focus.js saves attention history linked to this class and live session while sharing.
   function updateSharing() {
-    const status = currentId ? teacher.get(currentId) : null;
-    const live = Boolean(status?.live) && !removedFromSession(currentId);
-    const next = live && shareToggle?.checked ? currentId : null;
+    const status = joinedClassId ? teacher.get(joinedClassId) : null;
+    const live = Boolean(status?.live) && !removedFromSession(joinedClassId);
+    const next = live && shareToggle?.checked ? joinedClassId : null;
     const nextSession = next ? status.sessionId || null : null;
     if (next !== sharingClassId || nextSession !== sharingSessionId) {
       if (sharingClassId && sharingClassId !== next) sendAttention(sharingClassId, { state: "Stopped" });
@@ -422,36 +433,117 @@ if (app) {
   }
 
   // ---------- Live session actions ----------
-  function joinSession(classId) {
-    if (!classes.some((item) => item.id === classId)) return;
+  // The attention tracker card lives in Solo focus, and moves to the class page's Live focus while
+  // the student is in that class's live session. It only moves while the camera is off.
+  // The live numbers and the timeline go with it, so each page only ever shows its own session's
+  // readings; they start blank after a move (student-focus.js clears them on "tracker-moved").
+  function placeTracker() {
+    const toClass = Boolean(joinedClassId);
+    const parts = [
+      ["#this-session", toClass ? "#classStatsSlot" : "#soloStatsSlot"],
+      ["#focus-session", toClass ? "#classTrackerSlot" : "#solo-tracker"],
+      ["#focus-timeline", toClass ? "#classTimelineSlot" : "#soloTimelineSlot"]
+    ];
+    const card = $("#focus-session");
+    if (!card || tracking || cameraStarting || card.parentElement === $(parts[1][1])) return;
+    parts.forEach(([part, slot]) => { const node = $(part); const target = $(slot); if (node && target) target.append(node); });
+    window.dispatchEvent(new CustomEvent("neurofocus:tracker-moved", { detail: { to: toClass ? "class" : "solo", classId: joinedClassId } }));
+  }
+
+  // Waits until the camera has stopped and every save of that session has finished
+  // (student-focus.js queues them one at a time), so switching never overlaps two sessions' saves.
+  const savesDone = () => (window.neuroFocusSavesDone ? window.neuroFocusSavesDone() : Promise.resolve());
+  async function stopCameraAndWait() {
+    if (tracking) {
+      await new Promise((resolve) => {
+        window.addEventListener("neurofocus:tracking-stopped", () => window.setTimeout(resolve, 0), { once: true });
+        window.dispatchEvent(new CustomEvent("neurofocus:stop-camera"));
+      });
+    }
+    await savesDone();
+  }
+
+  async function joinSession(classId) {
+    const item = classes.find((entry) => entry.id === classId);
+    if (!item) return;
     if (removedFromSession(classId)) {
       notify({ title: "You can’t join this session", text: "Your teacher removed you from it. Ask them to let you back in.", kind: "error" });
       return;
     }
+    // A solo session (or another class's session) is ended and saved first, so it's never shared.
+    if (tracking && joinedClassId !== classId) {
+      const ok = await confirmAction({
+        title: `Join ${item.name}’s live session?`,
+        message: joinedClassId
+          ? "Your current class session ends first. It’s already saved under that class."
+          : "Your solo session ends first and is saved to My progress as Personal. It isn’t shared with your teacher.",
+        confirmLabel: "Join session"
+      });
+      if (!ok) return;
+    }
+    // Even with no camera running, a session that just stopped may still be saving.
+    await stopCameraAndWait();
+    joinedClassId = classId;
     joinedSessionId = teacher.get(classId)?.sessionId || null;
+    // Any "you're invited, join" notice for this class is done with.
+    liveNotices.get(classId)?.();
+    liveNotices.delete(classId);
     if (classId !== currentId) selectClass(classId);
     if (shareToggle && !shareToggle.checked) {
       shareToggle.checked = true;
       shareToggle.dispatchEvent(new Event("change"));
     }
-    window.dispatchEvent(new CustomEvent("neurofocus:start-camera"));
+    updateSharing();
+    placeTracker();
+    // Show the class page's Live focus with the tracker in sight (student-ui.js).
+    if (window.neuroFocusRouteClassId !== classId) window.location.hash = `class/${classId}`;
+    if (!tracking) {
+      cameraStarting = true;
+      window.dispatchEvent(new CustomEvent("neurofocus:start-camera"));
+    }
     render(); // checks in for attendance even if the camera is slow to start
-    // Show the Focus session view (student-ui.js) with the tracker in sight.
-    window.neuroFocusNavigate?.("focus-session");
   }
 
-  function leaveSession() {
-    const stop = $("#stopAnalyzer");
-    if (stop && !stop.hidden) stop.click();
+  // Leaving the live session: the camera stops (the session so far is saved under the class) and
+  // nothing more is shared. The student stays in the class.
+  async function leaveSession() {
+    await stopCameraAndWait();
+    joinedClassId = null;
+    joinedSessionId = null;
+    updateSharing();
+    render();
   }
+
+  // Before a solo session starts (student-ui.js): if the student is in a class's live session,
+  // they confirm leaving it, so nothing from the solo session is shared.
+  async function prepareSolo() {
+    if (!joinedClassId) { await savesDone(); return true; }
+    const item = classes.find((entry) => entry.id === joinedClassId);
+    const ok = await confirmAction({
+      title: "Start a solo session?",
+      message: `You’ll leave ${item?.name || "your class"}’s live session first${tracking ? ", and that session is saved under the class" : ""}. Your solo session stays private.`,
+      confirmLabel: "Leave and start solo"
+    });
+    if (!ok) return false;
+    await leaveSession();
+    return true;
+  }
+
+  // Which session the camera belongs to, for Solo focus and the timer (student-focus.js).
+  window.neuroFocusClassContext = () => ({
+    joinedClassId,
+    name: classes.find((entry) => entry.id === joinedClassId)?.name || "",
+    tracking
+  });
 
   // ---------- Attendance check-in ----------
-  // While the student is in a live session (sharing, and tracking or having pressed Join), the
+  // While the student is in a live session they joined (camera on or off, sharing on or off), the
   // database marks them present or late and counts their minutes; repeated every 30 seconds.
   function updateCheckIn() {
-    const status = currentId ? teacher.get(currentId) : null;
-    const inSession = status?.live && status.sessionId && sharingClassId === currentId
-      && (tracking || joinedSessionId === status.sessionId);
+    // Attendance only needs the student to have joined this live session. It doesn't depend on
+    // the camera or on sharing attention: with sharing off they're still present.
+    const status = joinedClassId ? teacher.get(joinedClassId) : null;
+    const inSession = status?.live && status.sessionId && !removedFromSession(joinedClassId);
     const sessionId = inSession ? status.sessionId : null;
     if (sessionId === checkIn.sessionId) return;
     window.clearInterval(checkIn.timer);
@@ -467,8 +559,8 @@ if (app) {
       if (data?.removed && !serverRemoved.has(sessionId)) {
         // Removed by the teacher, even if the presence notice never arrived.
         serverRemoved.add(sessionId);
-        const status = teacher.get(currentId);
-        if (status) showSessionRemoval(currentId, status);
+        const status = teacher.get(joinedClassId);
+        if (status) showSessionRemoval(joinedClassId, status);
         updateSharing();
         render();
         return;
@@ -486,11 +578,46 @@ if (app) {
   function render() {
     noteFocusSession();
     updateCheckIn();
+    placeTracker();
     renderSidebar();
     renderCards();
+    renderClassPage();
     renderBanner();
+    renderSoloNotice();
     updateShareStatus();
     publishStatus();
+  }
+
+  // The class page's header (#view-class). The page shows the class in the address, which is
+  // selected when it opens (it's also where the student appears online to the teacher).
+  function renderClassPage() {
+    const id = window.neuroFocusRouteClassId;
+    if (window.neuroFocusView !== "class" || !id) return;
+    const item = classes.find((entry) => entry.id === id);
+    if (!item) return;
+    $("#classPageTitle").textContent = item.name;
+    $("#classPageTile").textContent = (item.name.trim()[0] || "C").toUpperCase();
+    const info = teacherNames.get(item.id);
+    $("#classPageTeacher").textContent = info?.name ? `Teacher: ${info.name}` : "Classroom";
+    const crumb = $("#pageCrumb");
+    if (crumb) crumb.textContent = item.name;
+    document.title = `${item.name} · Neuro-Focus`;
+  }
+
+  // Solo focus never shows class details, except to say the camera is busy with a class session.
+  function renderSoloNotice() {
+    const busy = Boolean(joinedClassId && (tracking || cameraStarting));
+    const name = classes.find((entry) => entry.id === joinedClassId)?.name || "your class";
+    $("#soloTrackerNote").hidden = !busy;
+    $("#view-focus")?.toggleAttribute("data-camera-in-class", busy);
+    if (busy) {
+      $("#soloTrackerNoteText").textContent = `You’re in ${name}’s live session. Leave it there to track a solo session; the timer and steps here still work.`;
+      $("#soloTrackerNoteLink").href = `#class/${joinedClassId}`;
+      $("#soloTrackerNoteLink").textContent = `Open ${name}`;
+    }
+    const notice = $("#soloClassNotice");
+    notice.hidden = !busy;
+    if (busy) notice.textContent = `Your camera is in use by ${name}’s live session.`;
   }
 
   // The Home view (student-dashboard.js) shows classes, teachers and live sessions from this snapshot.
@@ -499,6 +626,7 @@ if (app) {
       loaded: true,
       error,
       currentId,
+      joinedClassId,
       tracking,
       classes: classes.map((item) => {
         const status = teacher.get(item.id);
@@ -543,7 +671,7 @@ if (app) {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "nav-item";
-      if (item.id === currentId) button.setAttribute("aria-current", "true");
+      if (window.neuroFocusView === "class" && item.id === window.neuroFocusRouteClassId) button.setAttribute("aria-current", "page");
       const name = document.createElement("span");
       name.className = "name";
       name.textContent = item.name;
@@ -553,7 +681,7 @@ if (app) {
       initial.textContent = (item.name.trim()[0] || "C").toUpperCase();
       button.append(initial, name);
       if (teacher.get(item.id)?.live) button.append(liveDot());
-      button.addEventListener("click", () => selectClass(item.id));
+      button.addEventListener("click", () => { window.location.hash = `class/${item.id}`; });
       list.append(button);
     });
   }
@@ -605,20 +733,18 @@ if (app) {
 
       const actions = document.createElement("div");
       actions.className = "my-class-actions";
-      if (item.id !== currentId) {
-        const open = document.createElement("button");
-        open.type = "button";
-        open.className = "btn-action";
-        open.textContent = "Work in this class";
-        open.addEventListener("click", () => selectClass(item.id));
-        actions.append(open);
-      } else {
+      const open = document.createElement("a");
+      open.className = "btn-action";
+      open.href = `#class/${item.id}`;
+      open.textContent = "Open class";
+      actions.append(open);
+      if (item.id === joinedClassId) {
         const tag = document.createElement("span");
         tag.className = "my-class-status";
-        tag.textContent = "✓ Current class";
+        tag.textContent = "✓ In the live session";
         actions.append(tag);
       }
-      if (status?.live && !removedFromSession(item.id) && !(item.id === currentId && tracking)) {
+      if (status?.live && !removedFromSession(item.id) && item.id !== joinedClassId) {
         const join = document.createElement("button");
         join.type = "button";
         join.className = "btn-join";
@@ -656,19 +782,18 @@ if (app) {
     const actions = $("#bannerActions");
     actions.replaceChildren();
     kicker.replaceChildren();
-    const item = current();
-
+    const item = classes.find((entry) => entry.id === window.neuroFocusRouteClassId) || current();
     if (!item) {
       banner.dataset.state = "";
-      kicker.textContent = "Get started";
-      title.textContent = "Join your first class";
-      sub.textContent = "Ask your teacher for the join code. You can still use the tracker, timer and NeuroBuddy on your own.";
-      actions.append(bannerButton("＋ Join a class", "btn-primary", openJoinDialog));
+      kicker.textContent = "Live focus";
+      title.textContent = "Class not found";
+      sub.textContent = "You may have left this class. Open Classes to see the ones you’re in.";
       return;
     }
 
-    title.textContent = item.name;
     const status = teacher.get(item.id);
+    const joined = joinedClassId === item.id;
+    title.textContent = status?.live ? `Live session · since ${clock(status.since)}` : "No live session right now";
     if (blockedClasses.has(item.id)) {
       banner.dataset.state = "error";
       kicker.textContent = "Live features unavailable";
@@ -676,51 +801,62 @@ if (app) {
     } else if (status?.live && removedFromSession(item.id)) {
       banner.dataset.state = "error";
       kicker.textContent = "Removed from this live session";
-      sub.textContent = "Your teacher removed you from today’s session, so your focus isn’t shared. You’re still in the class and will be invited to the next session.";
-    } else if (status?.live && tracking && shareToggle?.checked) {
+      sub.textContent = "Your teacher removed you from today’s session, so nothing is shared. You’re still in the class and will be invited to the next session.";
+      if (joined) actions.append(bannerButton("Leave session", "btn-action", leaveSession));
+    } else if (status?.live && joined && tracking && shareToggle?.checked) {
       banner.dataset.state = "sharing";
       kicker.append(liveDot(), checkIn.status === "late" ? "You’re in the live session · marked late" : "You’re in the live session");
       sub.textContent = checkIn.status
-        ? "Your attendance is recorded. Your teacher sees your attention score, never your video."
-        : "Your teacher sees your attention score, never your video.";
+        ? "Your attendance is recorded. Your teacher sees your attention estimate, never your video."
+        : "Your teacher sees your attention estimate, never your video.";
+      actions.append(bannerButton("Leave session", "btn-action", leaveSession));
+    } else if (status?.live && joined) {
+      banner.dataset.state = "live";
+      kicker.append(liveDot(), "You’ve joined");
+      sub.textContent = !shareToggle?.checked
+        ? "Sharing is paused, so your teacher can’t see your attention estimate. Your attendance still counts."
+        : "Your camera is off, so nothing is shared. Your attendance still counts. Turn the camera on to share your attention estimate.";
+      if (!tracking && !cameraStarting) actions.append(bannerButton("Turn camera on", "btn-primary", () => window.dispatchEvent(new CustomEvent("neurofocus:start-camera"))));
       actions.append(bannerButton("Leave session", "btn-action", leaveSession));
     } else if (status?.live) {
       banner.dataset.state = "live";
-      kicker.append(liveDot(), `Live session · since ${clock(status.since)}`);
-      sub.textContent = tracking && !shareToggle?.checked
-        ? "You’re tracking privately. Turn on “Share with my teacher” to join the session."
-        : "Your teacher started a live session. Join to share your focus.";
+      kicker.append(liveDot(), "Live now");
+      sub.textContent = "Your teacher started a live session. Join to share your attention estimate (never video). Nothing is shared until you join.";
       actions.append(bannerButton("Join session", "btn-join", () => joinSession(item.id)));
+    } else if (joined) {
+      banner.dataset.state = "";
+      kicker.textContent = "Live session paused";
+      sub.textContent = "Your teacher’s dashboard disconnected. Sharing resumes if they come back.";
+      actions.append(bannerButton("Leave session", "btn-action", leaveSession));
     } else {
       banner.dataset.state = "";
-      kicker.textContent = "Current class";
+      kicker.textContent = "Live focus";
       sub.textContent = status?.online
         ? "Your teacher is online but hasn’t started a live session. You’ll get a notification when they do."
-        : "No live session right now. You’ll get a notification when your teacher starts one.";
+        : "You’ll get a notification when your teacher starts a live session. For studying on your own, use Solo focus.";
     }
-    if (classes.length > 1) {
-      actions.append(bannerButton("Switch class", "btn-action", () => {
-        window.location.hash = "classes";
-      }));
-    }
+    $("#classTrackerNote").hidden = joined;
   }
 
   function updateShareStatus() {
     if (!shareStatus) return;
-    const item = current();
-    const live = Boolean(item && teacher.get(item.id)?.live);
+    const item = classes.find((entry) => entry.id === window.neuroFocusRouteClassId) || current();
+    const status = item ? teacher.get(item.id) : null;
+    const live = Boolean(status?.live);
+    const joined = item && joinedClassId === item.id;
     let text;
     let state = "";
     if (item && blockedClasses.has(item.id)) text = `Live sharing is unavailable. ${SETUP_TEXT}`;
     else if (navigator.onLine === false) text = "Connection lost · your teacher isn’t receiving updates until you’re back online.";
-    else if (!item) text = "Not shared · join a class to share your focus with a teacher.";
+    else if (!item) text = "Not shared.";
     else if (live && removedFromSession(item.id)) text = "Not shared · your teacher removed you from this live session.";
-    else if (!shareToggle?.checked) text = "Sharing paused · your teacher can’t see your focus.";
-    else if (!live) text = `Private · your teacher in ${item.name} can only see your focus during a live session.`;
-    else if (tracking) {
-      text = `Live · your teacher in ${item.name} sees your attention score (never your video).`;
+    else if (!shareToggle?.checked) text = "Sharing paused · your teacher can’t see your attention estimate.";
+    else if (!live) text = "Not shared · there’s no live session right now.";
+    else if (joined && tracking) {
+      text = `Live · your teacher in ${item.name} sees your attention estimate (never your video).`;
       state = "live";
-    } else text = `${item.name} is live. Start tracking to share your attention score (never your video).`;
+    } else if (joined) text = "You’ve joined · turn the camera on to share your attention estimate.";
+    else text = "Not shared yet · join the live session to share your attention estimate.";
     shareStatus.textContent = text;
     shareStatus.dataset.state = state;
   }
@@ -760,6 +896,7 @@ if (app) {
     currentId = data.id;
     await refresh();
     flushJoinNotice();
+    window.location.hash = `class/${data.id}`;
     notify({
       title: data.rejoined ? `Welcome back to ${data.name}` : `You joined ${data.name}`,
       text: "Your teacher can see you on their class list now.",
@@ -820,7 +957,10 @@ if (app) {
       state: legacyState(reading), cumulativeFocus: window.neuroFocusSessionStats?.focusPercent ?? null
     });
   });
+  window.addEventListener("neurofocus:tracking-started", () => { cameraStarting = false; render(); });
+  window.addEventListener("neurofocus:tracking-error", () => { cameraStarting = false; render(); });
   window.addEventListener("neurofocus:tracking-stopped", () => {
+    cameraStarting = false;
     tracking = false;
     lastSentTracking = null;
     if (sharingClassId) sendAttention(sharingClassId, { state: "Stopped" });
@@ -842,8 +982,23 @@ if (app) {
     });
   });
 
+  // A class page opened (student-ui.js): that class becomes the selected one.
+  let classesLoaded = false;
+  function openRoutedClass() {
+    const id = window.neuroFocusRouteClassId;
+    if (window.neuroFocusView !== "class" || !id || !classesLoaded) return;
+    if (!classes.some((item) => item.id === id)) {
+      notify({ title: "That class isn’t available", text: "You may have left it. Here are the classes you’re in.", kind: "info" });
+      window.location.hash = "classes";
+      return;
+    }
+    if (id !== currentId) selectClass(id);
+    else render();
+  }
+  window.addEventListener("neurofocus:viewchange", openRoutedClass);
+
   // Actions for the Home view (student-dashboard.js), with the same behaviour as the buttons here.
-  window.neuroFocusClassActions = { joinSession, selectClass, openJoinDialog, leaveSession };
+  window.neuroFocusClassActions = { joinSession, selectClass, openJoinDialog, leaveSession, prepareSolo };
 
   const recheckSetup = () => missingDatabaseUpdates(supabase).then((missing) => showSetupBanner(missing)).catch(() => {});
 
@@ -861,6 +1016,8 @@ if (app) {
   void recheckSetup();
   try {
     await loadClasses();
+    classesLoaded = true;
+    openRoutedClass();
   } catch (error) {
     console.error("Class loading failed", error);
     $("#studentClassList").replaceChildren(Object.assign(document.createElement("p"), {

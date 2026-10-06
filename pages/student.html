@@ -37,18 +37,23 @@
   </script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <link rel="stylesheet" href="../styles/theme.css?v=1">
-  <link rel="stylesheet" href="../styles/student.css?v=13">
-  <link rel="stylesheet" href="../styles/home.css?v=2">
+  <link rel="stylesheet" href="../styles/student.css?v=15">
+  <link rel="stylesheet" href="../styles/home.css?v=4">
   <link rel="stylesheet" href="../styles/account.css?v=1">
   <link rel="stylesheet" href="../styles/dashboard-layout.css?v=4">
 </head>
 <body data-required-role="student">
   <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+    <symbol id="i-quiz" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 4.9.7c0 1.7-2.4 2.3-2.4 3.8M12 17h.01"/></symbol>
+    <symbol id="i-megaphone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11v2a1 1 0 0 0 1 1h2l6 4V6L6 10H4a1 1 0 0 0-1 1Z"/><path d="M16 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></symbol>
+    <symbol id="i-assignment" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h3"/></symbol>
+    <symbol id="i-paperclip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21 11-8.5 8.5a5 5 0 0 1-7-7L14 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 7"/></symbol>
     <symbol id="i-brain" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M12 5v13"/></symbol>
     <symbol id="i-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></symbol>
     <symbol id="i-chat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/><path d="M8.5 11h.01M12 11h.01M15.5 11h.01"/></symbol>
     <symbol id="i-note" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></symbol>
     <symbol id="i-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 18l-6-6 6-6"/></symbol>
     <symbol id="i-trend" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 17 6-6 4 4 8-8"/><path d="M15 7h6v6"/></symbol>
     <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
     <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
@@ -96,7 +101,7 @@
       <nav class="nav-group" aria-label="Workspace">
         <div class="nav-label">Workspace</div>
         <a class="nav-item" href="#dashboard" data-view-link="dashboard"><svg class="icon"><use href="#i-home"/></svg>Home</a>
-        <a class="nav-item" href="#focus" data-view-link="focus"><svg class="icon"><use href="#i-timer"/></svg>Focus session</a>
+        <a class="nav-item" href="#focus" data-view-link="focus"><svg class="icon"><use href="#i-timer"/></svg>Solo focus</a>
         <a class="nav-item" href="#buddy" data-view-link="buddy"><svg class="icon"><use href="#i-chat"/></svg>NeuroBuddy</a>
         <a class="nav-item" href="#notes" data-view-link="notes"><svg class="icon"><use href="#i-note"/></svg>Class notes</a>
         <a class="nav-item" href="#progress" data-view-link="progress"><svg class="icon"><use href="#i-chart"/></svg>My progress</a>
@@ -360,26 +365,28 @@
             <div class="hero-copy">
               <!-- Session state (student-focus.js): ready, tracking, timer running or on a break -->
               <p class="eyebrow-pill"><span class="tag" id="focusStateTag">Ready</span><span id="focusStateText">Camera off</span></p>
-              <h1 class="welcome-title" id="focusPageTitle">Focus session</h1>
-              <p class="hero-lead">Your timer, next steps and live attention in one place. The camera only turns on when you start, and video never leaves this device.</p>
+              <h1 class="welcome-title" id="focusPageTitle">Solo focus</h1>
+              <p class="hero-lead">Study on your own with the timer and, if you like, attention tracking. The camera only turns on when you start, and video never leaves this device.</p>
               <div class="page-hero-actions">
                 <button class="btn-primary" type="button" id="quickStart" data-start-focus><svg class="icon"><use href="#i-play"/></svg><span>Start focus session</span></button>
-                <button class="btn-action" type="button" data-action="join-class"><svg class="icon"><use href="#i-plus"/></svg>Join a class</button>
               </div>
             </div>
 
-            <!-- Current class + live session status (student-classes.js) -->
-            <section class="class-banner" id="classBanner" data-state="loading" aria-live="polite" aria-labelledby="bannerTitle">
-              <span class="next-icon" aria-hidden="true"><svg><use href="#i-school"/></svg></span>
-              <div class="class-banner-kicker" id="bannerKicker">Your class</div>
-              <h2 class="class-banner-title" id="bannerTitle">Loading your classes…</h2>
-              <p class="class-banner-sub" id="bannerSub"></p>
-              <div class="class-banner-actions" id="bannerActions"></div>
+            <!-- Solo sessions are personal. When a class live session is using the camera, this says so (student-classes.js). -->
+            <section class="class-banner personal-card" id="soloPrivacy" data-state="personal" aria-labelledby="soloPrivacyTitle">
+              <span class="next-icon" aria-hidden="true"><svg><use href="#i-lock"/></svg></span>
+              <div class="class-banner-kicker">Personal session</div>
+              <h2 class="class-banner-title" id="soloPrivacyTitle">Private to you</h2>
+              <p class="class-banner-sub">Saved to My progress as Personal. Never shared with teachers, and it doesn’t affect class attendance.</p>
+              <p class="solo-class-notice" id="soloClassNotice" hidden></p>
             </section>
           </div>
         </section>
 
-        <!-- This session at a glance (student-focus.js). Numbers start fresh each time tracking starts. -->
+        <!-- This session at a glance (student-focus.js). Numbers start fresh each time tracking starts.
+             The tiles, tracker card and timeline move together to a class's Live focus while the
+             student is in that class's live session (student-classes.js). -->
+        <div class="stats-slot" id="soloStatsSlot">
         <section class="glance focus-glance" id="this-session" aria-label="This session at a glance">
           <article class="glance-tile home-card live-tile-focus" id="liveScoreTile" style="--d: 1">
             <span class="glance-label"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg>Attention (estimate)</span>
@@ -404,9 +411,18 @@
             <small class="glance-note" id="statNudges">0 nudges shown</small>
           </article>
         </section>
+        </div>
 
         <div class="focus-stage">
-          <!-- Attention tracker (eye-analyzer.js) -->
+          <!-- Attention tracker (eye-analyzer.js). The same card moves to a class's Live focus tab while
+               the student is in that class's live session (student-classes.js), and back afterwards. -->
+          <div class="tracker-slot" id="solo-tracker">
+          <div class="tracker-slot-note panel-card" id="soloTrackerNote" hidden>
+            <span class="placeholder-rings" aria-hidden="true"><span class="chip-icon"><svg><use href="#i-school"/></svg></span></span>
+            <b>Your camera is in use by a class session</b>
+            <span id="soloTrackerNoteText">Leave the live session to track a solo session.</span>
+            <a class="btn-action" id="soloTrackerNoteLink" href="#classes">Open class</a>
+          </div>
           <section style="--d: 5" class="panel-card home-card tracker-card" id="focus-session" aria-labelledby="trackerTitle">
             <div class="panel-head">
               <div>
@@ -438,11 +454,10 @@
               <div class="setting-tiles" role="group" aria-label="Tracking settings">
                 <label class="setting-tile"><span class="setting-top"><b>Re-engagement nudges</b><span class="switch"><input type="checkbox" id="nudgeToggle" checked></span></span><small>A gentle prompt after a few seconds looking away.</small></label>
                 <label class="setting-tile"><span class="setting-top"><b>Gentle chime</b><span class="switch"><input type="checkbox" id="chimeToggle"></span></span><small>A soft sound with nudges and when a block ends.</small></label>
-                <label class="setting-tile"><span class="setting-top"><b>Share with my teacher</b><span class="switch"><input type="checkbox" id="shareToggle" checked></span></span><small>Only your attention score, only in live sessions.</small></label>
               </div>
-              <p class="share-status" id="shareStatus" aria-live="polite">Checking your class…</p>
             </div>
           </section>
+          </div>
 
           <div class="focus-side">
             <!-- Focus timer (student-focus.js) -->
@@ -508,6 +523,7 @@
         </div>
 
         <!-- Focus timeline (student-focus.js) -->
+        <div class="stats-slot" id="soloTimelineSlot">
         <section style="--d: 8" class="panel-card home-card timeline-card" id="focus-timeline" aria-labelledby="timelineTitle">
           <div class="panel-head">
             <div>
@@ -520,6 +536,7 @@
             <div class="chart-empty" id="timelineEmpty">Start attention tracking to see your focus timeline.</div>
           </div>
         </section>
+        </div>
       </section>
 
       <!-- ================= NeuroBuddy (learning-assistant.js) ================= -->
@@ -715,7 +732,7 @@
             <div class="hero-copy">
               <p class="eyebrow-pill"><span class="tag">Saved</span><span>Each session is added when you stop tracking</span></p>
               <h1 class="welcome-title" id="progressPageTitle">My progress</h1>
-              <p class="hero-lead">Sessions you’ve finished, how your focus is changing and what helps you focus best. Live numbers are in <a class="text-link" href="#focus">Focus session</a>.</p>
+              <p class="hero-lead">Sessions you’ve finished, how your focus is changing and what helps you focus best. Live numbers are in <a class="text-link" href="#focus">Solo focus</a> or your class’s Live focus.</p>
             </div>
             <div class="page-hero-actions">
               <div class="range-switch" role="group" aria-label="Time range">
@@ -803,7 +820,7 @@
           <div>
             <div class="page-kicker">Your teachers and live sessions</div>
             <h1 class="page-title" id="classesPageTitle">Classes</h1>
-            <p class="page-sub">Pick the class you’re working in. It’s where you join live sessions, and it gives your notes and NeuroBuddy context.</p>
+            <p class="page-sub">Open a class to join its live sessions. Classroom sessions are shared with your teacher only while you’ve joined.</p>
           </div>
           <div class="page-actions">
             <button class="btn-primary" type="button" data-action="join-class"><svg class="icon"><use href="#i-plus"/></svg>Join a class</button>
@@ -814,6 +831,122 @@
             <p class="empty-state">Loading classes…</p>
           </div>
         </section>
+      </section>
+
+      <!-- ================= One class (student-classes.js) =================
+           The classroom hub. Live focus: the class's live session, joining and leaving, sharing with
+           the teacher and, while joined, the attention tracker. Classroom sessions are kept apart
+           from Solo focus: only here, and only after joining, is anything shared. -->
+      <section class="view class-view" id="view-class" data-view="class" hidden aria-labelledby="classPageTitle">
+        <section class="home-hero page-hero" aria-labelledby="classPageTitle">
+          <div class="home-hero-art" aria-hidden="true">
+            <svg viewBox="0 0 560 200" fill="none">
+              <g stroke="currentColor" stroke-width="1.2">
+                <path d="M330 92 420 48l90 44-90 44Z" stroke-opacity="0.3"/>
+                <path d="M366 110v34c30 22 78 22 108 0v-34" stroke-opacity="0.22"/>
+                <path d="M510 92v46" stroke-opacity="0.22"/>
+              </g>
+              <circle cx="510" cy="142" r="4" fill="currentColor" fill-opacity="0.5"/>
+            </svg>
+          </div>
+          <div class="page-hero-inner">
+            <div class="home-hero-hello">
+              <span class="class-tile hero-face class-page-tile" id="classPageTile" aria-hidden="true">C</span>
+              <div class="hero-copy">
+                <p class="eyebrow-pill"><span class="tag">Class</span><span id="classPageTeacher">Classroom</span></p>
+                <h1 class="welcome-title" id="classPageTitle">Class</h1>
+                <p class="hero-lead">Classroom sessions with your teacher. Your attention estimate is shared only while you’ve joined a live session.</p>
+              </div>
+            </div>
+            <div class="page-hero-actions">
+              <a class="btn-action" href="#classes"><svg class="icon"><use href="#i-school"/></svg>All classes</a>
+            </div>
+          </div>
+        </section>
+
+        <div class="class-hub-tabs" role="tablist" aria-label="Class sections">
+          <button type="button" role="tab" id="classTabLive" data-class-tab="live" aria-selected="true" aria-controls="classPanelLive"><svg class="icon"><use href="#i-video"/></svg>Live focus</button>
+          <button type="button" role="tab" id="classTabPosts" data-class-tab="posts" aria-selected="false" aria-controls="classPanelPosts" tabindex="-1"><svg class="icon"><use href="#i-megaphone"/></svg>Posts</button>
+          <button type="button" role="tab" id="classTabAssignments" data-class-tab="assignments" aria-selected="false" aria-controls="classPanelAssignments" tabindex="-1"><svg class="icon"><use href="#i-assignment"/></svg>Assignments</button>
+          <button type="button" role="tab" id="classTabQuizzes" data-class-tab="quizzes" aria-selected="false" aria-controls="classPanelQuizzes" tabindex="-1"><svg class="icon"><use href="#i-quiz"/></svg>Quizzes</button>
+        </div>
+
+        <div class="class-hub-panel" id="classPanelLive" role="tabpanel" aria-labelledby="classTabLive">
+          <!-- Live session status, Join / Leave (student-classes.js) -->
+          <section class="class-banner" id="classBanner" data-state="loading" aria-live="polite" aria-labelledby="bannerTitle">
+            <span class="next-icon" aria-hidden="true"><svg><use href="#i-school"/></svg></span>
+            <div class="class-banner-kicker" id="bannerKicker">Live focus</div>
+            <h2 class="class-banner-title" id="bannerTitle">Loading…</h2>
+            <p class="class-banner-sub" id="bannerSub"></p>
+            <div class="class-banner-actions" id="bannerActions"></div>
+          </section>
+
+          <div class="stats-slot" id="classStatsSlot"></div>
+          <div class="class-live-grid">
+            <div class="tracker-slot" id="classTrackerSlot">
+              <div class="tracker-slot-note panel-card" id="classTrackerNote">
+                <span class="placeholder-rings" aria-hidden="true"><span class="chip-icon"><svg><use href="#i-video"/></svg></span></span>
+                <b>Attention tracking starts when you join</b>
+                <span>Join your teacher’s live session to turn it on. Only your attention estimate is shared, never video.</span>
+              </div>
+            </div>
+            <section class="panel-card sharing-card" aria-labelledby="sharingTitle">
+              <h2 class="panel-title" id="sharingTitle"><span class="chip-icon green"><svg><use href="#i-eye"/></svg></span>Classroom session</h2>
+              <label class="setting-tile"><span class="setting-top"><b>Share with my teacher</b><span class="switch"><input type="checkbox" id="shareToggle" checked></span></span><small>Only your attention estimate, only while you’re in this class’s live session.</small></label>
+              <p class="share-status" id="shareStatus" aria-live="polite">Checking your class…</p>
+              <p class="panel-sub">Classroom sessions are saved to My progress under this class. Solo focus sessions are never shared.</p>
+            </section>
+          </div>
+          <div class="stats-slot" id="classTimelineSlot"></div>
+        </div>
+
+        <!-- Posts (student-classroom.js): announcements from the teacher -->
+        <div class="class-hub-panel" id="classPanelPosts" role="tabpanel" aria-labelledby="classTabPosts" hidden>
+          <p class="classroom-setup" id="studentPostsSetup" hidden></p>
+          <section class="panel-card" aria-labelledby="studentPostsTitle">
+            <div class="panel-head">
+              <div>
+                <h2 class="panel-title" id="studentPostsTitle"><span class="chip-icon"><svg><use href="#i-megaphone"/></svg></span>Posts</h2>
+                <p class="panel-sub">Announcements from your teacher, newest first.</p>
+              </div>
+            </div>
+            <ul class="post-list" id="studentPostList"><li class="empty-state">Loading…</li></ul>
+          </section>
+        </div>
+
+        <!-- Assignments (student-classroom.js): your teacher's assignments and your own submissions -->
+        <div class="class-hub-panel" id="classPanelAssignments" role="tabpanel" aria-labelledby="classTabAssignments" hidden>
+          <p class="classroom-setup" id="studentAssignmentsSetup" hidden></p>
+          <section class="panel-card" aria-labelledby="studentAssignmentsTitle">
+            <div class="panel-head">
+              <div>
+                <h2 class="panel-title" id="studentAssignmentsTitle"><span class="chip-icon"><svg><use href="#i-assignment"/></svg></span>Assignments <span id="studentAssignmentsInfo"></span></h2>
+                <p class="panel-sub">Upload one file per assignment. You can replace it until the deadline. Only you and your teacher can see it.</p>
+              </div>
+            </div>
+            <ul class="assignment-cards" id="studentAssignmentList"><li class="empty-state">Loading…</li></ul>
+          </section>
+        </div>
+
+        <!-- Quizzes (student-quizzes.js): live class quizzes you join and answer -->
+        <div class="class-hub-panel" id="classPanelQuizzes" role="tabpanel" aria-labelledby="classTabQuizzes" hidden>
+          <p class="classroom-setup" id="studentQuizzesSetup" hidden></p>
+          <section class="panel-card" id="studentQuizListCard" aria-labelledby="studentQuizzesTitle">
+            <div class="panel-head">
+              <div>
+                <h2 class="panel-title" id="studentQuizzesTitle"><span class="chip-icon"><svg><use href="#i-quiz"/></svg></span>Quizzes <span id="studentQuizTips"></span></h2>
+                <p class="panel-sub">When your teacher opens a quiz, join it here. One point for each correct answer.</p>
+              </div>
+            </div>
+            <ul class="assignment-list" id="studentQuizList"><li class="empty-state">Loading…</li></ul>
+          </section>
+          <section class="panel-card quiz-play" id="studentQuizPlay" hidden aria-labelledby="studentQuizTitle">
+            <button class="text-link back-to-list" type="button" id="studentQuizBack"><svg class="icon"><use href="#i-back"/></svg>All quizzes</button>
+            <h2 class="panel-title" id="studentQuizTitle">Quiz</h2>
+            <p class="quiz-status" id="studentQuizStatus" aria-live="polite"></p>
+            <div id="studentQuizBody"></div>
+          </section>
+        </div>
       </section>
 
       <!-- ================= My profile (scripts/shared/profile.js) ================= -->
@@ -1024,17 +1157,20 @@
 
   <script src="../scripts/shared/app.js?v=4"></script>
   <script src="../scripts/shared/dashboard-nav.js?v=3"></script>
-  <script src="../scripts/student/student-ui.js?v=3"></script>
+  <script src="../scripts/student/student-ui.js?v=6"></script>
   <!-- auth-guard.js must load first: the other modules wait on window.neuroFocusReady -->
   <script type="module" src="../scripts/auth/auth-guard.js?v=4"></script>
-  <script type="module" src="../scripts/tracking/eye-analyzer.js?v=4"></script>
+  <script type="module" src="../scripts/tracking/eye-analyzer.js?v=5"></script>
   <script type="module" src="../scripts/student/learning-assistant.js?v=5"></script>
   <script type="module" src="../scripts/student/student-notes.js?v=6"></script>
-  <script type="module" src="../scripts/student/student-classes.js?v=14"></script>
-  <script type="module" src="../scripts/student/student-focus.js?v=10"></script>
-  <script type="module" src="../scripts/student/student-history.js?v=6"></script>
+  <script type="module" src="../scripts/student/student-classes.js?v=16"></script>
+  <script type="module" src="../scripts/student/student-focus.js?v=12"></script>
+  <script type="module" src="../scripts/student/student-history.js?v=7"></script>
   <script type="module" src="../scripts/shared/profile.js?v=1"></script>
-  <script type="module" src="../scripts/student/student-dashboard.js?v=7"></script>
+  <script type="module" src="../scripts/student/student-dashboard.js?v=8"></script>
+  <script type="module" src="../scripts/student/student-classroom.js?v=3"></script>
+  <script type="module" src="../scripts/student/student-quizzes.js?v=1"></script>
+  <script src="../scripts/shared/info-popover.js?v=1"></script>
   <script type="module" src="../scripts/shared/home-background.js?v=1"></script>
 </body>
 </html>
