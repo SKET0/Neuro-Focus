@@ -36,7 +36,7 @@
     })();
   </script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="../styles/student.css?v=1">
+  <link rel="stylesheet" href="../styles/student.css?v=6">
   <link rel="stylesheet" href="../styles/dashboard-layout.css?v=3">
 </head>
 <body data-required-role="student">
@@ -210,101 +210,137 @@
           </div>
         </section>
 
-        <div class="home-grid">
-          <div class="home-col">
-            <section class="panel-card home-card" id="today-plan" aria-labelledby="planTitle">
-              <div class="panel-head">
-                <div>
-                  <h2 class="panel-title" id="planTitle"><span class="chip-icon"><svg><use href="#i-calendar"/></svg></span>Today’s plan</h2>
-                  <p class="panel-sub">Live classes as they happen and the steps you set yourself.</p>
-                </div>
-              </div>
-              <ul class="plan-list" id="planList" aria-live="polite"><li class="empty-state">Loading…</li></ul>
-              <form class="inline-form plan-add" id="planAddForm">
-                <input id="planAddInput" class="field-input" type="text" maxlength="120" placeholder="Add a small step, like “Read pages 12–14”" aria-label="Add a step to today’s plan" autocomplete="off">
-                <button class="btn-action" type="submit"><svg class="icon"><use href="#i-plus"/></svg>Add</button>
-              </form>
-              <p class="plan-note">No class timetable or deadlines are connected to Neuro-Focus, so nothing here is guessed: live sessions appear when your teacher starts them, and steps are the ones you add (saved on this device).</p>
-            </section>
+        <!-- At a glance: overall focus score and this week, from saved sessions (student-dashboard.js) -->
+        <section class="glance" aria-label="Your focus at a glance">
+          <a class="glance-tile score-tile home-card" style="--d: 1" href="#progress" aria-describedby="scoreNote">
+            <span class="score-ring" aria-hidden="true">
+              <svg viewBox="0 0 120 120">
+                <defs>
+                  <linearGradient id="scoreGradient" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" style="stop-color: var(--accent)"/>
+                    <stop offset="100%" style="stop-color: var(--green)"/>
+                  </linearGradient>
+                </defs>
+                <circle class="score-track" cx="60" cy="60" r="50"/>
+                <circle class="score-fill" id="scoreRing" cx="60" cy="60" r="50"/>
+              </svg>
+              <span class="score-center"><strong id="scoreValue">—</strong><small>score</small></span>
+            </span>
+            <span class="glance-text">
+              <span class="glance-label">Focus score</span>
+              <b class="glance-value-sm" id="scoreLevel">Loading…</b>
+              <small class="glance-note" id="scoreNote">&nbsp;</small>
+            </span>
+          </a>
+          <a class="glance-tile home-card" style="--d: 2" href="#progress">
+            <span class="glance-label"><svg class="icon" aria-hidden="true"><use href="#i-timer"/></svg>Focused this week</span>
+            <b class="glance-value" id="glanceFocusTime">—</b>
+            <span class="glance-bars" id="glanceBars" aria-hidden="true"></span>
+            <small class="glance-note" id="glanceFocusNote">&nbsp;</small>
+          </a>
+          <a class="glance-tile home-card" style="--d: 3" href="#progress">
+            <span class="glance-label"><svg class="icon" aria-hidden="true"><use href="#i-flame"/></svg>Day streak</span>
+            <b class="glance-value" id="glanceStreak">—</b>
+            <span class="glance-days" id="glanceDays" aria-hidden="true"></span>
+            <small class="glance-note" id="glanceStreakNote">&nbsp;</small>
+          </a>
+          <a class="glance-tile timer-tile home-card" style="--d: 4" href="#focus-timer" id="glanceTimer">
+            <span class="glance-label"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg>Focus timer</span>
+            <b class="glance-value" id="glanceTimerValue">25:00</b>
+            <small class="glance-note" id="toolTimer">Ready when you are</small>
+            <small class="glance-note tracking-note" id="toolTracking">Camera off</small>
+          </a>
+        </section>
 
-            <section class="panel-card home-card" id="home-classes" aria-labelledby="homeClassesTitle">
-              <div class="panel-head">
-                <div>
-                  <h2 class="panel-title" id="homeClassesTitle"><span class="chip-icon"><svg><use href="#i-school"/></svg></span>Your classes</h2>
-                  <p class="panel-sub">Pick a class to work in, or join when your teacher goes live.</p>
-                </div>
-                <button class="btn-action" type="button" data-action="join-class"><svg class="icon"><use href="#i-plus"/></svg>Join a class</button>
+        <div class="home-pair">
+          <section style="--d: 5" class="panel-card home-card" id="today-plan" aria-labelledby="planTitle">
+            <div class="panel-head">
+              <div>
+                <h2 class="panel-title" id="planTitle"><span class="chip-icon"><svg><use href="#i-calendar"/></svg></span>Today’s plan</h2>
+                <p class="panel-sub">Live classes as they happen and the steps you set yourself.</p>
               </div>
-              <div class="home-class-grid" id="homeClassGrid"><p class="empty-state">Loading your classes…</p></div>
-            </section>
-          </div>
+            </div>
+            <ul class="plan-list" id="planList" aria-live="polite"><li class="empty-state">Loading…</li></ul>
+            <form class="inline-form plan-add" id="planAddForm">
+              <input id="planAddInput" class="field-input" type="text" maxlength="120" placeholder="Add a small step, like “Read pages 12–14”" aria-label="Add a step to today’s plan" autocomplete="off">
+              <button class="btn-action" type="submit"><svg class="icon"><use href="#i-plus"/></svg>Add</button>
+            </form>
+            <p class="plan-note">No class timetable or deadlines are connected to Neuro-Focus, so nothing here is guessed: live sessions appear when your teacher starts them, and steps are the ones you add (saved on this device).</p>
+          </section>
 
-          <div class="home-col">
-            <section class="panel-card home-card buddy-entry" aria-labelledby="buddyEntryTitle">
-              <div class="buddy-entry-head">
-                <span class="buddy-face" aria-hidden="true"><svg><use href="#i-chat"/></svg></span>
-                <div>
-                  <p class="page-kicker">NeuroBuddy</p>
-                  <h2 class="buddy-entry-title" id="buddyEntryTitle">What are we learning today?</h2>
-                </div>
+          <section style="--d: 6" class="panel-card home-card" id="continue-card" aria-labelledby="continueTitle">
+            <div class="panel-head">
+              <div>
+                <h2 class="panel-title" id="continueTitle"><span class="chip-icon green"><svg><use href="#i-history"/></svg></span>Continue where you left off</h2>
+                <p class="panel-sub">Your latest notes, chats and sessions.</p>
               </div>
-              <form id="buddyEntryForm" class="tutor-form-row">
-                <input id="buddyEntryInput" class="field-input" type="text" placeholder="Ask about anything you’re studying…" aria-labelledby="buddyEntryTitle" autocomplete="off">
-                <button class="btn-primary" type="submit">Ask</button>
-              </form>
-              <div class="prompt-chips" role="group" aria-label="Ways NeuroBuddy can help">
-                <button class="chip" type="button" data-buddy-starter="Explain this topic simply, with one everyday example: "><svg><use href="#i-spark"/></svg>Explain a topic</button>
-                <button class="chip" type="button" data-buddy-starter="I'm stuck getting started. Break this task into tiny first steps: "><svg><use href="#i-rocket"/></svg>Help me start</button>
-                <button class="chip" type="button" data-buddy-starter="Help me plan this assignment as a short list of steps in a sensible order: "><svg><use href="#i-list"/></svg>Plan an assignment</button>
-              </div>
-            </section>
-
-            <section class="panel-card home-card" id="continue-card" aria-labelledby="continueTitle">
-              <div class="panel-head">
-                <div>
-                  <h2 class="panel-title" id="continueTitle"><span class="chip-icon green"><svg><use href="#i-history"/></svg></span>Continue where you left off</h2>
-                  <p class="panel-sub">Your latest notes, chats and sessions.</p>
-                </div>
-              </div>
-              <ul class="continue-list" id="continueList"><li class="empty-state">Loading…</li></ul>
-            </section>
-
-            <section class="panel-card home-card" aria-labelledby="focusToolsTitle">
-              <div class="panel-head">
-                <div>
-                  <h2 class="panel-title" id="focusToolsTitle"><span class="chip-icon amber"><svg><use href="#i-target"/></svg></span>Focus tools</h2>
-                  <p class="panel-sub">Your camera only turns on when you start tracking.</p>
-                </div>
-              </div>
-              <div class="tool-rows">
-                <a class="tool-row" href="#focus-timer">
-                  <span class="chip-icon"><svg><use href="#i-timer"/></svg></span>
-                  <span><b>Focus timer</b><small id="toolTimer">Ready when you are</small></span>
-                  <svg class="chevron" aria-hidden="true"><use href="#i-chevron"/></svg>
-                </a>
-                <a class="tool-row" href="#focus-session">
-                  <span class="chip-icon green"><svg><use href="#i-eye"/></svg></span>
-                  <span><b>Attention tracking</b><small id="toolTracking">Camera off</small></span>
-                  <svg class="chevron" aria-hidden="true"><use href="#i-chevron"/></svg>
-                </a>
-                <a class="tool-row" href="#progress">
-                  <span class="chip-icon amber"><svg><use href="#i-chart"/></svg></span>
-                  <span><b>My progress</b><small>Attention scores, charts and saved sessions</small></span>
-                  <svg class="chevron" aria-hidden="true"><use href="#i-chevron"/></svg>
-                </a>
-              </div>
-            </section>
-          </div>
+            </div>
+            <ul class="continue-list" id="continueList"><li class="empty-state">Loading…</li></ul>
+          </section>
         </div>
+
+        <div class="home-pair">
+          <section style="--d: 7" class="panel-card home-card" id="home-classes" aria-labelledby="homeClassesTitle">
+            <div class="panel-head">
+              <div>
+                <h2 class="panel-title" id="homeClassesTitle"><span class="chip-icon"><svg><use href="#i-school"/></svg></span>Your classes</h2>
+                <p class="panel-sub">Pick a class to work in, or join when your teacher goes live.</p>
+              </div>
+              <button class="btn-action" type="button" data-action="join-class"><svg class="icon"><use href="#i-plus"/></svg>Join a class</button>
+            </div>
+            <div class="home-class-grid" id="homeClassGrid"><p class="empty-state">Loading your classes…</p></div>
+          </section>
+
+          <section style="--d: 8" class="panel-card home-card buddy-entry" aria-labelledby="buddyEntryTitle">
+            <div class="buddy-entry-head">
+              <span class="buddy-face" aria-hidden="true"><svg><use href="#i-chat"/></svg></span>
+              <div>
+                <p class="page-kicker">NeuroBuddy</p>
+                <h2 class="buddy-entry-title" id="buddyEntryTitle">What are we learning today?</h2>
+              </div>
+            </div>
+            <form id="buddyEntryForm" class="tutor-form-row">
+              <input id="buddyEntryInput" class="field-input" type="text" placeholder="Ask about anything you’re studying…" aria-labelledby="buddyEntryTitle" autocomplete="off">
+              <button class="btn-primary" type="submit">Ask</button>
+            </form>
+            <div class="prompt-chips" role="group" aria-label="Ways NeuroBuddy can help">
+              <button class="chip" type="button" data-buddy-starter="Explain this topic simply, with one everyday example: "><svg><use href="#i-spark"/></svg>Explain a topic</button>
+              <button class="chip" type="button" data-buddy-starter="I'm stuck getting started. Break this task into tiny first steps: "><svg><use href="#i-rocket"/></svg>Help me start</button>
+              <button class="chip" type="button" data-buddy-starter="Help me plan this assignment as a short list of steps in a sensible order: "><svg><use href="#i-list"/></svg>Plan an assignment</button>
+            </div>
+          </section>
+        </div>
+
+        <!-- Focus coach (student-dashboard.js + focus-analysis.js): tips from the student's own saved sessions -->
+        <section style="--d: 9" class="panel-card home-card coach-card" id="focus-coach" aria-labelledby="coachTitle">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title" id="coachTitle"><span class="chip-icon green"><svg><use href="#i-spark"/></svg></span>Focus coach</h2>
+              <p class="panel-sub" id="coachBasis">Looking at your saved sessions…</p>
+            </div>
+            <a class="text-link" href="#progress"><svg class="icon" aria-hidden="true"><use href="#i-chart"/></svg>See my progress</a>
+          </div>
+          <div class="coach-progress" id="coachProgress" hidden></div>
+          <div class="coach-grid">
+            <div class="coach-col" aria-labelledby="coachWinsTitle">
+              <h3 class="coach-heading" id="coachWinsTitle"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Going well</h3>
+              <ul class="coach-list" id="coachWins"><li class="empty-state">Loading…</li></ul>
+            </div>
+            <div class="coach-col" aria-labelledby="coachTipsTitle">
+              <h3 class="coach-heading tips" id="coachTipsTitle"><svg class="icon" aria-hidden="true"><use href="#i-rocket"/></svg>Try next</h3>
+              <ul class="coach-list" id="coachTips"><li class="empty-state">Loading…</li></ul>
+            </div>
+          </div>
+        </section>
       </section>
 
       <!-- ================= Focus session ================= -->
       <section class="view" id="view-focus" data-view="focus" hidden aria-labelledby="focusPageTitle">
         <div class="page-head">
           <div>
-            <div class="page-kicker">Timer and attention tracking</div>
+            <div class="page-kicker">This session · timer and attention tracking</div>
             <h1 class="page-title" id="focusPageTitle">Focus session</h1>
-            <p class="page-sub">Work in short blocks with breaks. Your camera only turns on when you start tracking, and video never leaves this device.</p>
+            <p class="page-sub">Everything about the session you’re in right now: your timer, steps and live attention numbers. Your camera only turns on when you start tracking, and video never leaves this device.</p>
           </div>
           <div class="page-actions">
             <button class="btn-action" type="button" data-action="join-class"><svg class="icon"><use href="#i-plus"/></svg>Join a class</button>
@@ -321,6 +357,40 @@
           </div>
           <div class="class-banner-actions" id="bannerActions"></div>
         </section>
+
+        <div class="section-heading" id="this-session">
+          <div>
+            <h2>This session</h2>
+            <p>Live numbers while attention tracking is on. They start fresh each time you start tracking.</p>
+          </div>
+        </div>
+        <!-- Live focus stats (student-focus.js) -->
+        <div class="stat-grid" aria-label="Live focus statistics">
+          <article class="stat-card">
+            <span class="stat-label">Live attention</span>
+            <span class="chip-icon"><svg><use href="#i-eye"/></svg></span>
+            <strong id="statLiveScore">—</strong>
+            <small id="statLiveState">Start tracking to begin</small>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">Session focus</span>
+            <span class="chip-icon green"><svg><use href="#i-target"/></svg></span>
+            <strong id="statSessionFocus">—</strong>
+            <small id="statTracked">0:00 tracked</small>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">Focus streak</span>
+            <span class="chip-icon amber"><svg><use href="#i-flame"/></svg></span>
+            <strong id="statStreak">0:00</strong>
+            <small id="statBestStreak">Best this session: 0:00</small>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">Attention lapses</span>
+            <span class="chip-icon red"><svg><use href="#i-flag"/></svg></span>
+            <strong id="statLapses">0</strong>
+            <small id="statNudges">0 nudges shown</small>
+          </article>
+        </div>
 
         <div class="dash-grid">
           <div class="dash-col">
@@ -360,7 +430,21 @@
                 <label class="switch"><input type="checkbox" id="shareToggle" checked> Share with my teacher</label>
               </div>
               <p class="share-status" id="shareStatus" aria-live="polite">Checking your class…</p>
-              <p class="tracker-progress-link">Live scores, lapses and your focus timeline are in <a class="text-link" href="#progress">My progress</a>.</p>
+              <p class="tracker-progress-link">When you stop tracking, this session is saved to <a class="text-link" href="#progress">My progress</a>.</p>
+            </section>
+
+            <!-- Focus timeline (student-focus.js) -->
+            <section class="panel-card" id="focus-timeline" aria-labelledby="timelineTitle">
+              <div class="panel-head">
+                <div>
+                  <div class="panel-title" id="timelineTitle"><span class="chip-icon"><svg><use href="#i-chart"/></svg></span>Focus timeline</div>
+                  <div class="panel-sub">This session’s attention, second by second, over the last 2 minutes. Above 70% counts as focused.</div>
+                </div>
+              </div>
+              <div class="chart-box">
+                <canvas id="focusTimeline" role="img" aria-label="Your attention score over time"></canvas>
+                <div class="chart-empty" id="timelineEmpty">Start attention tracking to see your focus timeline.</div>
+              </div>
             </section>
           </div>
 
@@ -548,71 +632,23 @@
         </div>
       </section>
 
-      <!-- ================= My progress (student-focus.js + student-history.js) ================= -->
+      <!-- ================= My progress: saved history only (student-history.js) ================= -->
       <section class="view" id="view-progress" data-view="progress" hidden aria-labelledby="progressPageTitle">
         <div class="page-head">
           <div>
-            <div class="page-kicker">Saved to your account</div>
+            <div class="page-kicker">Your track record · saved to your account</div>
             <h1 class="page-title" id="progressPageTitle">My progress</h1>
-            <p class="page-sub">Your attention scores, focus timeline and saved sessions, and what helps you focus best.</p>
+            <p class="page-sub">Sessions you’ve finished, how your focus is changing over time, and what helps you focus best. Live numbers for the session you’re in are in Focus session.</p>
           </div>
           <div class="page-actions">
             <a class="btn-action" href="#focus"><svg class="icon"><use href="#i-timer"/></svg>Open focus session</a>
           </div>
         </div>
 
-        <div class="section-heading">
-          <div>
-            <h2>This session</h2>
-            <p>Live numbers while attention tracking is on.</p>
-          </div>
-        </div>
-        <!-- Live focus stats (student-focus.js) -->
-        <div class="stat-grid" aria-label="Live focus statistics">
-          <article class="stat-card">
-            <span class="stat-label">Live attention</span>
-            <span class="chip-icon"><svg><use href="#i-eye"/></svg></span>
-            <strong id="statLiveScore">—</strong>
-            <small id="statLiveState">Start tracking to begin</small>
-          </article>
-          <article class="stat-card">
-            <span class="stat-label">Session focus</span>
-            <span class="chip-icon green"><svg><use href="#i-target"/></svg></span>
-            <strong id="statSessionFocus">—</strong>
-            <small id="statTracked">0:00 tracked</small>
-          </article>
-          <article class="stat-card">
-            <span class="stat-label">Focus streak</span>
-            <span class="chip-icon amber"><svg><use href="#i-flame"/></svg></span>
-            <strong id="statStreak">0:00</strong>
-            <small id="statBestStreak">Best this session: 0:00</small>
-          </article>
-          <article class="stat-card">
-            <span class="stat-label">Attention lapses</span>
-            <span class="chip-icon red"><svg><use href="#i-flag"/></svg></span>
-            <strong id="statLapses">0</strong>
-            <small id="statNudges">0 nudges shown</small>
-          </article>
-        </div>
-
-        <!-- Focus timeline (student-focus.js) -->
-        <section class="panel-card" id="focus-timeline" aria-labelledby="timelineTitle">
-          <div class="panel-head">
-            <div>
-              <div class="panel-title" id="timelineTitle"><span class="chip-icon"><svg><use href="#i-chart"/></svg></span>Focus timeline</div>
-              <div class="panel-sub">Your attention each second over the last 2 minutes. Above 70% counts as focused.</div>
-            </div>
-          </div>
-          <div class="chart-box">
-            <canvas id="focusTimeline" role="img" aria-label="Your attention score over time"></canvas>
-            <div class="chart-empty" id="timelineEmpty">Start attention tracking to see your focus timeline.</div>
-          </div>
-        </section>
-
         <div class="section-heading" id="history">
           <div>
-            <h2>Your history</h2>
-            <p>Every session you track is saved here.</p>
+            <h2>Your saved sessions</h2>
+            <p>Each session is added when you stop tracking.</p>
           </div>
           <div class="range-switch" role="group" aria-label="Time range">
             <button type="button" data-range="7" aria-pressed="true">7 days</button>
@@ -929,9 +965,10 @@
   <script type="module" src="../scripts/student/learning-assistant.js?v=4"></script>
   <script type="module" src="../scripts/student/student-notes.js?v=5"></script>
   <script type="module" src="../scripts/student/student-classes.js?v=11"></script>
-  <script type="module" src="../scripts/student/student-focus.js?v=7"></script>
-  <script type="module" src="../scripts/student/student-history.js?v=2"></script>
+  <script type="module" src="../scripts/student/student-focus.js?v=8"></script>
+  <script type="module" src="../scripts/student/student-history.js?v=4"></script>
   <script type="module" src="../scripts/student/student-profile.js?v=1"></script>
-  <script type="module" src="../scripts/student/student-dashboard.js?v=1"></script>
+  <script type="module" src="../scripts/student/student-dashboard.js?v=5"></script>
+  <script type="module" src="../scripts/student/home-background.js?v=1"></script>
 </body>
 </html>

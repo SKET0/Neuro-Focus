@@ -2,12 +2,15 @@
 // main action chosen from real data (join a live class → continue studying → start a focus
 // session), today's plan, their classes, a way into NeuroBuddy and where they left off.
 // Nothing is made up: no timetable or deadlines are connected, so only live sessions, the
-// student's own steps, notes, chats and saved sessions are shown. Detailed scores and charts
-// stay in My progress. The camera is never started from here without a click.
+// student's own steps, notes, chats and saved sessions are shown. Live scores are in Focus
+// session and saved history in My progress. The camera is never started from here without a click.
 //
 // Data comes from the other student modules: classes and live sessions (student-classes.js,
 // "neurofocus:class-status"), the timer and steps (student-focus.js) and the profile
 // (student-profile.js). Notes and the latest saved session are read here.
+
+import { buildCoaching, averageFocus, focusedSeconds, sum, levelFor } from "./focus-analysis.js?v=1";
+import { notify } from "../shared/class-live.js?v=9";
 
 const app = await window.neuroFocusReady;
 
@@ -23,6 +26,8 @@ if (app) {
   let tracking = false;
   let recentNotes = null; // null while loading
   let lastSession = null;
+  let savedSessions = null; // finished saved sessions, newest first (null while loading)
+  let sessionsFailed = false;
   let extrasLoadedAt = 0;
 
   // ---------- Small helpers ----------
@@ -437,7 +442,7 @@ if (app) {
       if (lastSession) {
         const minutes = Math.max(1, Math.round(lastSession.tracked_seconds / 60));
         const focus = lastSession.focus_percent === null || lastSession.focus_percent === undefined ? "" : ` · ${lastSession.focus_percent}% focused`;
-        row("i-history", "", "Your last focus session", `${relativeTime(lastSession.started_at)} · ${minutes} min tracked${focus}`, null, "session", "#progress");
+        row("i-history", "", lastSession.ended_at ? "Your last focus session" : "Your last focus session (unfinished)", `${relativeTime(lastSession.started_at)} · ${minutes} min tracked${focus}`, null, "session", "#progress");
       }
       if (!items.length) {
         items.push(el("li", "empty-state", recentNotes === null
@@ -454,10 +459,14 @@ if (app) {
     extrasLoadedAt = Date.now();
     const [notes, sessions] = await Promise.all([
       supabase.from("student_notes").select("id, title, class_id, updated_at").eq("student_id", app.user.id).order("updated_at", { ascending: false }).limit(3),
-      supabase.from("attention_sessions").select("started_at, tracked_seconds, focus_percent").eq("student_id", app.user.id).gt("tracked_seconds", 4).order("started_at", { ascending: false }).limit(1)
+      supabase.from("attention_sessions").select("id, started_at, last_seen_at, ended_at, tracked_seconds, focus_percent, lapses, best_streak_seconds").eq("student_id", app.user.id).gt("tracked_seconds", 4).order("started_at", { ascending: false }).limit(60)
     ]);
     recentNotes = notes.error ? [] : notes.data || [];
-    lastSession = sessions.error ? null : sessions.data?.[0] || null;
+    // The session being recorded right now isn't saved history yet (student-focus.js decides).
+    const inProgress = window.neuroFocusSessionInProgress || ((s) => !s.ended_at);
+    sessionsFailed = Boolean(sessions.error);
+    savedSessions = sessions.error ? [] : (sessions.data || []).filter((s) => !inProgress(s));
+    lastSession = savedSessions[0] || null;
     renderAll();
   }
 
@@ -489,13 +498,17 @@ if (app) {
     ].filter(Boolean).join(", ");
     if (pill.getAttribute("aria-label") !== spoken) pill.setAttribute("aria-label", spoken);
 
+    const timerValue = $("#glanceTimerValue");
+    if (timerValue && timerState && timerValue.textContent !== mmss(timerState.remaining)) timerValue.textContent = mmss(timerState.remaining);
+    $("#glanceTimer")?.setAttribute("data-state", running ? (timerState.phase === "break" ? "break" : "running") : timerActive() ? "paused" : "idle");
     if (toolTimer) {
-      toolTimer.textContent = timerActive()
-        ? timerLine().replace(/^./, (c) => c.toUpperCase())
-        : `Ready · ${timerState ? Math.round(timerState.total / 60) : 25}-minute focus blocks with breaks`;
+      const line = timerActive()
+        ? (running ? (timerState.phase === "break" ? "Break running" : "Focus block running") : "Paused")
+        : `Ready · ${timerState ? Math.round(timerState.total / 60) : 25}-minute blocks`;
+      if (toolTimer.textContent !== line) toolTimer.textContent = line;
     }
     if (toolTracking) {
-      toolTracking.textContent = tracking ? "On · video never leaves this device" : "Camera off until you press start";
+      toolTracking.textContent = tracking ? "Tracking on · video stays on this device" : "Camera off until you start tracking";
       toolTracking.dataset.state = tracking ? "on" : "";
     }
   }
@@ -517,12 +530,228 @@ if (app) {
   });
 
   // ---------- Wiring ----------
+  // ---------- Focus coach ----------
+  // What's going well and what to try next, from the student's saved sessions and what they have
+  // set up right now (focus-analysis.js). Each tip's button uses the controls that already exist.
+  const nudgeToggle = $("#nudgeToggle");
+  const timerPreset = $("#timerPreset");
+  const habits = () => ({
+    nudgesOn: Boolean(nudgeToggle?.checked),
+    stepsPlanned: goals.some((goal) => !goal.done),
+    timerPreset: timerPreset?.value || "25-5"
+  });
+
+  function runCoachAction(action) {
+    if (action.kind === "preset") {
+      // Changing the length resets the timer, so a running block is never cut short from here.
+      if (timerActive()) {
+        notify({ title: "Your timer is running", text: "Change the block length in the timer when this block is done.", kind: "info" });
+      } else if (timerPreset) {
+        timerPreset.value = action.value;
+        timerPreset.dispatchEvent(new Event("change"));
+        notify({ title: `Timer set to ${timerPreset.selectedOptions[0]?.textContent || action.value}`, text: "Start a focus block whenever you’re ready.", kind: "success" });
+      }
+      window.neuroFocusNavigate?.("focus-timer");
+    } else if (action.kind === "nudges" && nudgeToggle) {
+      nudgeToggle.checked = true;
+      nudgeToggle.dispatchEvent(new Event("change")); // saved like any other setting (student-focus.js)
+      notify({ title: "Re-engagement nudges are on", text: "You’ll get a gentle prompt if your attention drifts while tracking.", kind: "success" });
+    } else if (action.kind === "step") {
+      const input = $("#planAddInput");
+      input.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
+      input.focus({ preventScroll: true });
+    }
+  }
+
+  function renderCoach() {
+    const winsList = $("#coachWins");
+    const tipsList = $("#coachTips");
+    const basis = $("#coachBasis");
+    const progressBox = $("#coachProgress");
+    if (savedSessions === null) return;
+    const coaching = sessionsFailed ? null : buildCoaching(savedSessions, habits());
+    renderIfChanged("coach", JSON.stringify([coaching, sessionsFailed]), $("#focus-coach"), () => {
+      if (!coaching) {
+        basis.textContent = "Couldn’t load your saved sessions. Check your connection, then come back to Home.";
+        winsList.replaceChildren(el("li", "empty-state", "Nothing to show yet."));
+        tipsList.replaceChildren(el("li", "empty-state", "Nothing to show yet."));
+        progressBox.hidden = true;
+        return;
+      }
+      basis.textContent = coaching.basis;
+      $("#focus-coach").dataset.stage = coaching.stage;
+
+      progressBox.hidden = !coaching.progress;
+      if (coaching.progress) {
+        const { done, needed } = coaching.progress;
+        const meter = el("div", "unlock-meter");
+        const fill = el("span");
+        fill.style.width = `${Math.round((done / needed) * 100)}%`;
+        meter.append(fill);
+        meter.setAttribute("role", "progressbar");
+        meter.setAttribute("aria-valuemin", "0");
+        meter.setAttribute("aria-valuemax", String(needed));
+        meter.setAttribute("aria-valuenow", String(done));
+        meter.setAttribute("aria-label", "Sessions until personal tips");
+        progressBox.replaceChildren(
+          el("p", "", done
+            ? `${done} of ${needed} sessions tracked. After ${needed}, these tips are based on how you actually focus.`
+            : `Track ${needed} focus sessions and these tips will be based on how you actually focus. Until then, here are tips that help most students.`),
+          meter
+        );
+      }
+
+      const item = (entry, kind, index) => {
+        const li = el("li", `coach-item ${kind}`);
+        if (entry.tone) li.dataset.tone = entry.tone;
+        const body = el("div", "coach-text");
+        body.append(el("b", "", entry.title), el("p", "", entry.text));
+        if (entry.action) {
+          const starts = entry.action.kind === "start";
+          const action = button(entry.action.label, "btn-action", starts ? null : () => runCoachAction(entry.action), starts ? "i-play" : null);
+          if (starts) action.dataset.startFocus = ""; // handled by student-ui.js
+          action.dataset.focusKey = `coach-${kind}-${index}`;
+          body.append(action);
+        }
+        li.append(chipIcon(entry.icon, kind === "win" ? "green" : entry.tone || ""), body);
+        return li;
+      };
+      winsList.replaceChildren(...(coaching.wins.length
+        ? coaching.wins.map((entry, index) => item(entry, "win", index))
+        : [el("li", "empty-state", "Track a session and what’s going well will show up here.")]));
+      tipsList.replaceChildren(...coaching.tips.map((entry, index) => item(entry, "tip", index)));
+    });
+  }
+  nudgeToggle?.addEventListener("change", renderCoach);
+  timerPreset?.addEventListener("change", renderCoach);
+
+  // ---------- At a glance: focus score and this week ----------
+  // From finished saved sessions only. The score is the share of tracked time spent focused
+  // (the same measure as My progress), weighted by session length.
+  const DAY_MS = 86400000;
+  const startOfDay = (date) => { const d = new Date(date); d.setHours(0, 0, 0, 0); return d; };
+  const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const SCORE_RING = 2 * Math.PI * 50;
+  const shortDuration = (seconds) => {
+    const minutes = Math.round(seconds / 60);
+    return minutes < 60 ? `${minutes}m` : `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+  };
+
+  // Numbers count up to their new value (instantly for reduced motion).
+  function countTo(node, target, format) {
+    const from = Number(node.dataset.value || 0);
+    node.dataset.value = String(target);
+    if (reducedMotion() || from === target) { node.textContent = format(target); return; }
+    const started = performance.now();
+    const step = (now) => {
+      const t = Math.min(1, (now - started) / 900);
+      const eased = 1 - (1 - t) ** 3;
+      node.textContent = format(Math.round(from + (target - from) * eased));
+      if (t < 1 && Number(node.dataset.value) === target) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
+  function renderGlance() {
+    if (savedSessions === null) return;
+    const today = startOfDay(Date.now());
+    const weekStart = today.getTime() - 6 * DAY_MS;
+    const thisWeek = savedSessions.filter((s) => new Date(s.started_at) >= weekStart);
+    const lastWeek = savedSessions.filter((s) => { const t = new Date(s.started_at); return t >= weekStart - 7 * DAY_MS && t < weekStart; });
+    const monthly = savedSessions.filter((s) => Date.now() - new Date(s.started_at) < 30 * DAY_MS);
+    const scoreSource = thisWeek.length ? thisWeek : monthly;
+    const score = averageFocus(scoreSource);
+    const previous = thisWeek.length ? averageFocus(lastWeek) : null;
+    const days = Array.from({ length: 7 }, (_, i) => {
+      const from = weekStart + i * DAY_MS;
+      const items = thisWeek.filter((s) => { const t = new Date(s.started_at).getTime(); return t >= from && t < from + DAY_MS; });
+      return { date: new Date(from), seconds: sum(items, focusedSeconds), studied: items.length > 0 };
+    });
+    let streak = 0;
+    const studiedOn = new Set(savedSessions.map((s) => startOfDay(s.started_at).getTime()));
+    let cursor = studiedOn.has(today.getTime()) ? today.getTime() : today.getTime() - DAY_MS;
+    while (studiedOn.has(cursor)) { streak += 1; cursor -= DAY_MS; }
+    const weekFocused = sum(thisWeek, focusedSeconds);
+    const lastWeekFocused = sum(lastWeek, focusedSeconds);
+
+    const key = JSON.stringify([score, previous, days.map((d) => Math.round(d.seconds)), streak, sessionsFailed]);
+    renderIfChanged("glance", key, $(".glance"), () => {
+      // Score ring
+      const ring = $("#scoreRing");
+      ring.style.strokeDasharray = String(SCORE_RING);
+      ring.style.strokeDashoffset = String(SCORE_RING * (1 - (score ?? 0) / 100));
+      const value = $("#scoreValue");
+      if (score === null) {
+        value.textContent = "—";
+        value.dataset.value = "0";
+        $("#scoreLevel").textContent = sessionsFailed ? "Couldn’t load" : "No score yet";
+        $("#scoreNote").textContent = sessionsFailed ? "Check your connection" : "Track a focus session to get one";
+      } else {
+        countTo(value, score, (n) => String(n));
+        $("#scoreLevel").textContent = levelFor(score).label;
+        $(".score-tile").dataset.level = levelFor(score).key;
+        const change = previous === null ? null : score - previous;
+        $("#scoreNote").textContent = !thisWeek.length ? "From the last 30 days"
+          : change === null ? "From this week’s sessions"
+          : change === 0 ? "Same as last week"
+          : `${change > 0 ? "▲" : "▼"} ${Math.abs(change)} pts vs last week`;
+        $("#scoreNote").dataset.trend = change > 0 ? "up" : change < 0 ? "down" : "";
+      }
+
+      // Focused this week, with a bar per day
+      countTo($("#glanceFocusTime"), Math.round(weekFocused / 60), (n) => shortDuration(n * 60));
+      const top = Math.max(...days.map((d) => d.seconds), 60);
+      $("#glanceBars").replaceChildren(...days.map((d, i) => {
+        const bar = el("span", "glance-bar");
+        bar.style.setProperty("--h", `${Math.max(6, Math.round((d.seconds / top) * 100))}%`);
+        bar.style.setProperty("--i", String(i));
+        if (!d.seconds) bar.dataset.empty = "true";
+        if (i === 6) bar.dataset.today = "true";
+        bar.title = `${d.date.toLocaleDateString([], { weekday: "long" })}: ${d.seconds ? `${shortDuration(d.seconds)} focused` : "no sessions"}`;
+        return bar;
+      }));
+      const delta = Math.round((weekFocused - lastWeekFocused) / 60);
+      $("#glanceFocusNote").textContent = !thisWeek.length ? "No sessions in the last 7 days"
+        : !lastWeek.length ? `Across ${plural(thisWeek.length, "session")}`
+        : delta === 0 ? "Same as last week" : `${delta > 0 ? "▲" : "▼"} ${shortDuration(Math.abs(delta) * 60)} vs last week`;
+
+      // Day streak, with the last 7 days as dots
+      countTo($("#glanceStreak"), streak, (n) => plural(n, "day"));
+      $("#glanceDays").replaceChildren(...days.map((d, i) => {
+        const dot = el("span", "glance-day", d.date.toLocaleDateString([], { weekday: "narrow" }));
+        dot.dataset.on = String(d.studied);
+        dot.style.setProperty("--i", String(i));
+        if (i === 6) dot.dataset.today = "true";
+        return dot;
+      }));
+      $("#glanceStreakNote").textContent = streak && !studiedOn.has(today.getTime()) ? "Study today to keep it going"
+        : streak ? "Keep it going!" : "Study today to start a streak";
+    });
+  }
+
+  // A soft spotlight follows the pointer across Home's cards (pointer devices only).
+  const homeView = $("#view-dashboard");
+  let spotFrame = 0;
+  homeView.addEventListener("pointermove", (event) => {
+    if (event.pointerType !== "mouse") return;
+    const card = event.target.closest(".home-card, .home-hero");
+    if (!card) return;
+    cancelAnimationFrame(spotFrame);
+    spotFrame = requestAnimationFrame(() => {
+      const box = card.getBoundingClientRect();
+      card.style.setProperty("--mx", `${event.clientX - box.left}px`);
+      card.style.setProperty("--my", `${event.clientY - box.top}px`);
+    });
+  });
+
   function renderAll() {
     renderGreeting();
     renderNext();
     renderPlan();
     renderClasses();
     renderContinue();
+    renderCoach();
+    renderGlance();
     renderFocusIndicators();
   }
 
@@ -539,6 +768,7 @@ if (app) {
   window.addEventListener("neurofocus:goals-change", (event) => {
     goals = event.detail || [];
     renderPlan();
+    renderCoach();
   });
   window.addEventListener("neurofocus:tracking-started", () => {
     tracking = true;

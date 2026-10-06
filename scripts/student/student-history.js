@@ -1,9 +1,12 @@
-// Focus history view: summary stats, a focus-time chart, plain-language insights and the
-// session list, all for the chosen range (7 days, 30 days or all time). Reads the student's
+// My progress view: the student's saved track record. Summary stats, a focus-time chart,
+// plain-language insights and the session list, all for the chosen range (7 days, 30 days or
+// all time). Live numbers for the session in progress are in Focus session (student-focus.js);
+// a session still being recorded is left out here until it is stopped. Reads the student's
 // saved attention_sessions, and a session's attention_samples when it is opened.
 // Saving happens in student-focus.js, which fires "neurofocus:history-saved" afterwards.
 // Shown in the My progress view; colours follow the student's theme.
 import { themeColor, withAlpha } from "../shared/appearance.js?v=1";
+import { hasFocus, focusedSeconds, sum, averageFocus, levelFor, buildInsights } from "./focus-analysis.js?v=1";
 
 const app = await window.neuroFocusReady;
 
@@ -15,7 +18,8 @@ if (app) {
   const rangeKey = `neuroFocusHistoryRange:${app.user.id}`;
   const missingTables = (error) => error && (error.code === "PGRST205" || error.code === "42P01" || /attention_sessions|attention_samples/.test(error.message || ""));
 
-  let sessions = []; // newest first
+  let sessions = []; // newest first, without sessions still in progress
+  let inProgressCount = 0;
   let range = "7";
   let shown = PAGE_SIZE;
   let chart = null;
@@ -67,23 +71,6 @@ if (app) {
     return d.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric", ...(d.getFullYear() !== new Date().getFullYear() ? { year: "numeric" } : {}) });
   }
 
-  const hasFocus = (s) => s.focus_percent !== null && s.focus_percent !== undefined;
-  const focusedSeconds = (s) => (hasFocus(s) ? (s.tracked_seconds * s.focus_percent) / 100 : 0);
-  const sum = (list, fn) => list.reduce((total, item) => total + fn(item), 0);
-  // Average focus weighted by how long each session was, so a 1-minute session doesn't count like a 40-minute one.
-  function averageFocus(list) {
-    const scored = list.filter(hasFocus);
-    const tracked = sum(scored, (s) => s.tracked_seconds);
-    return tracked ? Math.round(sum(scored, focusedSeconds) / tracked * 100) : null;
-  }
-
-  const LEVELS = [
-    { min: 80, key: "great", label: "Great focus", color: "var(--green)" },
-    { min: 60, key: "good", label: "Good focus", color: "var(--info)" },
-    { min: 40, key: "mixed", label: "Up and down", color: "var(--amber)" },
-    { min: 0, key: "tough", label: "Hard to focus", color: "var(--red)" }
-  ];
-  const levelFor = (pct) => LEVELS.find((level) => pct >= level.min);
 
   // ---------- Range ----------
   function rangeInfo() {
@@ -237,74 +224,6 @@ if (app) {
   }
 
   // ---------- Insights ----------
-  const TIMES = [
-    { key: "morning", from: 5, to: 12, phrase: "in the morning" },
-    { key: "afternoon", from: 12, to: 17, phrase: "in the afternoon" },
-    { key: "evening", from: 17, to: 21, phrase: "in the evening" },
-    { key: "night", from: 21, to: 29, phrase: "late at night" }
-  ];
-  const LENGTHS = [
-    { max: 15 * 60, phrase: "sessions under 15 minutes", title: "Shorter sessions work best for you", tip: "Short focus-timer blocks with breaks suit you." },
-    { max: 30 * 60, phrase: "15–30 minute sessions", title: "Your sweet spot is 15–30 minutes", tip: "Plan your work in blocks of about that length." },
-    { max: Infinity, phrase: "sessions over 30 minutes", title: "You stay focused in longer sessions", tip: "Long, deep-work sessions are a strength of yours." }
-  ];
-
-  // Compares groups (time of day, session length) and returns the best and worst with enough data.
-  function compareGroups(list, groupOf) {
-    const groups = new Map();
-    list.filter(hasFocus).forEach((s) => {
-      const key = groupOf(s);
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key).push(s);
-    });
-    const scored = [...groups].filter(([, items]) => sum(items, (s) => s.tracked_seconds) >= 180)
-      .map(([key, items]) => ({ key, avg: averageFocus(items) }))
-      .sort((a, b) => b.avg - a.avg);
-    return scored.length >= 2 && scored[0].avg - scored[scored.length - 1].avg >= 5 ? { best: scored[0], worst: scored[scored.length - 1] } : null;
-  }
-
-  function buildInsights(current) {
-    const insights = [];
-    const chronological = current.filter(hasFocus).slice().reverse();
-
-    if (chronological.length >= 4) {
-      const half = Math.floor(chronological.length / 2);
-      const before = averageFocus(chronological.slice(0, half));
-      const after = averageFocus(chronological.slice(half));
-      if (after - before >= 5) insights.push({ tone: "green", icon: "i-trend", title: "Your focus is improving", text: `Your recent sessions average ${after}% focus, up from ${before}% before.` });
-      else if (before - after >= 5) insights.push({ tone: "amber", icon: "i-flag", title: "Your focus has dipped lately", text: `Recent sessions average ${after}%, down from ${before}%. A quieter spot or shorter sessions can help.` });
-      else insights.push({ tone: "", icon: "i-target", title: "Your focus is steady", text: `Your sessions stay around ${averageFocus(chronological)}% focus.` });
-    }
-
-    const hour = (s) => { const h = new Date(s.started_at).getHours(); return h < 5 ? h + 24 : h; };
-    const times = compareGroups(current, (s) => TIMES.find((t) => hour(s) >= t.from && hour(s) < t.to).key);
-    if (times) {
-      const best = TIMES.find((t) => t.key === times.best.key);
-      const worst = TIMES.find((t) => t.key === times.worst.key);
-      insights.push({ tone: "", icon: "i-sun", title: `You focus best ${best.phrase}`, text: `${times.best.avg}% focus, compared with ${times.worst.avg}% ${worst.phrase}. Try saving harder work for then.` });
-    }
-
-    const lengths = compareGroups(current, (s) => LENGTHS.findIndex((l) => s.tracked_seconds < l.max));
-    if (lengths) {
-      const best = LENGTHS[lengths.best.key];
-      const worst = LENGTHS[lengths.worst.key];
-      insights.push({ tone: "", icon: "i-timer", title: best.title, text: `${best.phrase[0].toUpperCase()}${best.phrase.slice(1)} average ${lengths.best.avg}% focus, versus ${lengths.worst.avg}% for ${worst.phrase}. ${best.tip}` });
-    }
-
-    const lapses = sum(current, (s) => s.lapses);
-    const minutes = sum(current, (s) => s.tracked_seconds) / 60;
-    if (minutes >= 5) {
-      if (!lapses) insights.push({ tone: "green", icon: "i-check", title: "No distractions recorded", text: "You stayed on task through every session in this range. Nice work." });
-      else {
-        const every = Math.max(1, Math.round(minutes / lapses));
-        insights.push(every >= 10
-          ? { tone: "green", icon: "i-check", title: `You lose focus about once every ${every} minutes`, text: "That's a strong stretch of attention. Short breaks will help you keep it up." }
-          : { tone: "amber", icon: "i-flag", title: `You lose focus about once every ${every} minute${every === 1 ? "" : "s"}`, text: "That's common, and it's okay. Gentle nudges and small micro-goals help you get back on track faster." });
-      }
-    }
-    return insights.slice(0, 4);
-  }
-
   function renderInsights(current, info) {
     const list = $("#insightList");
     const counted = current.filter(hasFocus).length;
@@ -369,13 +288,16 @@ if (app) {
     const main = el("span", "session-main");
     const title = el("span", "session-title", `${time(session.started_at)} · ${duration(session.tracked_seconds)}`);
     if (session.classes?.name) title.append(el("span", "class-tag", session.classes.name));
+    // Never stopped (e.g. the page was closed while tracking): shown, but clearly marked.
+    const unfinished = !session.ended_at;
+    if (unfinished) title.append(el("span", "class-tag unfinished-tag", "Unfinished"));
     const lapses = session.lapses ? plural(session.lapses, "distraction") : "no distractions";
     main.append(title, el("span", "session-meta", `${duration(focusedSeconds(session))} focused · ${lapses}`));
 
     const verdict = pct === null ? el("span") : el("span", "verdict", levelFor(pct).label);
     if (pct !== null) verdict.dataset.level = levelFor(pct).key;
     row.append(focusRing(pct), main, verdict, svgUse("i-chevron", "chevron"));
-    row.setAttribute("aria-label", `${dayTitle(session.started_at)} at ${time(session.started_at)}, ${duration(session.tracked_seconds)}, ${pct === null ? "no focus score" : `${pct}% focus, ${levelFor(pct).label}`}. Show details.`);
+    row.setAttribute("aria-label", `${dayTitle(session.started_at)} at ${time(session.started_at)}, ${duration(session.tracked_seconds)}${unfinished ? ", unfinished" : ""}, ${pct === null ? "no focus score" : `${pct}% focus, ${levelFor(pct).label}`}. Show details.`);
 
     const detail = el("div", "session-detail");
     detail.hidden = !openSessions.has(session.id);
@@ -418,6 +340,7 @@ if (app) {
       fact("Focused for", `${duration(focusedSeconds(session))} of ${duration(session.tracked_seconds)}`),
       fact("Longest streak", clock(session.best_streak_seconds))
     );
+    if (!session.ended_at) facts.append(el("span", "unfinished-note", `Unfinished: tracking wasn’t stopped, so this shows what was saved up to ${time(session.last_seen_at || session.started_at)}.`));
     const note = el("p", "strip-note", "Loading timeline…");
     detail.replaceChildren(facts, note);
 
@@ -460,7 +383,8 @@ if (app) {
 
   function renderList(current, info) {
     const days = $("#historyDays");
-    $("#historyCount").textContent = current.length ? `${plural(current.length, "session")} ${info.phrase}` : "";
+    const ongoing = inProgressCount ? `${plural(inProgressCount, "session")} still in progress, added here when stopped` : "";
+    $("#historyCount").textContent = [current.length ? `${plural(current.length, "session")} ${info.phrase}` : "", ongoing].filter(Boolean).join(" · ");
     if (!current.length) {
       const empty = el("div", "empty-state");
       const link = el("a", "", "Open Focus session");
@@ -522,7 +446,10 @@ if (app) {
       $("#insightList").replaceChildren(el("li", "empty-state", "Insights appear once your history loads."));
       return;
     }
-    sessions = data;
+    const inProgress = window.neuroFocusSessionInProgress
+      || ((s) => !s.ended_at && Date.now() - new Date(s.last_seen_at || s.started_at) < 90000);
+    sessions = data.filter((s) => !inProgress(s));
+    inProgressCount = data.length - sessions.length;
     render();
   }
 

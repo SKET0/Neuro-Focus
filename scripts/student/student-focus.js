@@ -368,6 +368,11 @@ if (app) {
     });
     paintTimeline();
     window.addEventListener("neurofocus:appearance-change", paintTimeline);
+    // The timeline lives in the Focus session view and may be drawn while that view is hidden:
+    // size it to its box whenever the view is shown.
+    window.addEventListener("neurofocus:viewchange", (event) => {
+      if (event.detail?.name === "focus") window.requestAnimationFrame(() => chart?.resize());
+    });
   } else {
     $("#timelineEmpty").textContent = "Chart library could not load. Check your internet connection and refresh.";
   }
@@ -598,6 +603,14 @@ if (app) {
     if (error) setHistoryStatus("Couldn’t update the session summary. Retrying…", true);
     else setHistoryStatus(final ? "Latest session saved." : "Recording this session. It appears here when you stop tracking.");
   }
+
+  // A saved session that hasn't finished yet: the one this page is recording right now, or one
+  // still being saved from another tab or device (progress is saved every 10 seconds, so it was
+  // updated in the last 90). My progress (student-history.js) and Home leave these out of history.
+  window.neuroFocusSessionInProgress = (session) => !session.ended_at && (
+    (saved.creating !== null && session.id === saved.sessionId)
+    || Date.now() - new Date(session.last_seen_at || session.started_at) < 90000
+  );
 
   window.addEventListener("neurofocus:tracking-started", startSavedSession);
   // Joining or leaving a live session mid-tracking closes this saved session and starts a new one.

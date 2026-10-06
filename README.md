@@ -177,7 +177,7 @@ Check it worked: **Storage** should now list a private bucket named `avatars`. U
 
 What students get:
 - **Home** is the page they land on after signing in: a welcome with their picture and name, one main action (join a live class → continue a recent note → start a focus session), today's plan (live sessions and their own steps only; no timetable is connected, so nothing is guessed), class cards with teachers and live status, a NeuroBuddy box, and links back to recent notes, chats and sessions. The camera never starts until they press a button.
-- **Focus session** holds the attention tracker, timer and steps; **My progress** holds the live scores, timeline and saved history.
+- **Focus session** is about the session in progress: the attention tracker, live scores, lapses and the live focus timeline, the timer and steps. **My progress** is the student's track record: finished, saved sessions, summaries, charts, date ranges and insights. A session still being recorded is left out of My progress until it is stopped; one that was never stopped (e.g. the page was closed) is marked *Unfinished*.
 - **My profile** (avatar, account menu or sidebar card): display name, built-in avatars or an uploaded picture with a square crop, and theme/accent with a live preview. **Save changes** stores everything on the account; **Cancel** goes back to what is saved.
 
 The chosen theme is also remembered in the browser for that account only, so pages open in the right colours straight away. It is cleared on sign-out and ignored if a different account signs in. Teacher pages always keep the default look.
