@@ -1,14 +1,15 @@
-// Home's live background: a slow "neural network" of drifting points in the student's accent
-// colour, drawn on a canvas behind the page (styles/student.css frosts the cards above it, so no
-// sharp movement passes behind text). It reacts gently to the mouse.
-// It only runs while Home is showing and the tab is visible, at most 30 frames a second, and
-// shows a still picture when the student prefers reduced motion.
-import { themeColor } from "../shared/appearance.js?v=1";
+// The Home pages' live background (student and teacher): a slow "neural network" of drifting
+// points in the accent colour, drawn on a canvas behind the page. styles/home.css frosts the
+// cards above it, so no sharp movement passes behind text. It reacts gently to the mouse.
+// It runs only while the element marked [data-live-background] is showing and the tab is
+// visible, at most 30 frames a second, and shows a still picture for reduced motion.
+import { themeColor } from "./appearance.js?v=1";
 
 const app = await window.neuroFocusReady;
 const main = document.querySelector("main");
+const area = document.querySelector("[data-live-background]");
 
-if (app && main) {
+if (app && main && area) {
   const canvas = document.createElement("canvas");
   canvas.className = "home-bg";
   canvas.setAttribute("aria-hidden", "true");
@@ -138,9 +139,10 @@ if (app && main) {
   }
 
   // Run only while it can be seen; a still picture for reduced motion.
+  const areaShown = () => !area.closest("[hidden]");
   function update() {
-    const visible = window.neuroFocusView === "dashboard" && document.visibilityState === "visible";
-    canvas.hidden = window.neuroFocusView !== "dashboard";
+    const visible = areaShown() && document.visibilityState === "visible";
+    canvas.hidden = !areaShown();
     const shouldRun = visible && !motionQuery.matches;
     if (shouldRun && !running) {
       running = true;
@@ -160,7 +162,8 @@ if (app && main) {
   }, { passive: true });
   main.addEventListener("pointerleave", () => { pointer.x = -9999; pointer.y = -9999; });
   window.addEventListener("resize", () => { resize(); if (!running) update(); });
-  window.addEventListener("neurofocus:viewchange", () => { resize(); update(); });
+  // The Home area is shown and hidden by each page's own navigation.
+  new MutationObserver(() => { resize(); update(); }).observe(area, { attributes: true, attributeFilter: ["hidden"] });
   window.addEventListener("neurofocus:appearance-change", () => { readColors(); if (!running) update(); });
   document.addEventListener("visibilitychange", update);
   motionQuery.addEventListener("change", update);

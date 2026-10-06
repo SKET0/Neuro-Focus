@@ -1,5 +1,6 @@
 // Reading a student's saved focus sessions (attention_sessions rows), shared by My progress
-// (student-history.js: insights for a date range) and Home (student-dashboard.js: the Focus coach).
+// (student-history.js: insights for a date range), Home (student-dashboard.js: the Focus coach)
+// and the teacher Home (teacher-home.js: class focus and insights from shared live-session history).
 // Everything here is worked out from the student's own saved numbers; nothing is invented.
 
 export const hasFocus = (s) => s.focus_percent !== null && s.focus_percent !== undefined;
@@ -35,7 +36,7 @@ export const LENGTHS = [
 ];
 
 const hourOf = (s) => { const h = new Date(s.started_at).getHours(); return h < 5 ? h + 24 : h; };
-const timeOfDay = (s) => TIMES.find((t) => hourOf(s) >= t.from && hourOf(s) < t.to).key;
+export const timeOfDay = (s) => TIMES.find((t) => hourOf(s) >= t.from && hourOf(s) < t.to).key;
 const lengthOf = (s) => LENGTHS.findIndex((l) => s.tracked_seconds < l.max);
 
 // Compares groups (time of day, session length) and returns the best and worst with enough data.

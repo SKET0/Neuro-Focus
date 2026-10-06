@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#09090b">
   <title>Neuro-Focus | Teacher Dashboard</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="../styles/theme.css?v=1">
   <style>
     :root {
       --bg: #09090b;
@@ -452,7 +453,8 @@
       .att-session-row .att-chips, .att-session-row .att-rate { grid-column: 1; justify-content: flex-start; }
     }
   </style>
-  <link rel="stylesheet" href="../styles/dashboard-layout.css?v=2">
+  <link rel="stylesheet" href="../styles/dashboard-layout.css?v=3">
+  <link rel="stylesheet" href="../styles/home.css?v=1">
 </head>
 <body data-required-role="teacher">
   <svg width="0" height="0" style="position: absolute" aria-hidden="true">
@@ -481,6 +483,13 @@
     <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></symbol>
     <symbol id="i-attendance" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/><path d="m9 15 2 2 4-4"/></symbol>
     <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 0 0 3.4 0"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8Z"/></symbol>
+    <symbol id="i-rocket" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15c-1.5 1.5-2 5-2 5s3.5-.5 5-2M14 4c4-1 6-1 6-1s0 2-1 6l-6 6-5-5Z"/><path d="M9 10 6 9l-2 2 5 1M14 15l1 3-2 2-1-5"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="m8 12 3 3 5-6"/></symbol>
+    <symbol id="i-trend" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 17 6-6 4 4 8-8"/><path d="M15 7h6v6"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></symbol>
   </svg>
 
   <aside id="sidebar" aria-label="Teacher navigation">
@@ -492,7 +501,7 @@
 
       <div class="nav-group">
         <div class="nav-label">Teaching</div>
-        <button class="nav-item" type="button" data-nav="classes"><svg class="icon"><use href="#i-grid"/></svg>All classes</button>
+        <button class="nav-item" type="button" data-nav="classes"><svg class="icon"><use href="#i-home"/></svg>Home</button>
         <button class="nav-item" type="button" data-nav="new-class"><svg class="icon"><use href="#i-plus"/></svg>New class</button>
       </div>
 
@@ -519,63 +528,165 @@
     <header>
       <div class="header-lead">
         <button id="navToggle" class="nav-toggle" type="button" aria-label="Open navigation" aria-controls="sidebar" aria-expanded="false">☰</button>
-        <div class="breadcrumbs"><span>Teacher</span><span>/</span><b id="crumbCurrent">Classes</b></div>
+        <div class="breadcrumbs"><span>Teacher</span><span>/</span><b id="crumbCurrent">Home</b></div>
       </div>
       <div class="header-actions">
-        <a class="btn-action" href="../index.html"><svg class="icon"><use href="#i-home"/></svg><span class="label-long">Home</span></a>
+        <a class="btn-action" href="../index.html"><svg class="icon"><use href="#i-brain"/></svg><span class="label-long">Website</span></a>
         <button class="btn-action" type="button" data-export-report="roster"><svg class="icon"><use href="#i-download"/></svg><span class="label-long">Export CSV</span><span class="label-short">CSV</span></button>
         <button id="signOutButton" class="btn-action" type="button"><svg class="icon"><use href="#i-logout"/></svg><span class="label-long">Sign out</span></button>
       </div>
     </header>
 
     <div class="portal-main">
-      <!-- ================= All classes ================= -->
-      <section id="classesView" class="stack" aria-labelledby="classesTitle">
-        <div class="page-head">
-          <div>
-            <div class="page-kicker" id="todayLabel">Today</div>
-            <h1 class="page-title" id="classesTitle">Your classes</h1>
-            <p class="page-sub">Create a class, share its join code, then open it to run a live session.</p>
+      <!-- ================= Home (teacher-home.js) ================= -->
+      <section id="classesView" class="stack view" data-live-background aria-labelledby="classesTitle">
+        <section class="home-hero" aria-labelledby="classesTitle">
+          <div class="home-hero-art" aria-hidden="true">
+            <svg viewBox="0 0 560 320" fill="none">
+              <g stroke="currentColor" stroke-opacity="0.22" stroke-width="1.2">
+                <path d="M30 250 150 170 262 214 360 104 470 146 548 70"/>
+                <path d="M150 170 214 74 360 104 420 30"/>
+                <path d="M262 214 334 292 470 146 528 250"/>
+                <path d="M214 74 306 22"/>
+                <path d="M90 300 150 170"/>
+              </g>
+              <g fill="currentColor">
+                <circle cx="150" cy="170" r="4" fill-opacity="0.55"/>
+                <circle cx="262" cy="214" r="3" fill-opacity="0.45"/>
+                <circle cx="360" cy="104" r="5" fill-opacity="0.6"/>
+                <circle cx="470" cy="146" r="4" fill-opacity="0.5"/>
+                <circle cx="214" cy="74" r="3" fill-opacity="0.4"/>
+                <circle cx="334" cy="292" r="3" fill-opacity="0.35"/>
+                <circle cx="548" cy="70" r="3" fill-opacity="0.4"/>
+                <circle cx="420" cy="30" r="2.5" fill-opacity="0.35"/>
+              </g>
+            </svg>
           </div>
-          <button class="btn-primary" type="button" data-nav="new-class"><svg class="icon"><use href="#i-plus"/></svg>New class</button>
+          <div class="home-hero-inner">
+            <div class="home-hero-hello">
+              <span class="hero-avatar"><span class="nf-avatar xl" id="teacherAvatar"></span></span>
+              <div class="hero-copy">
+                <p class="eyebrow-pill"><span class="tag">Today</span><span id="todayLabel">Today</span></p>
+                <h1 class="welcome-title" id="classesTitle">Welcome back</h1>
+                <p class="hero-lead" id="teacherLead">Here’s how your classes are doing.</p>
+                <div class="hero-links">
+                  <button class="text-link" type="button" data-nav="new-class"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>New class</button>
+                  <a class="text-link" href="#teacherInsights"><svg class="icon" aria-hidden="true"><use href="#i-chart"/></svg>Class insights</a>
+                </div>
+              </div>
+            </div>
+
+            <!-- The one main action: return to a live session, create a class, share a code, or go live -->
+            <section class="next-card" id="teacherNext" data-kind="loading" aria-labelledby="tNextTitle" aria-live="polite" aria-busy="true">
+              <span class="next-icon" id="tNextIcon" aria-hidden="true"><svg><use href="#i-spark"/></svg></span>
+              <div class="next-kicker" id="tNextKicker">Up next</div>
+              <h2 class="next-title" id="tNextTitle">Getting your classes ready…</h2>
+              <p class="next-sub" id="tNextSub"></p>
+              <div class="next-buttons" id="tNextButtons"><span class="next-skeleton"></span><span class="next-skeleton short"></span></div>
+            </section>
+          </div>
+        </section>
+
+        <!-- At a glance (teacher-home.js; students, online and live numbers from teacher-classes.js) -->
+        <section class="glance" aria-label="Your classes at a glance">
+          <a class="glance-tile score-tile home-card" style="--d: 1" href="#teacherInsights" aria-describedby="tScoreNote">
+            <span class="score-ring" aria-hidden="true">
+              <svg viewBox="0 0 120 120">
+                <defs>
+                  <linearGradient id="scoreGradient" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" style="stop-color: var(--accent)"/>
+                    <stop offset="100%" style="stop-color: var(--green)"/>
+                  </linearGradient>
+                </defs>
+                <circle class="score-track" cx="60" cy="60" r="50"/>
+                <circle class="score-fill" id="tScoreRing" cx="60" cy="60" r="50"/>
+              </svg>
+              <span class="score-center"><strong id="tScoreValue">—</strong><small>focus</small></span>
+            </span>
+            <span class="glance-text">
+              <span class="glance-label">Class focus</span>
+              <b class="glance-value-sm" id="tScoreLevel">Loading…</b>
+              <small class="glance-note" id="tScoreNote">&nbsp;</small>
+            </span>
+          </a>
+          <a class="glance-tile home-card" style="--d: 2" href="#recentSessions">
+            <span class="glance-label"><svg class="icon" aria-hidden="true"><use href="#i-attendance"/></svg>Attendance</span>
+            <b class="glance-value" id="tAttendance">—</b>
+            <span class="glance-bars" id="tAttendanceBars" aria-hidden="true"></span>
+            <small class="glance-note" id="tAttendanceNote">&nbsp;</small>
+          </a>
+          <a class="glance-tile home-card" style="--d: 3" href="#teacherClassesPanel">
+            <span class="glance-label"><svg class="icon" aria-hidden="true"><use href="#i-users"/></svg>Students</span>
+            <b class="glance-value" id="sumStudents">—</b>
+            <span class="online-meter" aria-hidden="true"><span id="tOnlineBar"></span></span>
+            <small class="glance-note"><span id="sumOnline">0</span> online now · <span id="sumClasses">—</span> classes</small>
+          </a>
+          <a class="glance-tile live-tile home-card" style="--d: 4" href="#teacherNext" id="sumLiveCard">
+            <span class="glance-label"><svg class="icon" aria-hidden="true"><use href="#i-live"/></svg>Live session</span>
+            <b class="glance-value" id="sumLive">Off</b>
+            <small class="glance-note" id="tLiveSharing">&nbsp;</small>
+            <small class="glance-note" id="sumLiveSub">Open a class to start one</small>
+          </a>
+        </section>
+
+        <div class="home-pair">
+          <section style="--d: 5" class="panel-card home-card" id="teacherClassesPanel" aria-labelledby="teacherClassesTitle">
+            <div class="panel-head">
+              <div>
+                <h2 class="panel-title" id="teacherClassesTitle"><span class="chip-icon"><svg><use href="#i-school"/></svg></span>Your classes</h2>
+                <p class="panel-sub">Open a class to run a live session, take attendance or see its history.</p>
+              </div>
+              <button class="btn-action" type="button" data-nav="new-class"><svg class="icon"><use href="#i-plus"/></svg>New class</button>
+            </div>
+            <div class="class-grid" id="classGrid"><p class="empty-state">Loading classes…</p></div>
+          </section>
+
+          <section style="--d: 6" class="panel-card home-card" id="checkInPanel" aria-labelledby="checkInTitle">
+            <div class="panel-head">
+              <div>
+                <h2 class="panel-title" id="checkInTitle"><span class="chip-icon amber"><svg><use href="#i-flag"/></svg></span>Students to check in with</h2>
+                <p class="panel-sub">From attendance and live-session focus in the last 30 days.</p>
+              </div>
+            </div>
+            <ul class="coach-list" id="checkInList"><li class="empty-state">Loading…</li></ul>
+          </section>
         </div>
 
-        <div class="stat-grid" aria-label="Teaching overview">
-          <article class="stat-card">
-            <span class="stat-label">Classes</span>
-            <span class="chip-icon"><svg><use href="#i-school"/></svg></span>
-            <strong id="sumClasses">—</strong>
-            <small>Active classes you teach</small>
-          </article>
-          <article class="stat-card">
-            <span class="stat-label">Students</span>
-            <span class="chip-icon green"><svg><use href="#i-users"/></svg></span>
-            <strong id="sumStudents">—</strong>
-            <small>Across all your classes</small>
-          </article>
-          <article class="stat-card">
-            <span class="stat-label">Online now</span>
-            <span class="chip-icon amber"><svg><use href="#i-eye"/></svg></span>
-            <strong id="sumOnline">0</strong>
-            <small>Students with their workspace open</small>
-          </article>
-          <article class="stat-card" id="sumLiveCard">
-            <span class="stat-label">Live session</span>
-            <span class="chip-icon red"><svg><use href="#i-live"/></svg></span>
-            <strong id="sumLive">Off</strong>
-            <small id="sumLiveSub">Open a class to start one</small>
-          </article>
-        </div>
+        <div class="home-pair">
+          <section style="--d: 7" class="panel-card home-card" id="recentSessions" aria-labelledby="recentSessionsTitle">
+            <div class="panel-head">
+              <div>
+                <h2 class="panel-title" id="recentSessionsTitle"><span class="chip-icon green"><svg><use href="#i-history"/></svg></span>Recent sessions</h2>
+                <p class="panel-sub">Your latest live sessions. Open one to see its attendance.</p>
+              </div>
+            </div>
+            <ul class="continue-list" id="recentSessionList"><li class="empty-state">Loading…</li></ul>
+          </section>
 
-        <div class="section-label">All classes</div>
-        <div class="class-grid" id="classGrid">
-          <p class="empty-state">Loading classes…</p>
+          <section style="--d: 8" class="panel-card home-card coach-card" id="teacherInsights" aria-labelledby="teacherInsightsTitle">
+            <div class="panel-head">
+              <div>
+                <h2 class="panel-title" id="teacherInsightsTitle"><span class="chip-icon green"><svg><use href="#i-spark"/></svg></span>Class insights</h2>
+                <p class="panel-sub" id="tInsightsBasis">Looking at your sessions…</p>
+              </div>
+            </div>
+            <div class="coach-grid">
+              <div class="coach-col" aria-labelledby="tWinsTitle">
+                <h3 class="coach-heading" id="tWinsTitle"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Going well</h3>
+                <ul class="coach-list" id="tWins"><li class="empty-state">Loading…</li></ul>
+              </div>
+              <div class="coach-col" aria-labelledby="tTipsTitle">
+                <h3 class="coach-heading tips" id="tTipsTitle"><svg class="icon" aria-hidden="true"><use href="#i-rocket"/></svg>Try next</h3>
+                <ul class="coach-list" id="tTips"><li class="empty-state">Loading…</li></ul>
+              </div>
+            </div>
+          </section>
         </div>
       </section>
 
       <!-- ================= One class ================= -->
       <section id="classView" class="stack" hidden aria-labelledby="classTitle">
-        <button class="btn-action back-link" type="button" data-nav="classes"><svg class="icon"><use href="#i-back"/></svg>All classes</button>
+        <button class="btn-action back-link" type="button" data-nav="classes"><svg class="icon"><use href="#i-back"/></svg>Home</button>
 
         <div class="class-hero">
           <div class="class-hero-main">
@@ -930,10 +1041,12 @@
 
   <script src="../scripts/shared/app.js?v=3"></script>
   <script src="../scripts/shared/dashboard-nav.js?v=3"></script>
-  <script src="../scripts/teacher/teacher-ui.js?v=1"></script>
+  <script src="../scripts/teacher/teacher-ui.js?v=2"></script>
   <script type="module" src="../scripts/auth/auth-guard.js?v=3"></script>
-  <script type="module" src="../scripts/teacher/teacher-classes.js?v=10"></script>
+  <script type="module" src="../scripts/teacher/teacher-classes.js?v=11"></script>
   <script type="module" src="../scripts/teacher/teacher-attendance.js?v=4"></script>
   <script type="module" src="../scripts/teacher/teacher-analytics.js?v=5"></script>
+  <script type="module" src="../scripts/teacher/teacher-home.js?v=1"></script>
+  <script type="module" src="../scripts/shared/home-background.js?v=1"></script>
 </body>
 </html>

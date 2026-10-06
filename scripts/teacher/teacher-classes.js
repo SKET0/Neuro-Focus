@@ -378,6 +378,23 @@ if (app) {
     set("#sumLive", liveClass ? "Live" : "Off");
     set("#sumLiveSub", liveClass ? `${liveClass.name} since ${clock(live.since)}` : "Open a class to start one");
     $("#sumLiveCard")?.setAttribute("data-live", String(Boolean(liveClass)));
+    publishStatus();
+  }
+
+  // The teacher Home (teacher-home.js) shows classes, online students and the live session from this.
+  function publishStatus() {
+    const detail = {
+      loaded: true,
+      classes: classes.map((item) => ({
+        id: item.id, name: item.name, joinCode: item.join_code, students: item.memberCount,
+        online: online.get(item.id)?.size || 0, joiningOpen: item.joining_open
+      })),
+      live: live && classes.some((item) => item.id === live.classId)
+        ? { classId: live.classId, since: live.since, sessionId: live.sessionId || null, sharing: sharingCount(live.classId) }
+        : null
+    };
+    window.neuroFocusTeacherStatus = detail;
+    window.dispatchEvent(new CustomEvent("neurofocus:teacher-status", { detail }));
   }
 
   function renderOnline(classId) {
@@ -672,7 +689,7 @@ if (app) {
       }
     });
     const names = { live: "Live monitor", students: "Master list", attendance: "Attendance", history: "History", settings: "Settings" };
-    $("#crumbCurrent").textContent = inClass ? `${selected().name} · ${names[tab]}` : "Classes";
+    $("#crumbCurrent").textContent = inClass ? `${selected().name} · ${names[tab]}` : "Home";
     if (inClass) renderClassHeader();
   }
 
@@ -884,8 +901,8 @@ if (app) {
     return true;
   }
 
-  async function copyCode() {
-    const item = selected();
+  async function copyCode(classId = selectedId) {
+    const item = classes.find((entry) => entry.id === classId);
     if (!item) return;
     const ok = await copyText(item.join_code);
     notify({ title: ok ? "Join code copied" : item.join_code, text: ok ? `${item.join_code} · share it with your students.` : "Copy this code and share it with your students.", kind: ok ? "success" : "info" });
@@ -1064,6 +1081,11 @@ if (app) {
   });
   window.addEventListener("pagehide", () => supabase.removeAllChannels());
 
+  // Actions for the teacher Home (teacher-home.js), with the same behaviour as the buttons here.
+  window.neuroFocusTeacherActions = { openClass, showClasses, openNewClass, copyCode };
+  // Refresh the "students sharing" count on Home while a session is live.
+  window.setInterval(() => { if (live && view === "classes") publishStatus(); }, 5000);
+
   // ---------- Start ----------
   void recheckSetup();
   try {
@@ -1071,11 +1093,8 @@ if (app) {
     await closeStaleSessions();
     await loadOpenSession();
     void keepSessionAlive();
-    let start = "";
-    try { start = localStorage.getItem(selectedKey) || ""; } catch { /* storage unavailable */ }
+    // Land on the live monitor if a session is running; otherwise on Home.
     if (live && classes.some((item) => item.id === live.classId)) openClass(live.classId, "live");
-    else if (classes.some((item) => item.id === start)) openClass(start, "live");
-    else if (classes.length === 1) openClass(classes[0].id, "students");
     else showClasses();
   } catch (error) {
     console.error("Class loading failed", error);

@@ -1,0 +1,166 @@
+/* Neuro-Focus theme tokens, shared by the student workspace and the teacher dashboard.
+   Every colour comes from these tokens. Student pages can switch theme and accent on <html>
+   (data-theme="default | light | dark", data-accent="default | blue | purple | green | orange",
+   set by scripts/shared/appearance.js); the teacher dashboard always uses the default look. */
+
+/* ---------- Theme tokens: the original Neuro-Focus look ---------- */
+:root {
+  color-scheme: dark;
+  --bg: #09090b;
+  --sidebar: #0c0c0f;
+  --surface: #141417;
+  --surface-2: #111114;
+  --surface-sunken: #0e0e11;
+  --surface-raised: #18181c;
+  --surface-hover: #1c1c21;
+  --surface-glass: rgba(20, 20, 23, 0.7);
+  --track: #1f1f24;
+  --border: #222226;
+  --border-strong: #2e2e34;
+  --border-hover: #3a3a42;
+  --text-main: #f4f4f5;
+  --text-strong: #ffffff;
+  --text-soft: #b4b4bc;
+  --text-muted: #82828c;
+  --text-faint: #6b6b75;
+
+  /* Status colours stay the same whatever the accent, so live / focused / warning states always read the same */
+  --green: #22c55e;
+  --red: #ef4444;
+  --amber: #f5b748;
+  --info: #00d9ff;
+  --success-text: #86efac;
+  --danger-text: #fca5a5;
+  --warning-text: #fcd34d;
+  --info-text: #67e8f9;
+
+  --accent: #00d9ff;
+  --accent-strong: color-mix(in srgb, var(--accent) 85%, #000);
+  --primary-bg: #f4f4f5;
+  --primary-hover: #ffffff;
+  --primary-text: #09090b;
+  --switch-knob: #d4d4d8;
+  --switch-knob-on: #ffffff;
+  --bubble-from: color-mix(in srgb, var(--accent) 52%, #000);
+  --bubble-to: color-mix(in srgb, var(--accent) 36%, #000);
+  --bubble-text: #ffffff;
+  --header-bg: rgba(9, 9, 11, 0.82);
+  --overlay-chip: rgba(9, 9, 11, 0.75);
+  --toast-bg: rgba(23, 23, 27, 0.92);
+  --shadow-color: rgba(0, 0, 0, 0.55);
+  --glow: color-mix(in srgb, var(--accent) 14%, transparent);
+  --glow-soft: color-mix(in srgb, var(--accent) 6%, transparent);
+
+  /* Shared dialogs and notices (styles/dashboard-layout.css reads these, with the original colours as fallbacks) */
+  --nf-dialog-bg: var(--surface);
+  --nf-dialog-border: var(--border-strong);
+  --nf-dialog-text: var(--text-soft);
+  --nf-input-bg: var(--surface-sunken);
+  --nf-notice-bg: var(--surface-raised);
+  --nf-hover: var(--surface-hover);
+  --nf-setup-text: #fde68a;
+  --nf-setup-title: #fef3c7;
+  --cyan: var(--accent);
+}
+
+/* ---------- Light: readable on bright screens ---------- */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f4f5f8;
+  --sidebar: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #fafbfc;
+  --surface-sunken: #f0f2f5;
+  --surface-raised: #ffffff;
+  --surface-hover: #e9ecf1;
+  --surface-glass: rgba(255, 255, 255, 0.82);
+  --track: #dcdfe5;
+  --border: #e1e4ea;
+  --border-strong: #cdd2da;
+  --border-hover: #aeb5c0;
+  --text-main: #16181d;
+  --text-strong: #000000;
+  --text-soft: #3b3f48;
+  --text-muted: #565b67;
+  --text-faint: #6f7480;
+  --green: #16a34a;
+  --red: #dc2626;
+  --amber: #d97706;
+  --info: #0e7490;
+  --success-text: #15803d;
+  --danger-text: #b91c1c;
+  --warning-text: #a16207;
+  --info-text: #0e7490;
+  --accent: #0e7490;
+  --primary-bg: #16181d;
+  --primary-hover: #000000;
+  --primary-text: #ffffff;
+  --switch-knob: #ffffff;
+  --switch-knob-on: #ffffff;
+  --bubble-from: var(--accent);
+  --bubble-to: color-mix(in srgb, var(--accent) 78%, #000);
+  --header-bg: rgba(244, 245, 248, 0.86);
+  --overlay-chip: rgba(255, 255, 255, 0.9);
+  --toast-bg: rgba(255, 255, 255, 0.97);
+  --shadow-color: rgba(15, 23, 42, 0.14);
+  --glow: color-mix(in srgb, var(--accent) 12%, transparent);
+  --glow-soft: color-mix(in srgb, var(--accent) 5%, transparent);
+  --nf-setup-text: #78350f;
+  --nf-setup-title: #451a03;
+}
+
+/* ---------- Calm dark: softer slate tones with gentler glows ---------- */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0f141a;
+  --sidebar: #121820;
+  --surface: #171e27;
+  --surface-2: #151b23;
+  --surface-sunken: #11171e;
+  --surface-raised: #1c242e;
+  --surface-hover: #222c37;
+  --surface-glass: rgba(23, 30, 39, 0.78);
+  --track: #283340;
+  --border: #242e39;
+  --border-strong: #303c49;
+  --border-hover: #415061;
+  --text-main: #e5ebf1;
+  --text-strong: #ffffff;
+  --text-soft: #b2bdc9;
+  --text-muted: #8f9cab;
+  --text-faint: #718090;
+  --info: #7cc7e8;
+  --success-text: #8ee0ae;
+  --danger-text: #f6a8a8;
+  --warning-text: #f0d58a;
+  --info-text: #a5dbf2;
+  --accent: #7cc7e8;
+  --primary-bg: #e5ebf1;
+  --primary-hover: #ffffff;
+  --primary-text: #0f141a;
+  --header-bg: rgba(15, 20, 26, 0.86);
+  --overlay-chip: rgba(15, 20, 26, 0.8);
+  --toast-bg: rgba(28, 36, 46, 0.96);
+  --shadow-color: rgba(0, 0, 0, 0.42);
+  --glow: color-mix(in srgb, var(--accent) 8%, transparent);
+  --glow-soft: color-mix(in srgb, var(--accent) 4%, transparent);
+}
+
+/* ---------- Accent colours (darker shades on the light theme keep text readable) ---------- */
+:root[data-accent="blue"] { --accent: #60a5fa; }
+:root[data-accent="purple"] { --accent: #a78bfa; }
+:root[data-accent="green"] { --accent: #4ade80; }
+:root[data-accent="orange"] { --accent: #fb923c; }
+:root[data-theme="light"][data-accent="blue"] { --accent: #1d4ed8; }
+:root[data-theme="light"][data-accent="purple"] { --accent: #6d28d9; }
+:root[data-theme="light"][data-accent="green"] { --accent: #15803d; }
+:root[data-theme="light"][data-accent="orange"] { --accent: #c2410c; }
+
+/* Smooth hand-over when a theme is previewed or saved (appearance.js adds this class briefly) */
+html.theme-switching, html.theme-switching * {
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease, fill 0.25s ease, stroke 0.25s ease !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  html.theme-switching, html.theme-switching * { transition: none !important; }
+}
+
