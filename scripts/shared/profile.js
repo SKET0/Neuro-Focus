@@ -1,4 +1,4 @@
-// My profile, shared by the student workspace and the teacher dashboard: display name, profile
+// Profile settings, shared by the student workspace and the teacher dashboard: display name, profile
 // picture (a built-in avatar or an uploaded photo cropped to a square), theme and accent colour.
 // Saved to the signed-in account with update_my_profile() and the private "avatars" storage
 // bucket (supabase/migrations/20261007000000_student_profiles.sql), so they follow the person to
@@ -23,7 +23,8 @@ if (app) {
     preview: $("#profileAvatarPreview"), caption: $("#avatarCaption"), options: $("#avatarOptions"),
     file: $("#avatarFile"), upload: $("#avatarUploadButton"), uploadLabel: $("#avatarUploadLabel"), remove: $("#avatarRemoveButton"),
     avatarError: $("#avatarError"), crop: $("#cropPanel"), stage: $("#cropStage"), canvas: $("#cropCanvas"), zoom: $("#cropZoom"),
-    status: $("#profileStatus"), save: $("#profileSave"), cancel: $("#profileCancel")
+    status: $("#profileStatus"), save: $("#profileSave"), cancel: $("#profileCancel"),
+    actions: $("#profileActions"), announce: $("#profileAnnounce")
   };
 
   // ---------- What is saved on the account ----------
@@ -118,10 +119,26 @@ if (app) {
   function setStatus(text, state = "") {
     els.status.textContent = text;
     els.status.dataset.state = state;
+    syncBar();
   }
+
+  // Save changes and Cancel only appear once something is changed (and while saving). A problem,
+  // such as a failed save or the missing database update, keeps the bar showing its message.
+  function syncBar() {
+    if (!els.actions) return;
+    const editing = saving || isDirty();
+    const wasShown = !els.actions.hidden;
+    els.save.hidden = !editing;
+    els.cancel.hidden = !editing;
+    els.actions.hidden = !editing && els.status.dataset.state !== "error";
+    // Keep keyboard focus on the page when the bar it was in goes away.
+    if (wasShown && els.actions.hidden && els.actions.contains(document.activeElement)) els.name.focus();
+  }
+  const announce = (text) => { if (els.announce) els.announce.textContent = text; };
 
   function updateButtons() {
     const dirty = isDirty();
+    syncBar();
     els.save.disabled = saving || !dirty || app.profileSetupMissing;
     els.cancel.disabled = saving || !dirty;
     els.upload.disabled = saving || app.profileSetupMissing;
@@ -427,6 +444,8 @@ if (app) {
       return;
     }
 
+    // Save is disabled while saving, which drops keyboard focus; put it back on the form after.
+    const keyboardSave = els.actions.contains(document.activeElement);
     setSaving(true);
     let newPath = null;
     let newPreview = null;
@@ -478,6 +497,11 @@ if (app) {
       // Home's greeting, and (for students) their teachers' class lists via student-classes.js.
       window.dispatchEvent(new CustomEvent("neurofocus:profile-updated", { detail: { ...saved, avatarUrl: savedUrl } }));
       setStatus("Saved. Your profile and look are updated on every device.", "success");
+      // The bar tucks away once everything is saved, so say so where it stays visible.
+      notify({ title: "Changes saved", text: "Your profile and look are updated on every device.", kind: "success", timeoutMs: 4000 });
+      announce("Changes saved.");
+      // (Chrome keeps focus on the disabled button until the bar hides, so check both.)
+      if (keyboardSave && (!document.activeElement || document.activeElement === document.body || els.actions.contains(document.activeElement))) els.name.focus();
     } catch (error) {
       // Keep the previous picture: remove a new upload that didn't make it onto the profile.
       if (newPath) void supabase.storage.from("avatars").remove([newPath]).catch(() => {});
@@ -493,11 +517,12 @@ if (app) {
     resetDraft();
     applyAppearance(saved, { animate: true });
     setStatus("Changes discarded. You’re seeing your saved profile.", "");
+    announce("Changes discarded. You’re seeing your saved profile.");
     els.name.focus();
   });
 
   // ---------- Leaving and coming back ----------
-  // A theme preview only lasts while My profile is open; unsaved edits wait in the form.
+  // A theme preview only lasts while Profile settings is open; unsaved edits wait in the form.
   window.addEventListener("neurofocus:viewchange", (event) => {
     const { name, previous } = event.detail || {};
     if (previous === "profile" && name !== "profile") {
@@ -506,10 +531,10 @@ if (app) {
       if (isDirty()) {
         notify({
           title: "Your profile changes aren’t saved yet",
-          text: "The theme preview was turned off. Go back to My profile to save or cancel them.",
+          text: "The theme preview was turned off. Go back to Profile settings to save or cancel them.",
           kind: "info",
           timeoutMs: 9000,
-          actions: [{ label: "Back to My profile", primary: true, onClick: () => window.neuroFocusNavigate?.("profile") }]
+          actions: [{ label: "Back to Profile settings", primary: true, onClick: () => window.neuroFocusNavigate?.("profile") }]
         });
       }
     } else if (name === "profile" && previous !== "profile" && isDirty()) {
@@ -524,7 +549,6 @@ if (app) {
   });
 
   // ---------- Start ----------
-  $("#factEmail").textContent = app.user.email || "Signed in with an external account";
   $("#factAccountId").textContent = app.user.id;
   $("#factRole").textContent = app.profile.role === "teacher" ? "Teacher" : "Student";
   resetDraft();

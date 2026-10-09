@@ -147,11 +147,11 @@ fieldset { border: 0; min-width: 0; }
 .sample-text a { color: var(--accent); }
 .sample-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .sample-row .btn-primary, .sample-row .btn-action { padding: 7px 12px; font-size: 12.5px; pointer-events: none; }
-.status-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; border: 1px solid; }
-.status-chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-.status-chip.ok { color: var(--success-text); border-color: color-mix(in srgb, var(--green) 35%, transparent); background: color-mix(in srgb, var(--green) 8%, transparent); }
-.status-chip.warn { color: var(--warning-text); border-color: color-mix(in srgb, var(--amber) 35%, transparent); background: color-mix(in srgb, var(--amber) 8%, transparent); }
-.status-chip.live { color: var(--danger-text); border-color: color-mix(in srgb, var(--red) 35%, transparent); background: color-mix(in srgb, var(--red) 8%, transparent); }
+.sample-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; border: 1px solid; }
+.sample-chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.sample-chip.ok { color: var(--success-text); border-color: color-mix(in srgb, var(--green) 35%, transparent); background: color-mix(in srgb, var(--green) 8%, transparent); }
+.sample-chip.warn { color: var(--warning-text); border-color: color-mix(in srgb, var(--amber) 35%, transparent); background: color-mix(in srgb, var(--amber) 8%, transparent); }
+.sample-chip.live { color: var(--danger-text); border-color: color-mix(in srgb, var(--red) 35%, transparent); background: color-mix(in srgb, var(--red) 8%, transparent); }
 .sample-chart { display: flex; align-items: flex-end; gap: 5px; height: 46px; margin-top: 14px; padding-bottom: 2px; border-bottom: 1px solid var(--border); }
 .sample-chart i { flex: 1; border-radius: 3px 3px 0 0; background: color-mix(in srgb, var(--accent) 78%, transparent); }
 
@@ -197,3 +197,24 @@ fieldset { border: 0; min-width: 0; }
   .profile-status { flex-basis: 100%; }
   .account-dropdown { position: fixed; top: 64px; right: 12px; left: 12px; width: auto; }
 }
+
+/* Profile settings → Sign-in and security (account-security.js) */
+.security-card { margin-top: 20px; scroll-margin-top: 80px; }
+.security-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.security-form { display: flex; flex-direction: column; gap: 8px; padding: 18px; border-radius: 14px; background: var(--surface-sunken); border: 1px solid var(--border); }
+.security-form [hidden] { display: none !important; }
+.security-title { font-size: 15px; font-weight: 650; }
+.security-current { font-size: 13px; color: var(--text-soft); overflow-wrap: anywhere; }
+.security-current b { color: var(--text-main); font-weight: 600; }
+.security-pending { padding: 10px 12px; border-radius: 10px; font-size: 12.5px; line-height: 1.45; color: var(--warning-text); background: color-mix(in srgb, var(--amber) 9%, transparent); border: 1px solid color-mix(in srgb, var(--amber) 30%, var(--border)); overflow-wrap: anywhere; }
+.security-field { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+#acctPasswordFields, #acctPasswordLink { display: flex; flex-direction: column; gap: 8px; }
+.security-show { display: inline-flex; align-items: center; gap: 8px; width: fit-content; font-size: 13px; color: var(--text-soft); cursor: pointer; }
+.security-show input { width: 16px; height: 16px; accent-color: var(--accent); }
+.security-form .field-input[aria-invalid="true"] { border-color: color-mix(in srgb, var(--red) 60%, var(--border-strong)); }
+@media (max-width: 860px) { .security-grid { grid-template-columns: 1fr; } }
+
+/* The Save changes bar slides up when something is changed (profile.js shows it only then) */
+.profile-actions { animation: profile-bar-in 0.28s cubic-bezier(0.2, 0.7, 0.2, 1); }
+@keyframes profile-bar-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .profile-actions { animation: none; } }

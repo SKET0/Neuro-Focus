@@ -188,7 +188,7 @@ export function buildCoaching(sessions, habits = {}, now = Date.now()) {
     if (sessions.length) {
       wins.push({ icon: "i-check", title: `${plural(sessions.length, "session")} recorded so far`, text: `${mins(sum(sessions, measuredSeconds))} of measured tracking saved.` });
     }
-    if (habits.stepsPlanned) wins.push({ icon: "i-list", title: "You’ve planned your steps", text: "Your next steps are written down in Today’s plan." });
+    if (habits.stepsPlanned) wins.push({ icon: "i-list", title: "You’ve planned your steps", text: "Your next steps are written down in Today." });
     if (habits.nudgesOn) wins.push({ icon: "i-spark", title: "Nudges are on", text: "You’ll get a gentle reminder if the tracker estimates you’ve looked away for a few seconds." });
 
     if (habits.timerPreset !== "15-3" && habits.timerPreset !== "10-2") {

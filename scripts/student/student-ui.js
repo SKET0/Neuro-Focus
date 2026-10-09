@@ -1,18 +1,56 @@
-// Student workspace shell: view switching (#dashboard, #focus, #buddy, #notes, #progress, #classes,
-// #class/<id>, #profile), the header breadcrumb, today's date and the "Start focus session" buttons.
-// #focus is Solo focus (personal, never shared); a class's page (#class/<id>) has its Live focus.
+// Student workspace shell: view switching (#dashboard, #classes, #class/<id>/<tab>, #focus, #notes,
+// #progress, #buddy, #profile), the header breadcrumb, today's date and the "Start focus session"
+// buttons. #focus is Solo focus (personal, never shared); a class's page has its Live focus tab.
+// Navigating never turns the camera on: only the Start / Join buttons do.
 (function studentWorkspace() {
   const VIEWS = {
-    dashboard: "Home", focus: "Solo focus", buddy: "NeuroBuddy", notes: "Class notes",
-    progress: "My progress", classes: "Classes", class: "Class", profile: "My profile"
+    dashboard: "Home", focus: "Solo focus", buddy: "NeuroBuddy", notes: "My notes",
+    progress: "My progress", classes: "Classes", class: "Class", profile: "Profile settings"
   };
+  const CLASS_TABS = { posts: "Posts", assignments: "Assignments", quizzes: "Quizzes", live: "Live focus" };
   const ALIASES = { home: "dashboard" };
   const views = document.querySelectorAll("[data-view]");
   const links = document.querySelectorAll("[data-view-link]");
-  const crumb = document.querySelector("#pageCrumb");
+  const crumbs = document.querySelector("#crumbs");
   const main = document.querySelector("main");
   let currentView = null;
   let currentClassId = null;
+  let tabChosen = true; // false when the address names a class but not a tab
+
+  // A class opens on Live focus while its live session is on (or the student is in it), else on Posts.
+  function defaultClassTab(classId) {
+    const status = window.neuroFocusClassStatus;
+    const item = status?.classes?.find((entry) => entry.id === classId);
+    const live = item && ((item.live && !item.removed && !item.blocked) || item.inSession);
+    return live || status?.joinedClassId === classId ? "live" : "posts";
+  }
+  const className = (classId) => window.neuroFocusClassStatus?.classes?.find((entry) => entry.id === classId)?.name
+    || (window.neuroFocusClasses || []).find((entry) => entry.id === classId)?.name || "Class";
+
+  // Home / Classes / Biology / Posts: every part but the last is a link.
+  function renderCrumbs(name) {
+    if (!crumbs) return;
+    const trail = [];
+    if (name !== "dashboard") trail.push({ label: "Home", href: "#dashboard" });
+    if (name === "class") {
+      trail.push({ label: "Classes", href: "#classes" }, { label: className(currentClassId), href: `#class/${currentClassId}/${defaultClassTab(currentClassId)}` },
+        { label: CLASS_TABS[window.neuroFocusRouteClassTab] || "Class" });
+    } else trail.push({ label: VIEWS[name] });
+    crumbs.replaceChildren(...trail.flatMap((part, index) => {
+      const last = index === trail.length - 1;
+      const node = document.createElement(last ? "span" : "a");
+      node.className = last ? "crumb-current" : "crumb-link";
+      if (last) node.setAttribute("aria-current", "page");
+      else node.href = part.href;
+      node.textContent = part.label;
+      if (!index) return [node];
+      const sep = document.createElement("span");
+      sep.className = "crumb-sep";
+      sep.setAttribute("aria-hidden", "true");
+      sep.textContent = "/";
+      return [sep, node];
+    }));
+  }
 
   function showView() {
     const raw = window.location.hash.slice(1);
@@ -28,7 +66,8 @@
     currentView = name;
     currentClassId = classId;
     window.neuroFocusRouteClassId = classId;
-    window.neuroFocusRouteClassTab = classId ? (classRoute?.[2] || "live").toLowerCase() : null;
+    tabChosen = Boolean(classRoute?.[2]);
+    window.neuroFocusRouteClassTab = classId ? (classRoute?.[2] || defaultClassTab(classId)).toLowerCase() : null;
     views.forEach((view) => {
       view.hidden = view.dataset.view !== name;
       // Cards settle in once when a view opens (styles/student.css; skipped for reduced motion).
@@ -37,12 +76,14 @@
         window.setTimeout(() => view.classList.remove("is-entering"), 900);
       }
     });
+    // The page's own link is current; inside a class, Classes stays highlighted.
     links.forEach((link) => {
-      if (link.dataset.viewLink === name && name !== "class") link.setAttribute("aria-current", "page");
+      if (link.dataset.viewLink === name) link.setAttribute("aria-current", "page");
+      else if (name === "class" && link.dataset.viewLink === "classes") link.setAttribute("aria-current", "true");
       else link.removeAttribute("aria-current");
     });
-    if (crumb) crumb.textContent = VIEWS[name];
-    document.title = `${VIEWS[name]} · Neuro-Focus`;
+    renderCrumbs(name);
+    document.title = name === "class" ? `${className(classId)} · ${CLASS_TABS[window.neuroFocusRouteClassTab]} · Neuro-Focus` : `${VIEWS[name]} · Neuro-Focus`;
     if (target) target.scrollIntoView({ block: "start" });
     else main?.scrollTo({ top: 0 });
     // Keyboard and screen-reader users land on the new page's heading.
@@ -58,11 +99,30 @@
   }
   window.addEventListener("hashchange", showView);
   showView();
+  // Class names and live sessions arrive after the page opens (student-classes.js). A class opened
+  // without a tab in its address moves to Live focus if its session turns out to be live.
+  window.addEventListener("neurofocus:class-status", () => {
+    if (currentView !== "class") return;
+    if (!tabChosen) {
+      tabChosen = true;
+      const tab = defaultClassTab(currentClassId);
+      if (tab !== window.neuroFocusRouteClassTab) { window.location.replace(`#class/${currentClassId}/${tab}`); return; }
+    }
+    renderCrumbs("class");
+    document.title = `${className(currentClassId)} · ${CLASS_TABS[window.neuroFocusRouteClassTab]} · Neuro-Focus`;
+  });
 
   // Go to a view or a card in one ("focus-session", "notes", …), even if the address already shows it.
   window.neuroFocusNavigate = (hash) => {
     if (window.location.hash.slice(1) === hash) showView();
     else window.location.hash = hash;
+  };
+  // My notes, showing one class's notes (student-notes.js listens for the filter).
+  window.neuroFocusOpenClassNotes = (classId) => {
+    window.addEventListener("neurofocus:viewchange", () => {
+      window.dispatchEvent(new CustomEvent("neurofocus:notes-filter", { detail: { classId } }));
+    }, { once: true });
+    window.neuroFocusNavigate("notes");
   };
 
   const today = document.querySelector("#todayLabel");

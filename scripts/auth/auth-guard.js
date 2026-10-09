@@ -99,7 +99,7 @@ window.neuroFocusReady = (async () => {
       return null;
     }
 
-    // Each account's saved look (My profile → Theme and accent) applies to its own dashboard only.
+    // Each account's saved look (Profile settings → Theme and accent) applies to its own dashboard only.
     if (requiredRole) {
       applyAppearance(profile);
       cacheAppearance(session.user.id, profile);

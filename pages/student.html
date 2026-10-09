@@ -37,19 +37,26 @@
   </script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <link rel="stylesheet" href="../styles/theme.css?v=1">
-  <link rel="stylesheet" href="../styles/student.css?v=15">
+  <link rel="stylesheet" href="../styles/student.css?v=29">
   <link rel="stylesheet" href="../styles/home.css?v=4">
-  <link rel="stylesheet" href="../styles/account.css?v=1">
-  <link rel="stylesheet" href="../styles/dashboard-layout.css?v=4">
+  <link rel="stylesheet" href="../styles/account.css?v=4">
+  <link rel="stylesheet" href="../styles/dashboard-layout.css?v=8">
+  <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="../assets/images/favicon-64.png" type="image/png" sizes="64x64">
+  <link rel="apple-touch-icon" href="../assets/images/apple-touch-icon.png">
 </head>
 <body data-required-role="student">
   <svg width="0" height="0" style="position: absolute" aria-hidden="true">
     <symbol id="i-quiz" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 4.9.7c0 1.7-2.4 2.3-2.4 3.8M12 17h.01"/></symbol>
     <symbol id="i-megaphone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11v2a1 1 0 0 0 1 1h2l6 4V6L6 10H4a1 1 0 0 0-1 1Z"/><path d="M16 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></symbol>
     <symbol id="i-assignment" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h3"/></symbol>
+    <symbol id="i-cards" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="14" height="13" rx="2"/><path d="M7 4h12a2 2 0 0 1 2 2v11"/><path d="M7 12h6M7 15.5h4"/></symbol>
+    <symbol id="i-shuffle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></symbol>
+    <symbol id="i-again" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></symbol>
     <symbol id="i-paperclip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21 11-8.5 8.5a5 5 0 0 1-7-7L14 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 7"/></symbol>
-    <symbol id="i-brain" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M12 5v13"/></symbol>
+    <symbol id="i-brain" viewBox="632 191 736 736" fill="none" stroke="currentColor" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"><!-- Neuro-Focus logo (assets/images/neuro-focus-logo.svg) --><path d="M790 565 C700 572 655 525 655 465 C655 345 790 245 955 245 C1170 245 1345 390 1345 548 C1345 640 1278 700 1188 722"/><path d="M802 552 C780 455 865 380 990 380 C1140 380 1246 465 1246 572 C1246 630 1214 668 1186 710 C1166 740 1166 770 1168 795"/><path d="M790 565 C850 562 890 540 935 518 C985 495 1025 485 1070 485 C1132 485 1162 515 1162 555 C1162 612 1102 682 1012 682 C932 682 855 640 818 578"/><path d="M1022 688 C1062 712 1100 721 1140 721 C1160 721 1176 718 1188 714"/><circle cx="1175" cy="835" r="38"/></symbol>
     <symbol id="i-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></symbol>
+    <symbol id="i-buddy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5V3"/><circle cx="12" cy="2.3" r="1.1" fill="currentColor" stroke="none"/><rect x="3.5" y="5" width="17" height="14" rx="7"/><rect x="6.5" y="8.6" width="11" height="6.8" rx="3.4"/><path d="M10 11.3v1.4M14 11.3v1.4" stroke-width="2.2"/></symbol>
     <symbol id="i-chat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/><path d="M8.5 11h.01M12 11h.01M15.5 11h.01"/></symbol>
     <symbol id="i-note" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></symbol>
     <symbol id="i-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></symbol>
@@ -95,45 +102,25 @@
     <div>
       <a class="brand-box" href="../index.html" aria-label="Neuro-Focus home page">
         <span class="brand-mark"><svg><use href="#i-brain"/></svg></span>
-        <span class="brand-text"><b>Neuro-Focus</b><small>Student workspace</small></span>
+        <span class="brand-text"><b class="wordmark">Neuro<span class="wordmark-tail">-Focus</span></b><small>Student workspace</small></span>
       </a>
 
       <nav class="nav-group" aria-label="Workspace">
-        <div class="nav-label">Workspace</div>
         <a class="nav-item" href="#dashboard" data-view-link="dashboard"><svg class="icon"><use href="#i-home"/></svg>Home</a>
-        <a class="nav-item" href="#focus" data-view-link="focus"><svg class="icon"><use href="#i-timer"/></svg>Solo focus</a>
-        <a class="nav-item" href="#buddy" data-view-link="buddy"><svg class="icon"><use href="#i-chat"/></svg>NeuroBuddy</a>
-        <a class="nav-item" href="#notes" data-view-link="notes"><svg class="icon"><use href="#i-note"/></svg>Class notes</a>
-        <a class="nav-item" href="#progress" data-view-link="progress"><svg class="icon"><use href="#i-chart"/></svg>My progress</a>
         <a class="nav-item" href="#classes" data-view-link="classes"><svg class="icon"><use href="#i-school"/></svg>Classes</a>
+        <a class="nav-item" href="#focus" data-view-link="focus"><svg class="icon"><use href="#i-timer"/></svg>Solo focus</a>
+        <a class="nav-item" href="#notes" data-view-link="notes"><svg class="icon"><use href="#i-note"/></svg>My notes</a>
+        <a class="nav-item" href="#progress" data-view-link="progress"><svg class="icon"><use href="#i-chart"/></svg>My progress</a>
       </nav>
-
-      <div class="nav-group">
-        <div class="nav-label">My classes <button class="nav-add" type="button" data-action="join-class" aria-label="Join a class">+</button></div>
-        <div id="sidebarClassList" class="sidebar-classes"><p class="sidebar-empty">Loading…</p></div>
-      </div>
-
-      <div class="nav-group">
-        <div class="nav-label">Meetings</div>
-        <div class="nav-item" data-open="zoom" data-start-camera role="button" tabindex="0"><svg class="icon"><use href="#i-video"/></svg>Join Zoom</div>
-        <div class="nav-item" data-open="meet" data-start-camera role="button" tabindex="0"><svg class="icon"><use href="#i-video"/></svg>Join Google Meet</div>
-      </div>
     </div>
 
-    <a class="user-card" href="#profile" data-view-link="profile">
-      <span class="nf-avatar" data-profile-avatar></span>
-      <div>
-        <b data-profile-name>Student</b>
-        <small>My profile</small>
-      </div>
-    </a>
   </aside>
 
   <main>
     <header>
       <div class="header-lead">
         <button id="navToggle" class="nav-toggle" type="button" aria-label="Open navigation" aria-controls="sidebar" aria-expanded="false">☰</button>
-        <nav class="breadcrumbs" aria-label="Breadcrumb"><a class="crumb-link" href="#dashboard">Workspace</a><span class="crumb-sep" aria-hidden="true">/</span><span class="crumb-current" id="pageCrumb" aria-current="page">Home</span></nav>
+        <nav class="breadcrumbs" id="crumbs" aria-label="Breadcrumb"><span class="crumb-current" aria-current="page">Home</span></nav>
       </div>
       <div class="header-actions">
         <!-- Timer and tracking at a glance, from every page (student-dashboard.js) -->
@@ -142,7 +129,8 @@
           <svg class="icon" aria-hidden="true"><use href="#i-timer"/></svg>
           <span id="focusPillText">Focus</span>
         </a>
-        <button class="btn-action" type="button" data-export-report="session"><svg class="icon"><use href="#i-download"/></svg><span class="label-long">Export session</span><span class="label-short">Export</span></button>
+        <!-- NeuroBuddy: the one way in, on every page -->
+        <a class="btn-action buddy-button" href="#buddy" data-view-link="buddy" aria-label="NeuroBuddy"><svg class="icon" aria-hidden="true"><use href="#i-buddy"/></svg><span class="label-long">NeuroBuddy</span></a>
         <!-- Account menu (scripts/shared/profile.js) -->
         <div class="account-menu">
           <button id="accountButton" class="account-button" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="accountMenu">
@@ -155,9 +143,8 @@
               <span class="nf-avatar" data-profile-avatar></span>
               <div><b data-profile-name>Student</b><small id="accountMenuEmail"></small></div>
             </div>
-            <a role="menuitem" href="#profile"><svg class="icon" aria-hidden="true"><use href="#i-user"/></svg>My profile</a>
+            <a role="menuitem" href="#profile"><svg class="icon" aria-hidden="true"><use href="#i-user"/></svg>Profile settings</a>
             <a role="menuitem" href="#profile-appearance"><svg class="icon" aria-hidden="true"><use href="#i-palette"/></svg>Theme and accent</a>
-            <a role="menuitem" href="#progress"><svg class="icon" aria-hidden="true"><use href="#i-chart"/></svg>My progress</a>
             <a role="menuitem" href="../index.html"><svg class="icon" aria-hidden="true"><use href="#i-brain"/></svg>Neuro-Focus home page</a>
             <div role="separator"></div>
             <button role="menuitem" id="signOutButton" type="button"><svg class="icon" aria-hidden="true"><use href="#i-logout"/></svg>Sign out</button>
@@ -193,19 +180,15 @@
           </div>
           <div class="home-hero-inner">
             <div class="home-hero-hello">
-              <a class="hero-avatar" href="#profile" title="Open My profile">
+              <a class="hero-avatar" href="#profile" title="Open Profile settings">
                 <span class="nf-avatar xl" data-profile-avatar></span>
                 <span class="hero-avatar-edit" aria-hidden="true"><svg class="icon"><use href="#i-pencil"/></svg></span>
-                <span class="sr-only">Open My profile</span>
+                <span class="sr-only">Open Profile settings</span>
               </a>
               <div class="hero-copy">
                 <p class="eyebrow-pill"><span class="tag">Today</span><span id="todayLabel">Today</span></p>
                 <h1 class="welcome-title" id="welcomeTitle">Welcome to your study space</h1>
                 <p class="hero-lead" id="heroLead">Here’s what you can do next.</p>
-                <div class="hero-links">
-                  <a class="text-link" href="#profile"><svg class="icon" aria-hidden="true"><use href="#i-user"/></svg>My profile</a>
-                  <a class="text-link" href="#progress"><svg class="icon" aria-hidden="true"><use href="#i-chart"/></svg>My progress</a>
-                </div>
               </div>
             </div>
 
@@ -220,8 +203,8 @@
           </div>
         </section>
 
-        <!-- At a glance: overall focus score and this week, from saved sessions (student-dashboard.js) -->
-        <section class="glance" aria-label="Your focus at a glance">
+        <!-- Your week as three simple infographics (student-dashboard.js) -->
+        <section class="glance home-stats" aria-label="Your week">
           <a class="glance-tile score-tile home-card" style="--d: 1" href="#progress" aria-describedby="scoreNote">
             <span class="score-ring" aria-hidden="true">
               <svg viewBox="0 0 120 120">
@@ -242,105 +225,57 @@
               <small class="glance-note" id="scoreNote">&nbsp;</small>
             </span>
           </a>
-          <a class="glance-tile home-card" style="--d: 2" href="#progress">
-            <span class="glance-label"><svg class="icon" aria-hidden="true"><use href="#i-timer"/></svg>Focused this week</span>
+          <a class="glance-tile home-card week-tile" style="--d: 2" href="#progress">
+            <span class="stat-head">
+              <span class="glance-label">Focus this week</span>
+              <small class="stat-trend" id="glanceFocusNote">&nbsp;</small>
+            </span>
             <b class="glance-value" id="glanceFocusTime">—</b>
-            <span class="glance-bars" id="glanceBars" aria-hidden="true"></span>
-            <small class="glance-note" id="glanceFocusNote">&nbsp;</small>
+            <span class="week-chart" id="glanceBars" aria-hidden="true"></span>
           </a>
-          <a class="glance-tile home-card" style="--d: 3" href="#progress">
-            <span class="glance-label"><svg class="icon" aria-hidden="true"><use href="#i-flame"/></svg>Day streak</span>
+          <a class="glance-tile home-card streak-tile" style="--d: 3" href="#progress">
+            <span class="stat-head">
+              <span class="glance-label">Streak</span>
+              <small class="stat-trend" id="glanceStreakNote">&nbsp;</small>
+            </span>
             <b class="glance-value" id="glanceStreak">—</b>
             <span class="glance-days" id="glanceDays" aria-hidden="true"></span>
-            <small class="glance-note" id="glanceStreakNote">&nbsp;</small>
-          </a>
-          <a class="glance-tile timer-tile home-card" style="--d: 4" href="#focus-timer" id="glanceTimer">
-            <span class="glance-label"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg>Focus timer</span>
-            <b class="glance-value" id="glanceTimerValue">25:00</b>
-            <small class="glance-note" id="toolTimer">Ready when you are</small>
-            <small class="glance-note tracking-note" id="toolTracking">Camera off</small>
           </a>
         </section>
 
         <div class="home-pair">
-          <section style="--d: 5" class="panel-card home-card" id="today-plan" aria-labelledby="planTitle">
-            <div class="panel-head">
-              <div>
-                <h2 class="panel-title" id="planTitle"><span class="chip-icon"><svg><use href="#i-calendar"/></svg></span>Today’s plan</h2>
-                <p class="panel-sub">Live classes as they happen and the steps you set yourself.</p>
-              </div>
+          <!-- Today: live classes and the student's own steps (shared with Solo focus) -->
+          <section style="--d: 4" class="panel-card home-card today-card" id="today-plan" aria-labelledby="planTitle">
+            <div class="today-head">
+              <h2 class="panel-title" id="planTitle"><span class="chip-icon"><svg><use href="#i-calendar"/></svg></span>Today</h2>
+              <span class="today-count" id="planCount" hidden></span>
             </div>
-            <ul class="plan-list" id="planList" aria-live="polite"><li class="empty-state">Loading…</li></ul>
-            <form class="inline-form plan-add" id="planAddForm">
-              <input id="planAddInput" class="field-input" type="text" maxlength="120" placeholder="Add a small step, like “Read pages 12–14”" aria-label="Add a step to today’s plan" autocomplete="off">
-              <button class="btn-action" type="submit"><svg class="icon"><use href="#i-plus"/></svg>Add</button>
+            <div class="today-meter" id="planMeter" hidden><span></span></div>
+            <ul class="today-list" id="planList" aria-live="polite"><li class="empty-state">Loading…</li></ul>
+            <form class="today-add" id="planAddForm">
+              <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+              <input id="planAddInput" type="text" maxlength="120" placeholder="Add a step, like “Read pages 12–14”" aria-label="Add a step for today" autocomplete="off">
             </form>
-            <p class="plan-note">No class timetable or deadlines are connected to Neuro-Focus, so nothing here is guessed: live sessions appear when your teacher starts them, and steps are the ones you add (saved on this device).</p>
           </section>
 
-          <section style="--d: 6" class="panel-card home-card" id="continue-card" aria-labelledby="continueTitle">
-            <div class="panel-head">
-              <div>
-                <h2 class="panel-title" id="continueTitle"><span class="chip-icon green"><svg><use href="#i-history"/></svg></span>Continue where you left off</h2>
-                <p class="panel-sub">Your latest notes, chats and sessions.</p>
-              </div>
-            </div>
-            <ul class="continue-list" id="continueList"><li class="empty-state">Loading…</li></ul>
+          <!-- Jump back in: the latest note, NeuroBuddy chat and focus session -->
+          <section style="--d: 5" class="panel-card home-card" id="continue-card" aria-labelledby="continueTitle">
+            <h2 class="panel-title" id="continueTitle"><span class="chip-icon green"><svg><use href="#i-history"/></svg></span>Jump back in</h2>
+            <ul class="jump-list" id="continueList"><li class="empty-state">Loading…</li></ul>
           </section>
         </div>
 
-        <div class="home-pair">
-          <section style="--d: 7" class="panel-card home-card" id="home-classes" aria-labelledby="homeClassesTitle">
-            <div class="panel-head">
-              <div>
-                <h2 class="panel-title" id="homeClassesTitle"><span class="chip-icon"><svg><use href="#i-school"/></svg></span>Your classes</h2>
-                <p class="panel-sub">Pick a class to work in, or join when your teacher goes live.</p>
-              </div>
-              <button class="btn-action" type="button" data-action="join-class"><svg class="icon"><use href="#i-plus"/></svg>Join a class</button>
-            </div>
-            <div class="home-class-grid" id="homeClassGrid"><p class="empty-state">Loading your classes…</p></div>
-          </section>
-
-          <section style="--d: 8" class="panel-card home-card buddy-entry" aria-labelledby="buddyEntryTitle">
-            <div class="buddy-entry-head">
-              <span class="buddy-face" aria-hidden="true"><svg><use href="#i-chat"/></svg></span>
-              <div>
-                <p class="page-kicker">NeuroBuddy</p>
-                <h2 class="buddy-entry-title" id="buddyEntryTitle">What are we learning today?</h2>
-              </div>
-            </div>
-            <form id="buddyEntryForm" class="tutor-form-row">
-              <input id="buddyEntryInput" class="field-input" type="text" placeholder="Ask about anything you’re studying…" aria-labelledby="buddyEntryTitle" autocomplete="off">
-              <button class="btn-primary" type="submit">Ask</button>
-            </form>
-            <div class="prompt-chips" role="group" aria-label="Ways NeuroBuddy can help">
-              <button class="chip" type="button" data-buddy-starter="Explain this topic simply, with one everyday example: "><svg><use href="#i-spark"/></svg>Explain a topic</button>
-              <button class="chip" type="button" data-buddy-starter="I'm stuck getting started. Break this task into tiny first steps: "><svg><use href="#i-rocket"/></svg>Help me start</button>
-              <button class="chip" type="button" data-buddy-starter="Help me plan this assignment as a short list of steps in a sensible order: "><svg><use href="#i-list"/></svg>Plan an assignment</button>
-            </div>
-          </section>
-        </div>
-
-        <!-- Focus coach (student-dashboard.js + focus-analysis.js): tips from the student's own saved sessions -->
-        <section style="--d: 9" class="panel-card home-card coach-card" id="focus-coach" aria-labelledby="coachTitle">
-          <div class="panel-head">
-            <div>
-              <h2 class="panel-title" id="coachTitle"><span class="chip-icon green"><svg><use href="#i-spark"/></svg></span>Focus coach</h2>
-              <p class="panel-sub" id="coachBasis">Looking at your saved sessions…</p>
-            </div>
-            <a class="text-link" href="#progress"><svg class="icon" aria-hidden="true"><use href="#i-chart"/></svg>See my progress</a>
+        <!-- Focus coach: one tip at a time (student-dashboard.js + focus-analysis.js) -->
+        <section style="--d: 6" class="panel-card home-card coach-card coach-mini" id="focus-coach" aria-labelledby="coachTitle">
+          <div class="coach-mini-icon" id="coachIcon" aria-hidden="true"><svg><use href="#i-spark"/></svg></div>
+          <div class="coach-mini-body">
+            <p class="coach-mini-kicker" id="coachTitle">Focus coach</p>
+            <h3 class="coach-mini-title" id="coachTipTitle">Looking at your sessions…</h3>
+            <p class="coach-mini-text" id="coachTipText"></p>
+            <div class="coach-progress" id="coachProgress" hidden></div>
+            <p class="coach-mini-win" id="coachWin" hidden></p>
           </div>
-          <div class="coach-progress" id="coachProgress" hidden></div>
-          <div class="coach-grid">
-            <div class="coach-col" aria-labelledby="coachWinsTitle">
-              <h3 class="coach-heading" id="coachWinsTitle"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Going well</h3>
-              <ul class="coach-list" id="coachWins"><li class="empty-state">Loading…</li></ul>
-            </div>
-            <div class="coach-col" aria-labelledby="coachTipsTitle">
-              <h3 class="coach-heading tips" id="coachTipsTitle"><svg class="icon" aria-hidden="true"><use href="#i-rocket"/></svg>Try next</h3>
-              <ul class="coach-list" id="coachTips"><li class="empty-state">Loading…</li></ul>
-            </div>
-          </div>
+          <div class="coach-mini-actions" id="coachActions"></div>
         </section>
       </section>
 
@@ -370,6 +305,11 @@
               <div class="page-hero-actions">
                 <button class="btn-primary" type="button" id="quickStart" data-start-focus><svg class="icon"><use href="#i-play"/></svg><span>Start focus session</span></button>
               </div>
+              <p class="meeting-links">In a video call?
+                <button class="text-link" type="button" data-open="zoom">Open Zoom</button>
+                <button class="text-link" type="button" data-open="meet">Open Google Meet</button>
+                <span class="info-wrap"><button class="info-btn" type="button" data-info aria-label="More about meeting links" aria-expanded="false" aria-controls="meetingInfo">i</button><span class="info-pop" id="meetingInfo" role="note" hidden>Opens your saved meeting link in a new tab (you’re asked for it the first time; it’s kept on this device). Your camera stays off until you press Start focus session.</span></span>
+              </p>
             </div>
 
             <!-- Solo sessions are personal. When a class live session is using the camera, this says so (student-classes.js). -->
@@ -541,92 +481,94 @@
 
       <!-- ================= NeuroBuddy (learning-assistant.js) ================= -->
       <section class="view buddy-view" id="view-buddy" data-view="buddy" hidden aria-labelledby="buddyTitle">
-        <section class="home-hero page-hero" aria-labelledby="buddyTitle">
-          <div class="home-hero-art" aria-hidden="true">
-            <svg viewBox="0 0 560 200" fill="none">
-              <g stroke="currentColor" stroke-width="1.2">
-                <rect x="300" y="34" width="150" height="56" rx="20" stroke-opacity="0.3"/>
-                <path d="M330 90l-10 20 26-20" stroke-opacity="0.3"/>
-                <rect x="380" y="112" width="132" height="46" rx="18" stroke-opacity="0.2"/>
-                <path d="M490 158l10 16-24-16" stroke-opacity="0.2"/>
-              </g>
-              <g fill="currentColor">
-                <circle cx="350" cy="62" r="4" fill-opacity="0.5"/><circle cx="375" cy="62" r="4" fill-opacity="0.4"/><circle cx="400" cy="62" r="4" fill-opacity="0.3"/>
-                <path d="M520 40l3 8 8 3-8 3-3 8-3-8-8-3 8-3Z" fill-opacity="0.45"/>
-                <path d="M262 132l2 5 5 2-5 2-2 5-2-5-5-2 5-2Z" fill-opacity="0.35"/>
-              </g>
-            </svg>
-          </div>
-          <div class="page-hero-inner">
-            <div class="home-hero-hello">
-              <span class="buddy-face hero-face" aria-hidden="true"><svg><use href="#i-chat"/></svg></span>
-              <div class="hero-copy">
-                <p class="eyebrow-pill"><span class="tag">AI study buddy</span><span id="buddyContext">No class picked · general help</span></p>
-                <h1 class="welcome-title" id="buddyTitle">NeuroBuddy</h1>
-                <p class="hero-lead">Explanations, summaries and quizzes in plain language, at your pace.</p>
-              </div>
+        <div class="buddy-app" id="buddyApp">
+          <!-- Chats on this device (learning-assistant.js, buddy-store.js) -->
+          <div class="buddy-chats panel-card" id="buddyChats" role="region" aria-labelledby="buddyTitle">
+            <div class="buddy-chats-head">
+              <span class="buddy-face" aria-hidden="true"><svg><use href="#i-buddy"/></svg></span>
+              <h1 class="buddy-brand" id="buddyTitle">NeuroBuddy</h1>
+              <button class="icon-btn buddy-chats-close" type="button" id="buddyChatsClose" aria-label="Hide chats"><svg class="icon"><use href="#i-close"/></svg></button>
             </div>
+            <button class="btn-primary buddy-new" type="button" id="buddyNewChat"><svg class="icon"><use href="#i-plus"/></svg>New chat</button>
+            <div class="buddy-search">
+              <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
+              <input class="field-input" id="buddySearch" type="search" placeholder="Search chats" aria-label="Search chats" autocomplete="off">
+            </div>
+            <nav class="buddy-chat-nav" aria-label="Your chats"><ul class="buddy-chat-list" id="buddyChatList"></ul></nav>
+            <p class="buddy-store-note"><svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg>Chats are saved on this device only.</p>
           </div>
-        </section>
 
-        <div class="buddy-grid">
-          <section style="--d: 1" class="panel-card home-card chat-card" id="study-assistant" aria-labelledby="tutorTitle">
-            <div class="panel-head">
-              <div>
-                <h2 class="panel-title" id="tutorTitle"><span class="chip-icon"><svg><use href="#i-chat"/></svg></span>Chat</h2>
-                <p class="panel-sub" id="tutorMessage">Ask questions or request re-engagement hints whenever focus drops.</p>
+          <section class="buddy-main panel-card" aria-labelledby="buddyChatTitle">
+            <header class="buddy-main-head">
+              <button class="icon-btn buddy-chats-open" type="button" id="buddyChatsOpen" aria-controls="buddyChats" aria-expanded="false" aria-label="Show chats"><svg class="icon"><use href="#i-list"/></svg></button>
+              <div class="buddy-main-title">
+                <div class="buddy-title-wrap" id="buddyTitleWrap">
+                  <h2 id="buddyChatTitle" title="Click to rename">New chat</h2>
+                  <button class="icon-btn buddy-rename-btn" type="button" id="buddyRename" aria-label="Rename this chat" title="Rename this chat"><svg class="icon"><use href="#i-pencil"/></svg></button>
+                </div>
+                <label class="buddy-class-pick">
+                  <svg class="icon" aria-hidden="true"><use href="#i-school"/></svg>
+                  <span class="sr-only">Class for this chat</span>
+                  <select id="buddyClass" class="field-select"></select>
+                </label>
               </div>
-              <button id="clearChat" class="btn-action" type="button" title="Clear this chat"><svg class="icon"><use href="#i-trash"/></svg>Clear</button>
-            </div>
-            <div class="chat-box" id="tutorConversation" aria-live="polite">
-              <p class="chat-bubble assistant-bubble">Hi, I'm NeuroBuddy, your AI study buddy! Ask me anything you need help understanding.</p>
-            </div>
-            <div class="composer">
-              <div class="prompt-chips" role="group" aria-label="Quick prompts">
-                <button class="chip" type="button" data-tutor-prompt="Explain this simply: "><svg><use href="#i-spark"/></svg>Explain simply</button>
-                <button class="chip" type="button" data-tutor-prompt="Summarize this in 3 short bullet points: "><svg><use href="#i-list"/></svg>3-point summary</button>
-                <button class="chip" type="button" data-tutor-prompt="Quiz me with 3 quick questions about "><svg><use href="#i-help"/></svg>Quiz me</button>
-                <button class="chip" type="button" data-tutor-prompt="I'm stuck getting started. Break this task into tiny first steps: "><svg><use href="#i-rocket"/></svg>Help me start</button>
+              <button class="btn-action" type="button" id="buddyFlashcards"><svg class="icon"><use href="#i-cards"/></svg><span>Flashcards</span></button>
+            </header>
+
+            <!-- Files and flashcard decks kept with this chat -->
+            <div class="buddy-shelf" id="buddyShelf" hidden></div>
+
+            <div class="buddy-thread chat-box" id="tutorConversation" aria-live="polite" aria-relevant="additions"></div>
+
+            <form class="buddy-composer" id="tutorForm" novalidate>
+              <div class="buddy-pending" id="buddyPending" hidden></div>
+              <label class="sr-only" for="tutorPrompt">Message NeuroBuddy</label>
+              <textarea id="tutorPrompt" rows="1" maxlength="4000" placeholder="Ask NeuroBuddy anything, or add a file…" autocomplete="off"></textarea>
+              <div class="buddy-composer-bar">
+                <button type="button" class="icon-btn" id="buddyAttach" aria-label="Add files or pictures"><svg class="icon"><use href="#i-paperclip"/></svg></button>
+                <input type="file" id="buddyFileInput" class="sr-only" multiple tabindex="-1" aria-hidden="true">
+                <!-- Explanation style, built into the composer (remembered on this device) -->
+                <div class="buddy-style">
+                  <button type="button" class="buddy-style-button" id="buddyStyleButton" aria-haspopup="listbox" aria-expanded="false" aria-controls="buddyStyleMenu">
+                    <svg class="icon" aria-hidden="true"><use href="#i-spark"/></svg><span id="buddyStyleLabel">Step by step</span><svg class="icon chevron" aria-hidden="true"><use href="#i-chevron-down"/></svg>
+                  </button>
+                  <ul class="buddy-style-menu" id="buddyStyleMenu" role="listbox" aria-label="How should NeuroBuddy explain?" tabindex="-1" hidden>
+                    <li role="option" data-style="simple" id="styleOptSimple"><b>Direct &amp; simple</b><small>Plain words, no extra detail</small></li>
+                    <li role="option" data-style="step-by-step" id="styleOptSteps"><b>Step by step</b><small>One small step at a time</small></li>
+                    <li role="option" data-style="examples" id="styleOptExamples"><b>With examples</b><small>Everyday examples to picture it</small></li>
+                    <li role="option" data-style="short" id="styleOptShort"><b>Short answers</b><small>Just the key point</small></li>
+                  </ul>
+                </div>
+                <span class="buddy-hint" aria-hidden="true">Enter to send · Shift+Enter for a new line</span>
+                <button type="submit" class="btn-primary buddy-send" id="buddySend" aria-label="Send"><svg class="icon"><use href="#i-send"/></svg></button>
               </div>
-              <form id="tutorForm" class="tutor-form-row">
-                <input id="tutorPrompt" class="field-input" type="text" placeholder="Ask NeuroBuddy a question or request a summary…" required autocomplete="off" aria-label="Question for NeuroBuddy">
-                <button class="btn-primary send-button" type="submit" aria-label="Ask NeuroBuddy"><span>Ask</span><svg class="icon" aria-hidden="true"><use href="#i-send"/></svg></button>
-              </form>
-            </div>
+            </form>
+            <p class="buddy-privacy"><svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg>Don’t share personal details. Files are read on this device; their text goes to the AI service only when you ask.
+              <span class="info-wrap"><button class="info-btn" type="button" data-info aria-label="Tips for NeuroBuddy" aria-expanded="false" aria-controls="buddyTips">i</button><span class="info-pop" id="buddyTips" role="note" hidden>Add a PDF, Word, PowerPoint or text file, or a photo of your notes, and ask about it; the file stays with the chat for follow-up questions. Change how NeuroBuddy explains with the menu next to the paperclip. Flashcards turn this chat, a file or any topic into cards you can practise with.</span></span>
+            </p>
+            <p class="sr-only" id="tutorMessage" role="status" aria-live="polite"></p>
           </section>
-
-          <div class="buddy-side">
-            <!-- Explanation style: the buttons set the hidden list below (learning-assistant.js) -->
-            <section style="--d: 2" class="panel-card home-card" aria-labelledby="styleTitle">
-              <h2 class="panel-title" id="styleTitle"><span class="chip-icon green"><svg><use href="#i-spark"/></svg></span>How should I explain?</h2>
-              <div class="style-options" role="radiogroup" aria-labelledby="styleTitle" id="styleOptions">
-                <button type="button" role="radio" data-style="simple"><b>Direct &amp; simple</b><small>Plain words, no extra detail</small></button>
-                <button type="button" role="radio" data-style="step-by-step"><b>Step by step</b><small>One small step at a time</small></button>
-                <button type="button" role="radio" data-style="examples"><b>With examples</b><small>Everyday examples to picture it</small></button>
-                <button type="button" role="radio" data-style="short"><b>Short answers</b><small>Just the key point</small></button>
-              </div>
-              <select id="supportStyle" class="field-select" aria-label="Explanation style" hidden>
-                <option value="simple">Direct &amp; simple</option>
-                <option value="step-by-step">Step-by-step</option>
-                <option value="examples">With examples</option>
-                <option value="short">Short answers</option>
-              </select>
-            </section>
-
-            <section style="--d: 3" class="panel-card home-card tips-card" aria-labelledby="tipsTitle">
-              <h2 class="panel-title" id="tipsTitle"><span class="chip-icon amber"><svg><use href="#i-help"/></svg></span>Get the most from NeuroBuddy</h2>
-              <ul>
-                <li><span class="chip-icon"><svg><use href="#i-spark"/></svg></span><div><b>Paste the hard part</b>A sentence, formula or question you’re stuck on works best.</div></li>
-                <li><span class="chip-icon green"><svg><use href="#i-rocket"/></svg></span><div><b>Stuck starting?</b>Ask for tiny first steps and add them to your micro-goals.</div></li>
-                <li><span class="chip-icon amber"><svg><use href="#i-help"/></svg></span><div><b>Check yourself</b>“Quiz me” turns what you learned into three quick questions.</div></li>
-                <li><span class="chip-icon"><svg><use href="#i-lock"/></svg></span><div><b>Keep it private</b>Don’t share personal details. Your class name gives NeuroBuddy context.</div></li>
-              </ul>
-            </section>
-          </div>
         </div>
+
+        <!-- Flashcards: make a deck, then practise it (buddy-flashcards.js) -->
+        <dialog class="nf-dialog nf-dialog-wide flash-dialog" id="flashDialog" aria-labelledby="flashTitle">
+          <div class="flash-body">
+            <div class="flash-head">
+              <div>
+                <h2 id="flashTitle">Flashcards</h2>
+                <p class="flash-sub" id="flashSub"></p>
+              </div>
+              <div class="flash-head-tools">
+                <button class="icon-btn" type="button" id="flashShuffle" aria-label="Shuffle and start again" title="Shuffle and start again" hidden><svg class="icon"><use href="#i-shuffle"/></svg></button>
+                <button class="icon-btn" type="button" id="flashClose" aria-label="Close flashcards" title="Close"><svg class="icon"><use href="#i-close"/></svg></button>
+              </div>
+            </div>
+            <div class="flash-content" id="flashContent"></div>
+          </div>
+        </dialog>
       </section>
 
-      <!-- ================= Class notes (student-notes.js) ================= -->
+      <!-- ================= My notes (student-notes.js) ================= -->
       <section class="view notes-view" id="view-notes" data-view="notes" hidden aria-labelledby="notesPageTitle">
         <section class="home-hero page-hero" aria-labelledby="notesPageTitle">
           <div class="home-hero-art" aria-hidden="true">
@@ -642,7 +584,7 @@
           <div class="page-hero-inner">
             <div class="hero-copy">
               <p class="eyebrow-pill"><span class="tag">Private</span><span id="notesCount">Only you can see your notes</span></p>
-              <h1 class="welcome-title" id="notesPageTitle">Class notes</h1>
+              <h1 class="welcome-title" id="notesPageTitle">My notes</h1>
               <p class="hero-lead">Write notes, or paste messy ones and let NeuroBuddy tidy them up. Then quiz yourself.</p>
             </div>
             <div class="page-hero-actions">
@@ -740,6 +682,7 @@
                 <button type="button" data-range="30" aria-pressed="false">30 days</button>
                 <button type="button" data-range="all" aria-pressed="false">All time</button>
               </div>
+              <button class="btn-action" type="button" data-export-report="session"><svg class="icon"><use href="#i-download"/></svg>Export session log</button>
             </div>
           </div>
         </section>
@@ -815,22 +758,50 @@
       </section>
 
       <!-- ================= Classes ================= -->
-      <section class="view" id="view-classes" data-view="classes" hidden aria-labelledby="classesPageTitle">
-        <div class="page-head">
-          <div>
-            <div class="page-kicker">Your teachers and live sessions</div>
-            <h1 class="page-title" id="classesPageTitle">Classes</h1>
-            <p class="page-sub">Open a class to join its live sessions. Classroom sessions are shared with your teacher only while you’ve joined.</p>
+      <section class="view classes-view" id="view-classes" data-view="classes" hidden aria-labelledby="classesPageTitle">
+        <section class="home-hero page-hero" aria-labelledby="classesPageTitle">
+          <div class="home-hero-art" aria-hidden="true">
+            <svg viewBox="0 0 560 200" fill="none">
+              <g stroke="currentColor" stroke-width="1.2">
+                <path d="M318 84 410 40l92 44-92 44Z" stroke-opacity="0.3"/>
+                <path d="M356 102v34c30 22 78 22 108 0v-34" stroke-opacity="0.22"/>
+                <path d="M502 84v46" stroke-opacity="0.22"/>
+                <path d="M250 150 318 84M502 84l40 56" stroke-opacity="0.14"/>
+              </g>
+              <circle cx="502" cy="134" r="4" fill="currentColor" fill-opacity="0.5"/>
+              <circle cx="250" cy="150" r="3" fill="currentColor" fill-opacity="0.35"/>
+              <circle cx="542" cy="140" r="2.5" fill="currentColor" fill-opacity="0.35"/>
+            </svg>
           </div>
-          <div class="page-actions">
-            <button class="btn-primary" type="button" data-action="join-class"><svg class="icon"><use href="#i-plus"/></svg>Join a class</button>
-          </div>
-        </div>
-        <section class="panel-card" id="my-classes" aria-label="My classes">
-          <div id="studentClassList" class="my-class-grid">
-            <p class="empty-state">Loading classes…</p>
+          <div class="page-hero-inner">
+            <div class="hero-copy">
+              <p class="eyebrow-pill"><span class="tag">Classes</span><span id="classesSummary">Loading…</span></p>
+              <h1 class="welcome-title" id="classesPageTitle">Classes</h1>
+              <p class="hero-lead">Posts, assignments, quizzes and live sessions from your teachers. Your focus is shared with a teacher only while you’re in their live session.</p>
+            </div>
+            <div class="page-hero-actions">
+              <button class="btn-primary" type="button" data-action="join-class"><svg class="icon"><use href="#i-plus"/></svg>Join a class</button>
+            </div>
           </div>
         </section>
+
+        <!-- Live sessions happening now (student-classes.js) -->
+        <div class="classes-live" id="classesLive" hidden></div>
+
+        <div class="classes-toolbar" id="classesToolbar" hidden>
+          <div class="classes-search">
+            <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
+            <input class="field-input" id="classesSearch" type="search" placeholder="Search classes or teachers" aria-label="Search classes or teachers" autocomplete="off">
+          </div>
+          <div class="classes-filter" role="group" aria-label="Show">
+            <button type="button" data-class-filter="all" aria-pressed="true">All</button>
+            <button type="button" data-class-filter="live" aria-pressed="false">Live now</button>
+          </div>
+        </div>
+
+        <div id="studentClassList" class="class-card-grid" role="list" aria-label="Your classes">
+          <p class="empty-state">Loading classes…</p>
+        </div>
       </section>
 
       <!-- ================= One class (student-classes.js) =================
@@ -859,19 +830,20 @@
               </div>
             </div>
             <div class="page-hero-actions">
-              <a class="btn-action" href="#classes"><svg class="icon"><use href="#i-school"/></svg>All classes</a>
+              <a class="btn-action" href="#classes"><svg class="icon"><use href="#i-back"/></svg>All classes</a>
+              <button class="btn-action" type="button" id="classNotesButton"><svg class="icon"><use href="#i-note"/></svg>My notes for this class</button>
             </div>
           </div>
         </section>
 
         <div class="class-hub-tabs" role="tablist" aria-label="Class sections">
-          <button type="button" role="tab" id="classTabLive" data-class-tab="live" aria-selected="true" aria-controls="classPanelLive"><svg class="icon"><use href="#i-video"/></svg>Live focus</button>
-          <button type="button" role="tab" id="classTabPosts" data-class-tab="posts" aria-selected="false" aria-controls="classPanelPosts" tabindex="-1"><svg class="icon"><use href="#i-megaphone"/></svg>Posts</button>
+          <button type="button" role="tab" id="classTabPosts" data-class-tab="posts" aria-selected="true" aria-controls="classPanelPosts"><svg class="icon"><use href="#i-megaphone"/></svg>Posts</button>
           <button type="button" role="tab" id="classTabAssignments" data-class-tab="assignments" aria-selected="false" aria-controls="classPanelAssignments" tabindex="-1"><svg class="icon"><use href="#i-assignment"/></svg>Assignments</button>
           <button type="button" role="tab" id="classTabQuizzes" data-class-tab="quizzes" aria-selected="false" aria-controls="classPanelQuizzes" tabindex="-1"><svg class="icon"><use href="#i-quiz"/></svg>Quizzes</button>
+          <button type="button" role="tab" id="classTabLive" data-class-tab="live" aria-selected="false" aria-controls="classPanelLive" tabindex="-1"><svg class="icon"><use href="#i-video"/></svg>Live focus<span class="tab-live" id="classTabLiveDot" hidden><span class="live-dot"></span><span class="sr-only">, live now</span></span></button>
         </div>
 
-        <div class="class-hub-panel" id="classPanelLive" role="tabpanel" aria-labelledby="classTabLive">
+        <div class="class-hub-panel" id="classPanelLive" role="tabpanel" aria-labelledby="classTabLive" hidden>
           <!-- Live session status, Join / Leave (student-classes.js) -->
           <section class="class-banner" id="classBanner" data-state="loading" aria-live="polite" aria-labelledby="bannerTitle">
             <span class="next-icon" aria-hidden="true"><svg><use href="#i-school"/></svg></span>
@@ -901,7 +873,7 @@
         </div>
 
         <!-- Posts (student-classroom.js): announcements from the teacher -->
-        <div class="class-hub-panel" id="classPanelPosts" role="tabpanel" aria-labelledby="classTabPosts" hidden>
+        <div class="class-hub-panel" id="classPanelPosts" role="tabpanel" aria-labelledby="classTabPosts">
           <p class="classroom-setup" id="studentPostsSetup" hidden></p>
           <section class="panel-card" aria-labelledby="studentPostsTitle">
             <div class="panel-head">
@@ -949,13 +921,13 @@
         </div>
       </section>
 
-      <!-- ================= My profile (scripts/shared/profile.js) ================= -->
+      <!-- ================= Profile settings (scripts/shared/profile.js, account-security.js) ================= -->
       <section class="view" id="view-profile" data-view="profile" hidden aria-labelledby="profilePageTitle">
         <div class="page-head">
           <div>
             <div class="page-kicker">Your account</div>
-            <h1 class="page-title" id="profilePageTitle">My profile</h1>
-            <p class="page-sub">Choose how you appear and how Neuro-Focus looks. Changes are saved to your account, so they follow you to any device.</p>
+            <h1 class="page-title" id="profilePageTitle">Profile settings</h1>
+            <p class="page-sub">Your name, picture and theme, plus the email and password you sign in with. Everything is saved to your account, so it follows you to any device.</p>
           </div>
         </div>
 
@@ -1016,11 +988,10 @@
               </div>
 
               <dl class="account-facts">
-                <div><dt>Login email</dt><dd id="factEmail">—</dd></div>
                 <div><dt>Account ID</dt><dd><code id="factAccountId">—</code></dd></div>
                 <div><dt>Role</dt><dd id="factRole">Student</dd></div>
               </dl>
-              <p class="field-help account-note">Your login email, account ID and role are separate from your profile and can’t be changed here.</p>
+              <p class="field-help account-note">Your account ID and role can’t be changed. To change your sign-in email or password, see <a class="text-link" href="#profile-security">Sign-in and security</a> below.</p>
             </section>
 
             <section class="panel-card" id="profile-appearance" aria-labelledby="appearanceTitle">
@@ -1069,21 +1040,76 @@
                 <div class="sample-row">
                   <span class="btn-primary">Save note</span>
                   <span class="btn-action">Cancel</span>
-                  <span class="status-chip ok">Focused</span>
-                  <span class="status-chip warn">Looked away</span>
-                  <span class="status-chip live">Live</span>
+                  <span class="sample-chip ok">Focused</span>
+                  <span class="sample-chip warn">Looked away</span>
+                  <span class="sample-chip live">Live</span>
                 </div>
                 <div class="sample-chart"><i style="height: 40%"></i><i style="height: 65%"></i><i style="height: 30%"></i><i style="height: 85%"></i><i style="height: 55%"></i><i style="height: 75%"></i><i style="height: 45%"></i></div>
               </div>
             </section>
           </div>
 
-          <div class="profile-actions">
+          <!-- Shown only while something is changed, saving, or a save failed (profile.js) -->
+          <div class="profile-actions" id="profileActions" hidden>
             <p class="profile-status" id="profileStatus" role="status" aria-live="polite">Loading your profile…</p>
             <button type="button" class="btn-action" id="profileCancel">Cancel</button>
             <button type="submit" class="btn-primary" id="profileSave">Save changes</button>
           </div>
+          <p class="sr-only" id="profileAnnounce" role="status" aria-live="polite"></p>
         </form>
+
+        <!-- Sign-in and security (scripts/shared/account-security.js): saved on their own, apart from the profile form -->
+        <section class="panel-card security-card" id="profile-security" aria-labelledby="securityTitle">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title" id="securityTitle"><span class="chip-icon"><svg><use href="#i-lock"/></svg></span>Sign-in and security</h2>
+              <p class="panel-sub">Change the email and password you sign in with. These save on their own, separately from your picture and theme.</p>
+            </div>
+          </div>
+          <div class="security-grid">
+            <form class="security-form" id="acctEmailForm" novalidate aria-labelledby="acctEmailTitle">
+              <h3 class="security-title" id="acctEmailTitle">Email address</h3>
+              <p class="security-current">You sign in with <b id="acctCurrentEmail">—</b></p>
+              <p class="security-pending" id="acctEmailPending" role="status" hidden></p>
+              <label class="field-label" for="acctNewEmail">New email address</label>
+              <input id="acctNewEmail" class="field-input" type="email" autocomplete="email" spellcheck="false" required aria-describedby="acctEmailHelp">
+              <div class="security-field" data-needs-password>
+                <label class="field-label" for="acctEmailPassword">Current password</label>
+                <input id="acctEmailPassword" class="field-input" type="password" autocomplete="current-password" required>
+              </div>
+              <p class="field-help" id="acctEmailHelp">We’ll email you a confirmation link. Your sign-in email only changes once you open it.</p>
+              <p class="form-message" id="acctEmailMessage" role="status" aria-live="polite"></p>
+              <div class="form-actions"><button type="submit" class="btn-primary" id="acctEmailSave">Change email</button></div>
+            </form>
+
+            <form class="security-form" id="acctPasswordForm" novalidate aria-labelledby="acctPasswordTitle">
+              <h3 class="security-title" id="acctPasswordTitle">Change password</h3>
+              <div id="acctPasswordFields">
+                <div class="security-field">
+                  <label class="field-label" for="acctCurrentPassword">Current password</label>
+                  <input id="acctCurrentPassword" class="field-input" type="password" autocomplete="current-password" required>
+                </div>
+                <div class="security-field">
+                  <label class="field-label" for="acctNewPassword">New password</label>
+                  <input id="acctNewPassword" class="field-input" type="password" autocomplete="new-password" minlength="8" required aria-describedby="acctNewPasswordHelp">
+                  <span class="field-help" id="acctNewPasswordHelp">At least 8 characters.</span>
+                </div>
+                <div class="security-field">
+                  <label class="field-label" for="acctConfirmPassword">New password again</label>
+                  <input id="acctConfirmPassword" class="field-input" type="password" autocomplete="new-password" minlength="8" required>
+                </div>
+                <label class="security-show"><input type="checkbox" id="acctShowPasswords"> Show passwords</label>
+                <p class="form-message" id="acctPasswordMessage" role="status" aria-live="polite"></p>
+                <div class="form-actions"><button type="submit" class="btn-primary" id="acctPasswordSave">Change password</button></div>
+              </div>
+              <div id="acctPasswordLink" hidden>
+                <p class="security-current">You sign in with Google, so this account doesn’t have a password yet.</p>
+                <p class="form-message" id="acctPasswordLinkMessage" role="status" aria-live="polite"></p>
+                <div class="form-actions"><button type="button" class="btn-action" id="acctPasswordLinkButton">Email me a link to set a password</button></div>
+              </div>
+            </form>
+          </div>
+        </section>
       </section>
     </div>
   </main>
@@ -1157,19 +1183,20 @@
 
   <script src="../scripts/shared/app.js?v=4"></script>
   <script src="../scripts/shared/dashboard-nav.js?v=3"></script>
-  <script src="../scripts/student/student-ui.js?v=6"></script>
+  <script src="../scripts/student/student-ui.js?v=8"></script>
   <!-- auth-guard.js must load first: the other modules wait on window.neuroFocusReady -->
   <script type="module" src="../scripts/auth/auth-guard.js?v=4"></script>
   <script type="module" src="../scripts/tracking/eye-analyzer.js?v=5"></script>
-  <script type="module" src="../scripts/student/learning-assistant.js?v=5"></script>
-  <script type="module" src="../scripts/student/student-notes.js?v=6"></script>
-  <script type="module" src="../scripts/student/student-classes.js?v=16"></script>
-  <script type="module" src="../scripts/student/student-focus.js?v=12"></script>
+  <script type="module" src="../scripts/student/learning-assistant.js?v=13"></script>
+  <script type="module" src="../scripts/student/student-notes.js?v=7"></script>
+  <script type="module" src="../scripts/student/student-classes.js?v=20"></script>
+  <script type="module" src="../scripts/student/student-focus.js?v=13"></script>
   <script type="module" src="../scripts/student/student-history.js?v=7"></script>
-  <script type="module" src="../scripts/shared/profile.js?v=1"></script>
-  <script type="module" src="../scripts/student/student-dashboard.js?v=8"></script>
-  <script type="module" src="../scripts/student/student-classroom.js?v=3"></script>
-  <script type="module" src="../scripts/student/student-quizzes.js?v=1"></script>
+  <script type="module" src="../scripts/shared/profile.js?v=5"></script>
+  <script type="module" src="../scripts/shared/account-security.js?v=1"></script>
+  <script type="module" src="../scripts/student/student-dashboard.js?v=13"></script>
+  <script type="module" src="../scripts/student/student-classroom.js?v=4"></script>
+  <script type="module" src="../scripts/student/student-quizzes.js?v=2"></script>
   <script src="../scripts/shared/info-popover.js?v=1"></script>
   <script type="module" src="../scripts/shared/home-background.js?v=1"></script>
 </body>

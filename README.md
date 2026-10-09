@@ -102,7 +102,15 @@ NeuroBuddy, the student study assistant and note organizer, calls the `learning-
 
    Or, without the CLI: **Supabase Dashboard → Edge Functions → Deploy a new function → Via editor**, name it `learning-assistant`, paste `supabase/functions/learning-assistant/index.ts`, and keep **Verify JWT** on.
 
-Each student account is limited to 30 NeuroBuddy requests per day, and free tiers also have provider-wide per-minute limits shared by all students. **Privacy:** on Gemini's free tier, Google may use prompts and responses to improve its products (the paid tier does not). NeuroBuddy only sends the student's question, the class name and recent chat turns, and tells students to avoid personal details.
+Each student account is limited to 30 NeuroBuddy requests per day (each answer or flashcard deck counts as one), and free tiers also have provider-wide per-minute limits shared by all students. **Privacy:** on Gemini's free tier, Google may use prompts and responses to improve its products (the paid tier does not). NeuroBuddy only sends the student's question, the class name, recent chat turns and the text of files the student added to that chat, and tells students to avoid personal details.
+
+### NeuroBuddy chats, files and flashcards
+
+- **Chats:** students start as many chats as they like (**New chat**), search, rename and delete them. Each chat can have a class for context. Chats are saved in the browser on that device (per account), like before; the old single chat per class becomes chats automatically the first time.
+- **Files:** the paperclip (or drag and drop, or paste a picture) adds PDF, Word (.docx), PowerPoint (.pptx), text, Markdown or CSV files, or photos (JPG, PNG, WebP), up to 15 MB each and 5 files per chat. Files are read **on the student's device**: only their text (up to 30,000 characters each) is kept with the chat and sent with questions. Pictures are shrunk and sent with that one message; they aren't kept. Scanned PDFs have no text, so students are asked to add a photo instead. The PDF, Word and PowerPoint readers load from cdnjs the first time they're needed, checked against fixed integrity hashes.
+- **Explanation style** (Direct & simple, Step by step, With examples, Short answers) is a menu in the message box, remembered on the device.
+- **Flashcards:** from the chat, one of its files, or any topic, 5–20 cards. Practising works like a pile: *Got it* takes a card out, *Again* puts it back a few cards later until it’s known. The summary lists the tricky cards; those come first next time. Decks are saved with the chat.
+- **Update the function** to use files and topic flashcards: redeploy `learning-assistant` (step 3 above). Version 2 of the function reads files and pictures and adds the `flashcards` task. Until it's redeployed, chats still work, flashcards from a chat or file fall back to the older 10-card quiz, and NeuroBuddy tells students it can't read files yet. Pictures need a provider that accepts images (`gemini` or `openai`; not `groq`).
 
 ## Phase 2 database update (saved history + private live channels)
 
@@ -165,7 +173,7 @@ Run `supabase/migrations/20261006000000_live_workflow_hardening.sql` once in the
 - **Shared attention history is tied to the live session it came from.** The database only lets a student save class-linked history while that class has an open live session they haven't been removed from. Everything else stays personal, so teachers only ever see attention recorded during their own live sessions.
 - **Sessions can't be left open forever.** The teacher's dashboard checks in every minute while live. If it was closed without pressing **End**, the session is ended at the dashboard's last activity the next time the teacher opens Neuro-Focus, and students who never joined are marked absent.
 
-## Student profiles update (Home dashboard, My profile, themes)
+## Student profiles update (Home dashboard, Profile settings, themes)
 
 Run `supabase/migrations/20261007000000_student_profiles.sql` once in **Supabase Dashboard → SQL Editor** (paste the whole file, click **Run**). It is safe to run again. It doesn't change any existing data.
 
@@ -173,12 +181,13 @@ Run `supabase/migrations/20261007000000_student_profiles.sql` once in **Supabase
 - **Private `avatars` storage bucket** (2 MB per file; JPG, PNG or WebP). Each person can only upload, replace or delete pictures in their own folder. A picture can be viewed by its owner and by the teachers of classes the owner is in, through links that expire after an hour. It is never public.
 - **`my_class_teachers()`:** lets students see their teacher's name on class cards without being able to read the teacher's profile.
 
-Check it worked: **Storage** should now list a private bucket named `avatars`. Until this update is run, the student pages still work with the default look and initials, and My profile explains that saving needs the update.
+Check it worked: **Storage** should now list a private bucket named `avatars`. Until this update is run, the student pages still work with the default look and initials, and Profile settings explains that saving needs the update.
 
 What students get:
-- **Home** is the page they land on after signing in: a welcome with their picture and name, one main action (join a live class → continue a recent note → start a focus session), today's plan (live sessions and their own steps only; no timetable is connected, so nothing is guessed), class cards with teachers and live status, a NeuroBuddy box, and links back to recent notes, chats and sessions. The camera never starts until they press a button.
+- **Home** is the page they land on after signing in, kept deliberately simple: a greeting with one main action (back to a live session they're in → join a live class → join a first class → continue a recent note → start a focus session); three small charts (focus score, focus time per day this week, day streak); **Today**, a checklist of their own steps (shared with Solo focus) plus any live class to join; **Jump back in** (latest note, NeuroBuddy chat and focus session); and one Focus coach tip, with more in My progress. No timetable is connected, so nothing is guessed. The camera never starts until they press a button.
 - **Focus session** is about the session in progress: the attention tracker, live scores, lapses and the live focus timeline, the timer and steps. **My progress** is the student's track record: finished, saved sessions, summaries, charts, date ranges and insights. A session still being recorded is left out of My progress until it is stopped; one that was never stopped (e.g. the page was closed) is marked *Unfinished*.
-- **My profile** (avatar, account menu or sidebar card): display name, built-in avatars or an uploaded picture with a square crop, and theme/accent with a live preview. **Save changes** stores everything on the account; **Cancel** goes back to what is saved.
+- **Profile settings** (account menu, or the picture on Home): display name, built-in avatars or an uploaded picture with a square crop, and theme/accent with a live preview. **Save changes** stores everything on the account; **Cancel** goes back to what is saved.
+- **Sign-in and security** (in Profile settings, for students and teachers; saved on its own): change the sign-in email or password. Both ask for the current password first. A new email only takes effect after the person opens the confirmation link Supabase emails (with Supabase's default *Secure email change*, a link goes to both the old and new address; the sign-in page says when one is left). Accounts that only use Google get an emailed link to set a password instead. Nothing here needs a database update; it uses Supabase Auth. In Supabase → Authentication → URL Configuration, `…/pages/login.html` must be an allowed redirect URL (it already is if sign-up confirmation and password reset work).
 
 The chosen theme is also remembered in the browser for that account only, so pages open in the right colours straight away. It is cleared on sign-out and ignored if a different account signs in. Teacher pages always keep the default look.
 
@@ -230,7 +239,7 @@ Until it is run, the Quizzes tabs say the update is needed; everything else keep
 2. **Student joins** (`join_class`) and appears on the teacher's master list straight away.
 3. **Teacher starts a live session** (`start_class_session`): a saved session is created and everyone on the master list is invited.
 4. **Student joins and tracks:** the attention tracker runs on the student's device. While they're in the session their browser checks in every 30 seconds (`check_in_session`, marking them present or late) and sends numbers only (score, state, focus) to the teacher. Video never leaves the device.
-5. **Teacher receives updates** on the Live monitor every second, and can remove a student from the session, let them back in or invite them again.
+5. **Teacher receives updates** on the class's Live focus tab every second, and can remove a student from the session, let them back in or invite them again.
 6. **Session ends** (`end_class_session`, or automatically after the dashboard has been gone for 15 minutes): no-shows are marked absent.
 7. **Saved records:** attendance (Attendance tab, spreadsheet download), shared attention history per session (History tab, plus a Focus column in each session's attendance), and the student's own Focus history, which includes their personal tracking too.
 
@@ -251,7 +260,7 @@ Enforced by the database (Row Level Security), not just by the pages:
 
 `tests/access-rules.test.mjs` checks all of this against every migration in an in-memory Postgres: `cd tests && npm install && npm test`.
 
-**Demonstration data:** the Live monitor's **Simulator (demo)** only uses made-up "Demo ·" learners, never real students. It shows a DEMO MODE banner, saves nothing, and its export is named `DEMO-simulated` and marked as demo. The dashboard always opens on the live classroom, and starting a real session switches out of the simulator.
+**Demonstration data:** the **Demo** page (sidebar → Demo) only uses made-up "Demo ·" learners, never real students. It shows a DEMO MODE banner, saves nothing, and its export is named `DEMO-simulated` and marked as demo. The dashboard always opens on the live classroom, and starting a real session switches out of the simulator.
 
 **Known limits:**
 - Live scores are reported by each student's browser, so a student could send made-up numbers for themselves. Realtime messages can't prove who sent them, so another class member could also post numbers under a classmate's ID to the teacher's live view. Students act on "removed" messages only after checking with the database. The saved records (attendance and history) are always written as the signed-in student and checked by the database.
@@ -262,16 +271,24 @@ Enforced by the database (Row Level Security), not just by the pages:
 A browser keeps one sign-in per web address, shared by all its tabs, so two tabs on `http://localhost:8000` are always the same account. Use two addresses instead:
 
 1. Tab 1: open http://localhost:8000 and sign in as the **teacher**. Click **＋ New class**, then **Copy join code**.
-2. Tab 2: open http://127.0.0.1:8000 (or a private window) and sign in as the **student**. Click **＋ Join a class** in the sidebar and paste the code. The teacher gets a "joined" (or "rejoined") notice and the student appears on the **Students** tab with a green online dot.
-3. Teacher: press **▶ Start live session**. The student gets a notice and a red **Live session** banner.
-4. Student: press **Join session**. Their attention tracker starts and the teacher's **Live monitor** shows their score every second. **End live session** stops sharing.
+2. Tab 2: open http://127.0.0.1:8000 (or a private window) and sign in as the **student**. Open **Classes**, click **＋ Join a class** and paste the code. The teacher gets a "joined" (or "rejoined") notice and the student appears on the **Students** tab with a green online dot.
+3. Teacher: press **▶ Start live session**. The student gets a notice, and the class's **Live focus** tab shows a live dot.
+4. Student: press **Join live session**. Their attention tracker starts and the teacher's **Live focus** tab shows their score every second. **End live session** stops sharing.
 
 If one tab's account changes because another tab on the same address signed in or out, that tab shows a notice instead of silently acting as the other account.
+
+## Finding your way around
+
+- **Students:** Home, Classes, Solo focus, My notes, My progress. NeuroBuddy is the one button in the header on every page; Profile settings is in the account menu.
+- **Teachers:** Home, Classes, Demo. **Classes** lists every class and links to the pages that cover all classes together (All students, Attendance report). A running session also gets a **Live now** shortcut.
+- **Inside a class:** Posts, Assignments, Quizzes, Live focus (teachers then have Master list, Attendance, History and Settings). A class opens on Live focus while its session is live, otherwise on Posts. Arrow keys move between tabs.
+- The header breadcrumb shows where you are (Home / Classes / Biology / Posts) and every part of it is a link; on phones it shows the last two parts. Old links (`#home`, `#class/<id>`, `#students`, `#attendance-report`, `#buddy`, …) still work.
+- Opening a page never turns the camera on. Only **Start focus session**, **Join live session** and **Turn camera on** do; the Zoom and Google Meet links on Solo focus only open the meeting.
 
 ## How classes and learning tools work
 
 - Teachers create classes and get a unique join code. They can add a password; class passwords are hashed in the database and are never returned to the browser.
-- Each class has five tabs for the teacher: **Live monitor**, **Master list** (online status, session status, attendance rate, **Remove from session**, **Remove from class**), **Attendance**, **History** (saved attention sessions) and **Settings** (rename, open/close joining, late threshold, password, new join code, delete).
+- Each class has the same first tabs for teachers and students: **Posts**, **Assignments**, **Quizzes** and **Live focus** (the teacher's live monitor). Teachers also get **Master list** (online status, session status, attendance rate, **Remove from session**, **Remove from class**), **Attendance**, **History** (saved attention sessions) and **Settings** (rename, open/close joining, late threshold, password, new join code, delete).
 - Students join by code, and must also provide the password if one was set. Students already in a class can always rejoin; new students need joining to be open.
 - Students share attention scores (never video) only while their teacher runs a live session in the class they are working in. Outside a live session their saved history is personal and teachers can't see it.
 - A student's notes belong to their account (Row Level Security). They can file a note under one of their classes or keep it personal. Teachers do not have access to those notes.

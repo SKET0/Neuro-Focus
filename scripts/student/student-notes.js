@@ -2,7 +2,7 @@
 // personal (student_notes table). Notes are written in a formatting editor and saved as
 // Markdown. NeuroBuddy can turn rough notes into a new organized note (shown as it writes)
 // and quiz the student on a note with flashcards.
-import { streamAssistant } from "../services/assistant-api.js?v=1";
+import { streamAssistant } from "../services/assistant-api.js?v=2";
 import { renderMarkdown, toMarkdown, markdownToPlain, markdownToHtml } from "../shared/markdown.js?v=1";
 import { confirmAction } from "../shared/class-live.js?v=9";
 

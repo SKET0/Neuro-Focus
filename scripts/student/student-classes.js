@@ -5,6 +5,8 @@ import {
   openClassChannel, teacherStatus, confirmAction, notify, showMessage, missingDatabaseUpdates, showSetupBanner, isMissingSql
 } from "../shared/class-live.js?v=9";
 import { paintAvatar, avatarUrls } from "../shared/avatars.js?v=1";
+import { classColor } from "./class-colors.js?v=1";
+import { createMascot } from "./buddy-mascot.js?v=3";
 import { normalizeReading, legacyState } from "../shared/tracking-states.js?v=1";
 
 const app = await window.neuroFocusReady;
@@ -496,7 +498,7 @@ if (app) {
     updateSharing();
     placeTracker();
     // Show the class page's Live focus with the tracker in sight (student-ui.js).
-    if (window.neuroFocusRouteClassId !== classId) window.location.hash = `class/${classId}`;
+    if (window.neuroFocusRouteClassId !== classId || window.neuroFocusRouteClassTab !== "live") window.location.hash = `class/${classId}/live`;
     if (!tracking) {
       cameraStarting = true;
       window.dispatchEvent(new CustomEvent("neurofocus:start-camera"));
@@ -659,6 +661,7 @@ if (app) {
 
   function renderSidebar() {
     const list = $("#sidebarClassList");
+    if (!list) return; // the sidebar lists pages only; classes are on the Classes page
     list.replaceChildren();
     if (!classes.length) {
       const empty = document.createElement("p");
@@ -686,84 +689,266 @@ if (app) {
     });
   }
 
+  // ---------- The Classes page ----------
+  // A "Live now" strip for live sessions, then one card per class: colour band, teacher, attendance,
+  // shortcuts to each tab, the main action (join, open) and a ⋯ menu (notes, join code, leave).
+  // Cards are only rebuilt when what they show changes, and only animate the first time.
+  let cardsKey = "";
+  let classFilter = "all";
+  let liveShown = new Set(); // classes already in the live strip (only new ones animate in)
+  const TAB_LINKS = [["posts", "i-megaphone", "Posts"], ["assignments", "i-assignment", "Assignments"], ["quizzes", "i-quiz", "Quizzes"], ["live", "i-video", "Live focus"]];
+  const el = (tag, className, text) => {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  };
+  const svgIcon = (id) => {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "icon");
+    svg.setAttribute("aria-hidden", "true");
+    const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+    use.setAttribute("href", `#${id}`);
+    svg.append(use);
+    return svg;
+  };
+  const isLive = (item) => Boolean(teacher.get(item.id)?.live) && !removedFromSession(item.id) && !blockedClasses.has(item.id);
+
   function renderCards() {
     const grid = $("#studentClassList");
-    grid.replaceChildren();
+    if (!grid) return;
+    const query = ($("#classesSearch")?.value || "").trim().toLowerCase();
+    const key = JSON.stringify([query, classFilter, joinedClassId, classes.map((item) => {
+      const status = teacher.get(item.id);
+      const info = teacherNames.get(item.id);
+      const stats = myAttendance.get(item.id);
+      return [item.id, item.name, item.join_code, status?.live, status?.since, status?.online, removedFromSession(item.id), blockedClasses.has(item.id), info?.name, info?.preset, info?.url, stats?.attended, stats?.counted];
+    })]);
+    if (key === cardsKey) return;
+    cardsKey = key;
+    const focusKey = grid.contains(document.activeElement) ? document.activeElement.dataset.focusKey : null;
+
+    // Summary in the page header
+    const liveCount = classes.filter(isLive).length;
+    const summary = $("#classesSummary");
+    if (summary) summary.textContent = classes.length ? `${classes.length} class${classes.length === 1 ? "" : "es"}${liveCount ? ` · ${liveCount} live now` : ""}` : "None yet";
+
+    renderLiveStrip();
+    const toolbar = $("#classesToolbar");
+    if (toolbar) toolbar.hidden = classes.length < 4;
+
     if (!classes.length) {
-      const empty = document.createElement("p");
-      empty.className = "empty-state";
-      empty.textContent = "You haven’t joined a class yet. Ask your teacher for a join code, then press “Join a class”.";
-      grid.append(empty);
+      const empty = el("div", "classes-empty");
+      const mascot = createMascot();
+      const join = el("button", "btn-primary", "");
+      join.type = "button";
+      join.append(svgIcon("i-plus"), "Join your first class");
+      join.dataset.focusKey = "join-first";
+      join.addEventListener("click", openJoinDialog);
+      empty.append(mascot, el("h2", "", "No classes yet"),
+        el("p", "", "Ask your teacher for a join code. Once you join, their posts, assignments, quizzes and live sessions show up here."), join);
+      grid.replaceChildren(empty);
+      grid.dataset.settled = "true";
       return;
     }
-    classes.forEach((item) => {
-      const status = teacher.get(item.id);
-      const card = document.createElement("article");
-      card.className = "my-class-card";
-      if (item.id === currentId) card.setAttribute("aria-current", "true");
-      const title = document.createElement("h3");
-      title.textContent = item.name;
-      // The class's teacher, with their picture or built-in avatar.
-      const teacherInfo = teacherNames.get(item.id);
-      const teacherLine = document.createElement("div");
-      teacherLine.className = "my-class-teacher";
-      if (teacherInfo) {
-        const face = document.createElement("span");
-        face.className = "nf-avatar sm";
-        paintAvatar(face, { name: teacherInfo.name, preset: teacherInfo.preset, url: teacherInfo.url });
-        const label = document.createElement("span");
-        label.textContent = teacherInfo.name;
-        teacherLine.append(face, label);
-      }
-      const code = document.createElement("span");
-      code.className = "code";
-      code.textContent = item.join_code;
-      const state = document.createElement("div");
-      state.className = "my-class-status";
-      state.dataset.live = String(Boolean(status?.live));
-      if (status?.live && removedFromSession(item.id)) state.append(liveDot(), "Live session · you were removed from it");
-      else if (status?.live) state.append(liveDot(), `Live session since ${clock(status.since)}`);
-      else state.textContent = status?.online ? "Teacher online · no live session" : "No live session";
-      const stats = myAttendance.get(item.id);
-      const attendanceLine = document.createElement("div");
-      attendanceLine.className = "my-class-attendance";
-      attendanceLine.textContent = stats?.counted
-        ? `Attendance ${Math.round((stats.attended / stats.counted) * 100)}% · ${stats.attended} of ${stats.counted} session${stats.counted === 1 ? "" : "s"}`
-        : "Attendance: no finished sessions yet";
 
-      const actions = document.createElement("div");
-      actions.className = "my-class-actions";
-      const open = document.createElement("a");
-      open.className = "btn-action";
-      open.href = `#class/${item.id}`;
-      open.textContent = "Open class";
-      actions.append(open);
-      if (item.id === joinedClassId) {
-        const tag = document.createElement("span");
-        tag.className = "my-class-status";
-        tag.textContent = "✓ In the live session";
-        actions.append(tag);
-      }
-      if (status?.live && !removedFromSession(item.id) && item.id !== joinedClassId) {
-        const join = document.createElement("button");
-        join.type = "button";
-        join.className = "btn-join";
-        join.textContent = "Join session";
-        join.addEventListener("click", () => joinSession(item.id));
-        actions.append(join);
-      }
-      const leave = document.createElement("button");
-      leave.type = "button";
-      leave.className = "btn-leave";
-      leave.textContent = "Leave";
-      leave.setAttribute("aria-label", `Leave ${item.name}`);
-      leave.addEventListener("click", () => leaveClass(item));
-      actions.append(leave);
-
-      card.append(title, ...(teacherInfo ? [teacherLine] : []), code, state, attendanceLine, actions);
-      grid.append(card);
+    const shown = classes.filter((item) => {
+      if (classFilter === "live" && !isLive(item)) return false;
+      if (!query) return true;
+      return `${item.name} ${teacherNames.get(item.id)?.name || ""}`.toLowerCase().includes(query);
     });
+    if (!shown.length) {
+      grid.replaceChildren(el("p", "empty-state", classFilter === "live" ? "None of your classes is live right now." : "No classes match that search."));
+      return;
+    }
+    grid.replaceChildren(...shown.map((item, index) => classCard(item, index)));
+    if (focusKey) grid.querySelector(`[data-focus-key="${CSS.escape(focusKey)}"]`)?.focus();
+    // Later updates (live status, attendance) replace cards without replaying the entrance.
+    window.setTimeout(() => { grid.dataset.settled = "true"; }, 900);
   }
+
+  function classCard(item, index) {
+    const status = teacher.get(item.id);
+    const live = isLive(item);
+    const inSession = item.id === joinedClassId;
+    const info = teacherNames.get(item.id);
+    const stats = myAttendance.get(item.id);
+    const card = el("article", "class-card-v2");
+    card.setAttribute("role", "listitem");
+    card.style.setProperty("--class-color", classColor(item.id));
+    card.style.setProperty("--i", String(index));
+    card.dataset.live = String(live);
+    card.dataset.inSession = String(inSession);
+
+    // Colour band with the class initial and its live status
+    const band = el("div", "class-band");
+    const initial = el("span", "class-band-initial", ([...item.name.trim()][0] || "C").toUpperCase());
+    initial.setAttribute("aria-hidden", "true");
+    const badge = el("span", "class-badge");
+    if (inSession) { badge.dataset.state = "in"; badge.append(el("span", "live-dot"), "You’re in"); }
+    else if (live) { badge.dataset.state = "live"; badge.append(el("span", "live-dot"), "Live now"); }
+    else if (status?.live && removedFromSession(item.id)) { badge.dataset.state = "removed"; badge.textContent = "Live · removed"; }
+    else if (status?.online) { badge.dataset.state = "online"; badge.textContent = "Teacher online"; }
+    else badge.hidden = true;
+    band.append(initial, badge);
+
+    // Name (the whole card opens the class) and teacher
+    const body = el("div", "class-body");
+    const title = el("h3", "class-name");
+    const link = el("a", "class-open-link", item.name);
+    link.href = `#class/${item.id}`;
+    link.dataset.focusKey = `open-${item.id}`;
+    title.append(link);
+    const who = el("div", "class-teacher-row");
+    if (info?.name) {
+      const face = el("span", "nf-avatar sm");
+      paintAvatar(face, { name: info.name, preset: info.preset, url: info.url });
+      who.append(face, el("span", "", info.name));
+    } else who.append(el("span", "class-teacher-unknown", "Your teacher"));
+    if (live && status?.since) who.append(el("small", "class-since", `since ${clock(status.since)}`));
+
+    // Attendance
+    const attendance = el("div", "class-attendance");
+    if (stats?.counted) {
+      const rate = Math.round((stats.attended / stats.counted) * 100);
+      const meter = el("span", "class-meter");
+      meter.setAttribute("role", "img");
+      meter.setAttribute("aria-label", `Attendance ${rate}%`);
+      const fill = el("span");
+      fill.style.setProperty("--rate", `${rate}%`);
+      meter.append(fill);
+      attendance.append(el("span", "class-attendance-label", "Attendance"), meter, el("b", "", `${rate}%`));
+      attendance.title = `${stats.attended} of ${stats.counted} live session${stats.counted === 1 ? "" : "s"}`;
+    } else attendance.append(el("span", "class-attendance-label", "No live sessions yet"));
+    body.append(title, who, attendance);
+
+    // Shortcuts to each part of the class
+    const tabs = el("nav", "class-shortcuts");
+    tabs.setAttribute("aria-label", `${item.name} sections`);
+    TAB_LINKS.forEach(([tab, iconId, label]) => {
+      const a = el("a", "class-shortcut");
+      a.href = `#class/${item.id}/${tab}`;
+      a.dataset.focusKey = `${tab}-${item.id}`;
+      a.title = label;
+      a.append(svgIcon(iconId), el("span", "", label === "Assignments" ? "Work" : label === "Live focus" ? "Live" : label));
+      a.setAttribute("aria-label", label);
+      if (tab === "live" && live) a.dataset.live = "true";
+      tabs.append(a);
+    });
+
+    // Main action and the ⋯ menu
+    const foot = el("div", "class-foot");
+    let main;
+    if (live && !inSession) {
+      main = el("button", "btn-join class-main", "");
+      main.type = "button";
+      main.append(svgIcon("i-video"), "Join live session");
+      main.addEventListener("click", () => joinSession(item.id));
+    } else {
+      main = el("a", "btn-action class-main", "");
+      main.href = inSession ? `#class/${item.id}/live` : `#class/${item.id}`;
+      main.append(inSession ? "Back to Live focus" : "Open class", svgIcon("i-chevron"));
+    }
+    main.dataset.focusKey = `main-${item.id}`;
+    foot.append(main, classMenu(item));
+    card.append(band, body, tabs, foot);
+    return card;
+  }
+
+  // ⋯ menu: My notes, Copy join code, Leave class.
+  function classMenu(item) {
+    const wrap = el("div", "class-menu");
+    const toggle = el("button", "class-menu-button");
+    toggle.type = "button";
+    toggle.dataset.focusKey = `menu-${item.id}`;
+    toggle.setAttribute("aria-label", `More for ${item.name}`);
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.textContent = "⋯";
+    const list = el("div", "class-menu-list");
+    list.hidden = true;
+    const close = (focus = false) => {
+      list.hidden = true;
+      toggle.setAttribute("aria-expanded", "false");
+      if (focus) toggle.focus();
+    };
+    const option = (iconId, label, onClick, danger = false) => {
+      const button = el("button", `class-menu-item${danger ? " danger" : ""}`);
+      button.type = "button";
+      button.append(svgIcon(iconId), label);
+      button.addEventListener("click", () => { close(); onClick(); });
+      list.append(button);
+    };
+    option("i-note", "My notes for this class", () => window.neuroFocusOpenClassNotes?.(item.id));
+    option("i-copy", `Copy join code (${item.join_code})`, async () => {
+      try { await navigator.clipboard.writeText(item.join_code); notify({ title: "Join code copied", text: item.join_code, kind: "success", timeoutMs: 3000 }); }
+      catch { notify({ title: "Join code", text: item.join_code, kind: "info" }); }
+    });
+    option("i-logout", "Leave class", () => leaveClass(item), true);
+    toggle.addEventListener("click", () => {
+      const opening = list.hidden;
+      document.querySelectorAll(".class-menu-list").forEach((other) => { other.hidden = true; });
+      document.querySelectorAll(".class-menu-button").forEach((other) => other.setAttribute("aria-expanded", "false"));
+      list.hidden = !opening;
+      toggle.setAttribute("aria-expanded", String(opening));
+      if (opening) list.querySelector("button")?.focus();
+    });
+    list.addEventListener("keydown", (event) => {
+      const items = [...list.querySelectorAll("button")];
+      const at = items.indexOf(document.activeElement);
+      if (event.key === "Escape") { event.preventDefault(); close(true); }
+      else if (event.key === "ArrowDown") { event.preventDefault(); items[(at + 1) % items.length].focus(); }
+      else if (event.key === "ArrowUp") { event.preventDefault(); items[(at - 1 + items.length) % items.length].focus(); }
+    });
+    wrap.addEventListener("focusout", (event) => { if (!wrap.contains(event.relatedTarget)) close(); });
+    wrap.append(toggle, list);
+    return wrap;
+  }
+
+  // Live sessions now: a strip above the cards with a one-press Join.
+  function renderLiveStrip() {
+    const strip = $("#classesLive");
+    if (!strip) return;
+    const liveClasses = classes.filter((item) => isLive(item) || item.id === joinedClassId);
+    strip.hidden = !liveClasses.length;
+    strip.replaceChildren(...liveClasses.map((item) => {
+      const status = teacher.get(item.id);
+      const inSession = item.id === joinedClassId;
+      const row = el("div", `classes-live-row${liveShown.has(item.id) ? "" : " is-new"}`);
+      row.style.setProperty("--class-color", classColor(item.id));
+      row.dataset.in = String(inSession);
+      const text = el("div", "classes-live-text");
+      const kicker = el("span", "classes-live-kicker");
+      kicker.append(el("span", "live-dot"), inSession ? "You’re in this live session" : status?.since ? `Live now · since ${clock(status.since)}` : "Live now");
+      text.append(kicker, el("b", "", item.name), el("small", "", inSession
+        ? "Only your attention estimate is shared with your teacher, never video."
+        : `${teacherNames.get(item.id)?.name || "Your teacher"} started a live session. Joining turns on your attention tracker.`));
+      let action;
+      if (inSession) {
+        action = el("a", "btn-action", "Back to Live focus");
+        action.href = `#class/${item.id}/live`;
+      } else {
+        action = el("button", "btn-join", "");
+        action.type = "button";
+        action.append(svgIcon("i-video"), "Join live session");
+        action.addEventListener("click", () => joinSession(item.id));
+      }
+      row.append(text, action);
+      return row;
+    }));
+    liveShown = new Set(liveClasses.map((item) => item.id));
+  }
+
+  $("#classesSearch")?.addEventListener("input", () => renderCards());
+  document.querySelectorAll("[data-class-filter]").forEach((button) => button.addEventListener("click", () => {
+    classFilter = button.dataset.classFilter;
+    document.querySelectorAll("[data-class-filter]").forEach((other) => other.setAttribute("aria-pressed", String(other === button)));
+    renderCards();
+  }));
+  document.addEventListener("click", (event) => {
+    if (event.composedPath().some((node) => node?.classList?.contains?.("class-menu"))) return;
+    document.querySelectorAll(".class-menu-list").forEach((list) => { list.hidden = true; });
+    document.querySelectorAll(".class-menu-button").forEach((button) => button.setAttribute("aria-expanded", "false"));
+  });
 
   function bannerButton(label, className, onClick) {
     const button = document.createElement("button");

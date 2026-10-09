@@ -1,5 +1,5 @@
-// Teacher class management: all-classes overview, one class at a time with tabs
-// (Live monitor, Students, Attendance, History, Settings), live sessions, the class master
+// Teacher class management: Home (#home), the Classes page (#classes), one class at a time with tabs
+// (Posts, Assignments, Quizzes, Live focus, then Master list, Attendance, History, Settings), live sessions, the class master
 // list, removing students from a session or the class, and class settings. Live sessions are
 // saved (class_sessions) so attendance can be taken; teacher-attendance.js shows it.
 // Live updates use private Supabase Realtime class channels (class-live.js).
@@ -15,7 +15,8 @@ if (app) {
   const $ = (selector) => document.querySelector(selector);
   const selectedKey = "neuroFocusCurrentClassId";
   const liveKey = `neuroFocusLiveSession:${app.user.id}`;
-  const TABS = ["live", "posts", "assignments", "quizzes", "students", "attendance", "history", "settings"];
+  const TABS = ["posts", "assignments", "quizzes", "live", "students", "attendance", "history", "settings"];
+  const TAB_NAMES = { live: "Live focus", posts: "Posts", assignments: "Assignments", quizzes: "Quizzes", students: "Master list", attendance: "Attendance", history: "History", settings: "Settings" };
   const REMOVED_NOTICE_MS = 2 * 60 * 1000; // removed students are told within this window
   const SHARING_STALE_MS = 6000;
   const SETUP_TEXT = "Run the class management database update first (see README).";
@@ -24,16 +25,20 @@ if (app) {
   let roster = [];                 // members of the open class: { id, name, joinedAt }
   let rosterLoadedFor = "";
   let selectedId = "";
-  let view = "classes";             // "classes" (Home), "class" (one class), "profile" (My profile),
+  let view = "classes";             // "classes" (Home), "list" (the Classes page), "class" (one class), "profile" (Profile settings),
                                    // "all-students" or "report" (attendance across classes, teacher-overview.js)
   // The Demo (teacher-demo.js) is a separate page with sample data only.
   const OVERVIEWS = {
-    "all-students": { address: "#students", label: "All students" },
-    report: { address: "#attendance-report", label: "Attendance report" },
+    list: { address: "#classes", label: "Classes" },
+    "all-students": { address: "#students", label: "All students", underClasses: true },
+    report: { address: "#attendance-report", label: "Attendance report", underClasses: true },
     demo: { address: "#demo", label: "Demo — sample data" }
   };
-  const NAV_FOR_VIEW = { "all-students": "all-students", report: "attendance-report", demo: "demo" };
-  let tab = "live";
+  // The sidebar has three places: Home, Classes (every class page sits under it) and Demo.
+  const NAV_FOR_VIEW = { list: "classes", "all-students": "classes", report: "classes", demo: "demo" };
+  let tab = "posts";
+  // A class opens on Live focus while its session is live, otherwise on Posts.
+  const defaultTab = (classId) => (live?.classId === classId ? "live" : "posts");
   let hasClassSettings = true;     // false until the class management SQL has been run
   let newIds = new Set();          // roster rows to highlight once
   let refreshTimer;
@@ -381,6 +386,7 @@ if (app) {
     const totalOnline = classes.reduce((sum, item) => sum + (online.get(item.id)?.size || 0), 0);
     const liveClass = live ? classes.find((item) => item.id === live.classId) : null;
     set("#sumClasses", String(classes.length));
+    set("#sumClassesLine", classes.length ? `${classes.length} ${classes.length === 1 ? "class" : "classes"} · ${plural(classes.reduce((sum, item) => sum + item.memberCount, 0), "student")}` : "No classes yet");
     set("#sumStudents", String(classes.reduce((sum, item) => sum + item.memberCount, 0)));
     set("#sumOnline", String(totalOnline));
     set("#sumLive", liveClass ? "Live" : "Off");
@@ -415,64 +421,11 @@ if (app) {
     }
   }
 
-  // Sidebar: every class, with its live dot or student count. The open class's pages
-  // (#classNav: Live monitor, Master list, ...) unfold right under it; a running session also
-  // gets a "Live now" shortcut at the top.
-  const classSubnav = $("#classNav"); // kept here: it moves in and out of the class list
+  // Sidebar: Home, Classes and Demo are fixed; a running session gets a "Live now" shortcut.
   function renderSidebarClasses() {
-    const list = $("#sidebarClassList");
-    const subnav = classSubnav;
-    const inClass = view === "class" && Boolean(selected());
     const liveClass = live ? classes.find((item) => item.id === live.classId) : null;
     $("#navLiveNow").hidden = !liveClass;
     $("#navLiveClass").textContent = liveClass?.name || "";
-    // Out of the list while it is rebuilt; back under the open class afterwards.
-    subnav.hidden = true;
-    list.closest(".nav-group").after(subnav);
-    if (!classes.length) {
-      const empty = document.createElement("p");
-      empty.className = "sidebar-empty";
-      empty.textContent = "No classes yet.";
-      list.replaceChildren(empty);
-      return;
-    }
-    list.replaceChildren(...classes.map((item) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "nav-item sidebar-class";
-      button.dataset.classId = item.id;
-      const open = inClass && item.id === selectedId;
-      button.dataset.open = String(open);
-      if (open) button.setAttribute("aria-expanded", "true");
-      const tile = document.createElement("span");
-      tile.className = "class-initial";
-      tile.setAttribute("aria-hidden", "true");
-      tile.textContent = initialOf(item.name);
-      const name = document.createElement("span");
-      name.className = "name";
-      name.textContent = item.name;
-      button.append(tile, name);
-      if (live?.classId === item.id) {
-        const dot = document.createElement("span");
-        dot.className = "nav-live";
-        dot.innerHTML = '<span class="live-dot"></span>';
-        button.append(dot);
-        button.setAttribute("aria-label", `${item.name}, live now`);
-      } else {
-        const count = document.createElement("span");
-        count.className = "nav-count";
-        count.textContent = item.memberCount ? String(item.memberCount) : "";
-        button.append(count);
-        button.setAttribute("aria-label", `${item.name}, ${plural(item.memberCount, "student")}`);
-      }
-      button.addEventListener("click", () => {
-        if (open) return; // its pages are already listed under it
-        openClass(item.id, live?.classId === item.id ? "live" : "students");
-      });
-      return button;
-    }));
-    subnav.hidden = !inClass;
-    if (inClass) list.querySelector(`[data-class-id="${CSS.escape(selectedId)}"]`)?.after(subnav);
   }
 
   function renderClassGrid() {
@@ -500,7 +453,7 @@ if (app) {
       card.type = "button";
       card.className = "class-card";
       card.dataset.classId = item.id;
-      card.addEventListener("click", () => openClass(item.id, live?.classId === item.id ? "live" : "students"));
+      card.addEventListener("click", () => openClass(item.id, defaultTab(item.id)));
 
       const top = document.createElement("div");
       top.className = "class-card-top";
@@ -543,7 +496,7 @@ if (app) {
       }
       const foot = document.createElement("span");
       foot.className = "class-card-foot";
-      foot.textContent = live?.classId === item.id ? "Open live monitor →" : "Open class →";
+      foot.textContent = live?.classId === item.id ? "Open Live focus →" : "Open class →";
       card.append(top, code, stats, foot);
       grid.append(card);
     });
@@ -557,13 +510,11 @@ if (app) {
     $("#classTitle").textContent = item.name;
     const badge = $("#classInitial");
     if (badge) badge.textContent = initialOf(item.name);
-    $("#classNavLabel").textContent = item.name;
     $("#classCode").textContent = item.join_code;
     $("#classMetaText").textContent = `${plural(item.memberCount, "student")} · ${onlineCount} online`;
     $("#joiningChip").hidden = item.joining_open;
     $("#tabStudentCount").textContent = item.memberCount ? String(item.memberCount) : "";
-    $("#navStudentCount").textContent = item.memberCount ? String(item.memberCount) : "";
-    $("#navLiveDot").hidden = !isLive;
+    $("#tabLiveDot").hidden = !isLive;
 
     const toggle = $("#sessionToggle");
     toggle.dataset.live = String(isLive);
@@ -750,30 +701,33 @@ if (app) {
     const inProfile = view === "profile";
     const overview = OVERVIEWS[view] ? view : null;
     $("#classesView").hidden = inClass || inProfile || Boolean(overview);
+    $("#classListView").hidden = overview !== "list";
     $("#classView").hidden = !inClass;
     $("#profileView").hidden = !inProfile;
     $("#allStudentsView").hidden = overview !== "all-students";
     $("#reportView").hidden = overview !== "report";
     $("#demoView").hidden = overview !== "demo";
-    // Exports are for real data only: no export button while the Demo is open.
-    document.querySelectorAll("[data-export-report]").forEach((button) => { button.hidden = overview === "demo"; });
+    // The CSV is the open class's live student table: shown on class pages only (never in the Demo).
+    document.querySelectorAll("[data-export-report]").forEach((button) => { button.hidden = !inClass; });
     renderSidebarClasses();
     syncAddress();
     document.querySelectorAll("[data-nav]").forEach((button) => {
       const target = button.dataset.nav;
-      const current = inProfile ? target === "profile" : inClass ? target === tab : overview ? target === NAV_FOR_VIEW[overview] : target === "classes";
+      const page = inProfile ? "profile" : inClass ? "classes" : overview ? NAV_FOR_VIEW[overview] : "home";
       if (button.classList.contains("nav-item") || button.classList.contains("user-card")) {
-        if (current) button.setAttribute("aria-current", "page");
+        // The page's own entry is current; pages inside Classes keep Classes highlighted.
+        if (target === page) button.setAttribute("aria-current", overview === "list" || page !== "classes" ? "page" : "true");
         else button.removeAttribute("aria-current");
       }
     });
-    const names = { live: "Live monitor", posts: "Posts", assignments: "Assignments", quizzes: "Quizzes", students: "Master list", attendance: "Attendance", history: "History", settings: "Settings" };
-    renderCrumbs(overview ? [{ label: OVERVIEWS[overview].label }]
-      : inProfile ? [{ label: "My profile" }]
-      : inClass ? [{ label: selected().name, go: () => openClass(selectedId, "live") }, { label: names[tab] }]
-      : [{ label: "Home" }]);
+    const toClasses = { label: "Classes", go: () => showOverview("list") };
+    renderCrumbs(overview ? [...(OVERVIEWS[overview].underClasses ? [toClasses] : []), { label: OVERVIEWS[overview].label }]
+      : inProfile ? [{ label: "Profile settings" }]
+      : inClass ? [toClasses, { label: selected().name, go: () => openClass(selectedId, defaultTab(selectedId)) }, { label: TAB_NAMES[tab] }]
+      : []);
+    document.title = `${overview ? OVERVIEWS[overview].label : inProfile ? "Profile settings" : inClass ? `${selected().name} · ${TAB_NAMES[tab]}` : "Home"} · Neuro-Focus`;
     if (inClass) renderClassHeader();
-    // The shared My profile page (profile.js) ends a theme preview when it is left.
+    // The shared Profile settings page (profile.js) ends a theme preview when it is left.
     const name = overview || (inProfile ? "profile" : inClass ? "class" : "dashboard");
     if (name !== shownView) {
       const previous = shownView;
@@ -783,11 +737,11 @@ if (app) {
     }
   }
 
-  // Breadcrumb trail in the header: every part but the last is a link ("Teacher" goes Home).
+  // Breadcrumb trail in the header: Home / Classes / Biology / Posts. Every part but the last is a link.
   function renderCrumbs(trail) {
     const nav = $("#crumbs");
     const focusedLabel = nav.contains(document.activeElement) ? document.activeElement.textContent : null;
-    const parts = [{ label: "Teacher", go: showClasses }, ...trail];
+    const parts = [{ label: "Home", go: showClasses }, ...trail];
     nav.replaceChildren(...parts.flatMap((part, index) => {
       const last = index === parts.length - 1;
       let node;
@@ -837,7 +791,7 @@ if (app) {
     if (kind === "profile" || kind === "profile-appearance") { showProfile(kind === "profile" ? "" : kind); return true; }
     if (kind === "class") {
       // A class that no longer exists (deleted, or a stale link) goes Home.
-      if (classes.some((item) => item.id === id)) openClass(id, TABS.includes(part) ? part : "live");
+      if (classes.some((item) => item.id === id)) openClass(id, TABS.includes(part) ? part : defaultTab(id));
       else showClasses();
       return true;
     }
@@ -855,6 +809,7 @@ if (app) {
   function showOverview(name) {
     view = name;
     renderView();
+    if (name === "list") renderClassGrid();
     window.scrollTo({ top: 0 });
     document.querySelector("main")?.scrollTo({ top: 0 });
   }
@@ -874,13 +829,15 @@ if (app) {
     else if (hash === "all-students") showOverview("all-students");
     else if (hash === "attendance-report") showOverview("report");
     else if (hash === "demo") showOverview("demo");
+    else if (hash === "classes") showOverview("list");
     else showClasses();
   };
 
   function setTab(next) {
-    tab = TABS.includes(next) ? next : "live";
+    tab = TABS.includes(next) ? next : defaultTab(selectedId);
     document.querySelectorAll(".class-tabs [data-tab]").forEach((button) => {
       button.setAttribute("aria-selected", String(button.dataset.tab === tab));
+      button.tabIndex = button.dataset.tab === tab ? 0 : -1;
     });
     TABS.forEach((name) => { $(`#tab-${name}`).hidden = name !== tab; });
     window.neuroFocusClassTab = tab;
@@ -1135,7 +1092,8 @@ if (app) {
   document.querySelectorAll("[data-nav]").forEach((button) => {
     button.addEventListener("click", () => {
       const target = button.dataset.nav;
-      if (target === "classes") showClasses();
+      if (target === "home") showClasses();
+      else if (target === "classes") showOverview("list");
       else if (target === "new-class") openNewClass();
       else if (target === "profile" || target === "profile-appearance") window.neuroFocusNavigate(target);
       else if (target === "all-students") showOverview("all-students");
@@ -1146,6 +1104,15 @@ if (app) {
   });
   document.querySelectorAll(".class-tabs [data-tab]").forEach((button) => {
     button.addEventListener("click", () => setTab(button.dataset.tab));
+  });
+  // Arrow keys, Home and End move between the class tabs.
+  $(".class-tabs").addEventListener("keydown", (event) => {
+    const step = { ArrowRight: 1, ArrowLeft: -1, Home: -99, End: 99 }[event.key];
+    if (!step) return;
+    event.preventDefault();
+    const index = step === -99 ? 0 : step === 99 ? TABS.length - 1 : (TABS.indexOf(tab) + step + TABS.length) % TABS.length;
+    setTab(TABS[index]);
+    document.querySelector(`.class-tabs [data-tab="${TABS[index]}"]`)?.focus();
   });
   $("#navLiveNow").addEventListener("click", () => { if (live) openClass(live.classId, "live"); });
   $("#sessionToggle").addEventListener("click", () => { void toggleSession(); });
@@ -1272,7 +1239,7 @@ if (app) {
   window.addEventListener("pagehide", () => supabase.removeAllChannels());
 
   // Actions for the teacher Home (teacher-home.js), with the same behaviour as the buttons here.
-  window.neuroFocusTeacherActions = { openClass, showClasses, openNewClass, copyCode, showOverview };
+  window.neuroFocusTeacherActions = { openClass, showClasses, openNewClass, copyCode, showOverview, defaultTab };
   // Refresh the "students sharing" count on Home while a session is live.
   window.setInterval(() => { if (live && view === "classes") publishStatus(); }, 5000);
 
@@ -1285,7 +1252,7 @@ if (app) {
     void keepSessionAlive();
     // Reopen the page in the address (after a refresh or from a link); otherwise land on the live
     // monitor if a session is running, or on Home.
-    const linked = /^#(class|profile|students|attendance-report|demo)/.test(window.location.hash) && routeTo(window.location.hash);
+    const linked = /^#(class|classes|profile|students|attendance-report|demo)/.test(window.location.hash) && routeTo(window.location.hash);
     if (linked) { /* done */ }
     else if (live && classes.some((item) => item.id === live.classId)) openClass(live.classId, "live");
     else showClasses();

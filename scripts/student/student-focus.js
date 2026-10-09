@@ -168,6 +168,13 @@ if (app) {
       goal.done = Boolean(done);
       saveGoals();
       renderGoals();
+    },
+    remove(id) {
+      const before = goals.length;
+      goals = goals.filter((item) => item.id !== id);
+      if (goals.length === before) return;
+      saveGoals();
+      renderGoals();
     }
   };
   window.neuroFocusGoals = goalsApi;

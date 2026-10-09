@@ -293,6 +293,16 @@ if (form) {
     showMessage(friendly(urlError), "error");
     window.history.replaceState(null, "", `login.html${params.get("mode") === "reset" ? "?mode=reset" : ""}`);
   }
+  // Changing the sign-in email (Profile settings): Supabase may ask for a link in each inbox. After
+  // the first, it sends a "message"; after the last, the address carries type=email_change.
+  const linkMessage = decode(hashParams.get("message") || "");
+  const emailChanged = hashParams.get("type") === "email_change";
+  if (linkMessage) {
+    showMessage(/other email/i.test(linkMessage)
+      ? "One link confirmed. Now open the confirmation link we sent to your other email address; your sign-in email changes once both are confirmed."
+      : linkMessage, "success");
+    window.history.replaceState(null, "", "login.html");
+  }
 
   try {
     const supabase = await getSupabase();
@@ -315,8 +325,16 @@ if (form) {
         paint();
         if (!urlError) showMessage("That reset link is invalid or has expired. Enter your email to get a new one.", "error");
       }
+    } else if (session && linkMessage) {
+      // Halfway through an email change: leave the message up, with a way back to the workspace.
+      window.history.replaceState(null, "", "login.html");
+      showMessage(message.textContent, "success", { label: "Open my workspace", onClick: () => openWorkspace(supabase, session.user.id) });
     } else if (session) {
-      // Already signed in (including coming back from Google): go to the right dashboard.
+      // Already signed in (including coming back from Google or an email change): go to the right dashboard.
+      if (emailChanged) {
+        showMessage(`Your sign-in email is now ${session.user.email}. Opening your workspace…`, "success");
+        await new Promise((resolve) => window.setTimeout(resolve, 1800));
+      }
       const { data: profile } = await supabase.from("profiles").select("role").eq("id", session.user.id).maybeSingle();
       if (profile) window.location.replace(profile.role === "teacher" ? "teacher.html" : "student.html");
     }

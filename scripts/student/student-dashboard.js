@@ -1,6 +1,7 @@
-// Home: the student's landing page after signing in. A welcome with their picture and name, one
-// main action chosen from real data (join a live class → continue studying → start a focus
-// session), today's plan, their classes, a way into NeuroBuddy and where they left off.
+// Home: the student's landing page after signing in, kept simple. A welcome with one main action
+// chosen from real data (join a live class → continue studying → start a focus session), three
+// small charts (focus score, this week, streak), Today (their own steps and any live class), Jump
+// back in (latest note, chat and session) and one Focus coach tip.
 // Nothing is made up: no timetable or deadlines are connected, so only live sessions, the
 // student's own steps, notes, chats and saved sessions are shown. Live scores are in Focus
 // session and saved history in My progress. The camera is never started from here without a click.
@@ -13,6 +14,8 @@ import { buildCoaching, averageFocus, focusedSeconds, sum, levelFor } from "./fo
 import { paintAvatar, greetingName } from "../shared/avatars.js?v=1";
 import { selectWithQuality } from "../shared/tracking-states.js?v=1";
 import { notify } from "../shared/class-live.js?v=9";
+import { latestChat } from "./buddy-store.js?v=1";
+import { classColor } from "./class-colors.js?v=1";
 
 const app = await window.neuroFocusReady;
 
@@ -20,7 +23,6 @@ if (app) {
   const { supabase } = app;
   const $ = (selector) => document.querySelector(selector);
   const RECENT_NOTE_DAYS = 14;
-  const CLASS_COLORS = ["#22d3ee", "#a78bfa", "#4ade80", "#fb923c", "#60a5fa", "#f472b6", "#facc15", "#2dd4bf"];
 
   let classStatus = window.neuroFocusClassStatus || { loaded: false, classes: [] };
   let timerState = window.neuroFocusTimerState || null;
@@ -81,7 +83,6 @@ if (app) {
     return date.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
   }
   const classNameOf = (id) => (id ? classStatus.classes?.find((item) => item.id === id)?.name || (window.neuroFocusClasses || []).find((item) => item.id === id)?.name || "Former class" : "Personal");
-  const classColor = (id) => CLASS_COLORS[[...String(id)].reduce((sum, ch) => (sum * 31 + ch.charCodeAt(0)) % 997, 7) % CLASS_COLORS.length];
   const actions = () => window.neuroFocusClassActions || {};
 
   // Open another view, then run something there (e.g. fill in NeuroBuddy's question box).
@@ -91,8 +92,8 @@ if (app) {
   }
   const openNote = (id) => goThen("notes", () => window.dispatchEvent(new CustomEvent("neurofocus:open-note", { detail: { id } })));
   const openClassNotes = (classId) => goThen("notes", () => window.dispatchEvent(new CustomEvent("neurofocus:notes-filter", { detail: { classId } })));
-  function askBuddy(text, send) {
-    const deliver = () => window.dispatchEvent(new CustomEvent("neurofocus:buddy-prompt", { detail: { text, send } }));
+  function askBuddy(text, send, classId) {
+    const deliver = () => window.dispatchEvent(new CustomEvent("neurofocus:buddy-prompt", { detail: { text, send, ...(classId !== undefined ? { classId } : {}) } }));
     if (window.neuroFocusView === "buddy") deliver();
     else goThen("buddy", deliver);
   }
@@ -116,8 +117,8 @@ if (app) {
     $("#welcomeTitle").replaceChildren(`${greeting}, `, name);
     const isNew = classStatus.loaded && !classStatus.error && !(classStatus.classes || []).length;
     $("#heroLead").textContent = isNew
-      ? "Welcome to your study space. Start by joining your first class, or try a short focus session on your own."
-      : "Here’s what you can do next. Go at your own pace; everything you need is one click away.";
+      ? "Welcome! Join your first class, or try a short focus session on your own."
+      : "Here’s what’s next. Go at your own pace.";
   }
 
   // ---------- The one main action ----------
@@ -129,6 +130,8 @@ if (app) {
     const pick = live.find((item) => item.id === classStatus.currentId) || live[0];
     if (pick) return { kind: "live", item: pick, more: live.length - 1 };
     if (tracking) return { kind: "tracking" };
+    // A new student's most useful step is joining their first class.
+    if (classStatus.loaded && !classStatus.error && !classes.length) return { kind: "join-first" };
     const note = (recentNotes || []).find((item) => Date.now() - new Date(item.updated_at) < RECENT_NOTE_DAYS * 86400000);
     if (note) return { kind: "continue", note };
     if (!classStatus.loaded || recentNotes === null) return { kind: "loading" };
@@ -154,9 +157,9 @@ if (app) {
         setIcon("i-eye");
         kicker.append(liveDot(), "You’re in a live session");
         title.textContent = next.item.name;
-        sub.textContent = "Your teacher sees your attention score, never your video. Keep your focus session open while class is on.";
+        sub.textContent = "Your teacher sees your attention score, never your video. Keep Live focus open while class is on.";
         buttons.append(
-          button("Open focus session", "btn-primary", () => window.neuroFocusNavigate?.("focus"), "i-timer"),
+          button("Back to Live focus", "btn-primary", () => { window.location.hash = `class/${next.item.id}/live`; }, "i-video"),
           button("Leave session", "btn-action", () => actions().leaveSession?.())
         );
       } else if (next.kind === "live") {
@@ -170,7 +173,13 @@ if (app) {
         kicker.textContent = "Focus session in progress";
         title.textContent = "You’re tracking your focus";
         sub.textContent = "Your camera is on for attention tracking. Video never leaves this device.";
-        buttons.append(button("Open focus session", "btn-primary", () => window.neuroFocusNavigate?.("focus"), "i-timer"));
+        buttons.append(button("Open Solo focus", "btn-primary", () => window.neuroFocusNavigate?.("focus"), "i-timer"));
+      } else if (next.kind === "join-first") {
+        setIcon("i-school");
+        kicker.textContent = "Get started";
+        title.textContent = "Join your first class";
+        sub.textContent = "Ask your teacher for a join code. You’ll see your class’s posts, assignments, quizzes and live sessions. Solo focus, notes and NeuroBuddy work on your own too.";
+        buttons.append(button("Join a class", "btn-primary", () => actions().openJoinDialog?.(), "i-plus"));
       } else if (next.kind === "continue") {
         setIcon("i-note");
         kicker.textContent = "Continue studying";
@@ -209,108 +218,64 @@ if (app) {
     return timerState.running ? `${mmss(timerState.remaining)} left in this ${phase}` : `Paused with ${mmss(timerState.remaining)} left in this ${phase}`;
   }
 
+  // Today: live classes (one line each) and the student's own steps as a checklist.
   function renderPlan() {
     const list = $("#planList");
     const classes = classStatus.classes || [];
-    const live = classes.filter((item) => item.live && !item.blocked);
-    const key = JSON.stringify([classStatus.loaded, live.map((item) => [item.id, item.since, item.inSession, item.removed]), timerActive(), timerState?.phase, timerState?.running, goals, classes.map((item) => [item.id, item.name])]);
-    const changed = renderIfChanged("plan", key, list, () => {
+    const live = classes.filter((item) => item.live && !item.blocked && !item.removed);
+    const key = JSON.stringify([classStatus.loaded, live.map((item) => [item.id, item.name, item.inSession]), goals]);
+    renderIfChanged("plan", key, list, () => {
       const items = [];
-      if (live.length || timerActive()) items.push(el("li", "plan-heading", "Happening now"));
       live.forEach((item) => {
-        const row = el("li", "plan-item");
-        row.dataset.kind = item.inSession ? "in-session" : "live";
-        const when = el("span", "plan-when");
-        when.append(liveDot(), item.inSession ? "In it" : "Live");
-        const body = el("div", "plan-body");
-        body.append(el("b", "", item.name), el("small", "", item.removed
-          ? "Your teacher removed you from this session. You’ll be invited to the next one."
-          : `Live session since ${clockTime(item.since)}${item.teacherName ? ` · ${item.teacherName}` : ""}`));
-        row.append(when, body);
-        if (!item.removed && !item.inSession) {
-          const join = button("Join", "btn-join", () => actions().joinSession?.(item.id));
+        const row = el("li", "today-live");
+        row.dataset.in = String(Boolean(item.inSession));
+        const text = el("span", "today-live-text");
+        const words = el("span");
+        words.append(el("b", "", item.name), item.inSession ? " · you’re in" : " is live");
+        text.append(liveDot(), words);
+        row.append(text);
+        if (item.inSession) {
+          const open = el("a", "btn-action today-live-action", "Open");
+          open.href = `#class/${item.id}/live`;
+          open.dataset.focusKey = `live-${item.id}`;
+          row.append(open);
+        } else {
+          const join = button("Join", "btn-join today-live-action", () => actions().joinSession?.(item.id));
           join.dataset.focusKey = `join-${item.id}`;
           join.setAttribute("aria-label", `Join the live session in ${item.name}`);
           row.append(join);
         }
         items.push(row);
       });
-      if (timerActive()) {
-        const row = el("li", "plan-item");
-        const when = el("span", "plan-when", timerState.phase === "break" ? "Break" : "Focus");
-        const body = el("div", "plan-body");
-        const small = el("small", "", timerLine());
-        small.id = "planTimerLine";
-        body.append(el("b", "", timerState.phase === "break" ? "Break time" : "Focus block"), small);
-        const open = el("a", "btn-action", "Open timer");
-        open.href = "#focus-timer";
-        open.dataset.focusKey = "timer";
-        row.append(when, body, open);
+      goals.forEach((goal) => {
+        const row = el("li", "today-step");
+        row.dataset.done = String(goal.done);
+        const label = el("label");
+        const box = el("input");
+        box.type = "checkbox";
+        box.checked = goal.done;
+        box.dataset.focusKey = `goal-${goal.id}`;
+        box.addEventListener("change", () => window.neuroFocusGoals?.setDone(goal.id, box.checked));
+        label.append(box, el("span", "", goal.text));
+        const remove = el("button", "today-remove", "×");
+        remove.type = "button";
+        remove.dataset.focusKey = `remove-${goal.id}`;
+        remove.setAttribute("aria-label", `Remove “${goal.text}”`);
+        remove.addEventListener("click", () => { window.neuroFocusGoals?.remove?.(goal.id); $("#planAddInput").focus(); });
+        row.append(label, remove);
         items.push(row);
-      }
-
-      if (goals.length) {
-        const heading = el("li", "plan-heading");
-        const done = goals.filter((goal) => goal.done).length;
-        const edit = el("a", "text-link", "Edit in Focus session");
-        edit.href = "#micro-goals";
-        heading.append(el("span", "", `Your steps · ${done} of ${goals.length} done`), edit);
-        items.push(heading);
-        goals.forEach((goal) => {
-          const row = el("li", "plan-item plan-step");
-          row.dataset.done = String(goal.done);
-          const label = el("label");
-          const box = el("input");
-          box.type = "checkbox";
-          box.checked = goal.done;
-          box.dataset.focusKey = `goal-${goal.id}`;
-          box.addEventListener("change", () => window.neuroFocusGoals?.setDone(goal.id, box.checked));
-          label.append(box, el("span", "", goal.text));
-          row.append(label);
-          items.push(row);
-        });
-      }
-
-      if (!items.length) {
-        // Nothing live and no steps: useful shortcuts instead of an invented schedule.
-        items.push(el("li", "plan-heading", classes.length ? "Nothing live right now. Quick starts" : "Quick starts"));
-        const grid = el("li");
-        const shortcuts = el("ul", "plan-shortcuts");
-        const shortcut = (iconId, tone, title, note, onClick, focusKey) => {
-          const item = el("li");
-          const node = el("button", "plan-shortcut");
-          node.type = "button";
-          node.dataset.focusKey = focusKey;
-          const text = el("span");
-          text.append(el("b", "", title), el("small", "", note));
-          node.append(chipIcon(iconId, tone), text);
-          node.addEventListener("click", onClick);
-          item.append(node);
-          return item;
-        };
-        if (classes.length) {
-          classes.slice(0, 4).forEach((item) => {
-            shortcuts.append(shortcut("i-note", "", `${item.name} notes`, "Review or add to your notes", () => openClassNotes(item.id), `notes-${item.id}`));
-          });
-          const current = classes.find((item) => item.id === classStatus.currentId) || classes[0];
-          shortcuts.append(shortcut("i-chat", "green", "Ask NeuroBuddy", `About ${current.name}`, () => askBuddy(`I'm studying ${current.name}. `, false), "buddy"));
-        } else {
-          shortcuts.append(
-            shortcut("i-school", "", "Join your first class", "Use the code from your teacher", () => actions().openJoinDialog?.(), "join"),
-            shortcut("i-note", "green", "Write a note", "Notes are private to you", () => window.neuroFocusNavigate?.("notes"), "notes"),
-            shortcut("i-chat", "amber", "Ask NeuroBuddy", "Explanations at your pace", () => askBuddy("", false), "buddy")
-          );
-        }
-        grid.append(shortcuts);
-        items.push(grid);
-      }
+      });
+      if (!items.length) items.push(el("li", "today-empty", "Nothing planned yet. Add one small step below."));
       list.replaceChildren(...items);
+
+      const done = goals.filter((goal) => goal.done).length;
+      const count = $("#planCount");
+      count.hidden = !goals.length;
+      count.textContent = `${done} of ${goals.length} done`;
+      const meter = $("#planMeter");
+      meter.hidden = !goals.length;
+      meter.firstElementChild.style.width = `${goals.length ? Math.round((done / goals.length) * 100) : 0}%`;
     });
-    // The countdown changes every second: update just its text.
-    if (!changed && timerActive()) {
-      const line = $("#planTimerLine");
-      if (line) line.textContent = timerLine();
-    }
   }
 
   $("#planAddForm").addEventListener("submit", (event) => {
@@ -327,6 +292,7 @@ if (app) {
   // ---------- Your classes ----------
   function renderClasses() {
     const grid = $("#homeClassGrid");
+    if (!grid) return; // classes are listed on the Classes page
     const classes = classStatus.classes || [];
     const key = JSON.stringify([classStatus.loaded, classStatus.error, classStatus.currentId,
       classes.map((item) => [item.id, item.name, item.teacherName, item.teacherAvatar, item.live, item.since, item.online, item.removed, item.inSession])]);
@@ -407,58 +373,39 @@ if (app) {
   }
 
   // ---------- Continue where you left off ----------
-  function lastChat() {
-    const classId = classStatus.currentId || "";
-    try {
-      const history = JSON.parse(localStorage.getItem(`neuroFocusChat:${app.user.id}:${classId || "open-tutor"}`) || "[]");
-      const question = [...history].reverse().find((message) => message.role === "user");
-      return question ? { classId, question: question.content } : null;
-    } catch {
-      return null;
-    }
-  }
+  // The latest NeuroBuddy chat on this device (buddy-store.js).
+  const lastChat = () => latestChat(app.user.id);
 
+  // Jump back in: at most three things, one short line each.
   function renderContinue() {
     const list = $("#continueList");
     const chat = lastChat();
-    const paused = Boolean(timerState && !timerState.running && timerState.remaining < timerState.total);
-    const key = JSON.stringify([recentNotes, chat, paused, paused && timerState.phase, lastSession, classStatus.classes?.map((item) => item.name)]);
+    const note = (recentNotes || [])[0] || null;
+    const key = JSON.stringify([note, chat, lastSession, recentNotes === null, classStatus.classes?.map((item) => item.name)]);
     renderIfChanged("continue", key, list, () => {
       const items = [];
-      const row = (iconId, tone, title, note, onClick, focusKey, href) => {
+      const tile = ({ iconId, tone, kind, title, meta, onClick, href, focusKey }) => {
         const item = el("li");
-        const node = el(href ? "a" : "button", "continue-item");
+        const node = el(href ? "a" : "button", "jump-item");
         if (href) node.href = href;
         else node.type = "button";
         node.dataset.focusKey = focusKey;
-        const text = el("span", "continue-text");
-        text.append(el("b", "", title), el("small", "", note));
+        const text = el("span", "jump-text");
+        text.append(el("small", "jump-kind", kind), el("b", "", title), el("span", "jump-meta", meta));
         node.append(chipIcon(iconId, tone), text, icon("i-chevron", "chevron"));
         if (onClick) node.addEventListener("click", onClick);
         item.append(node);
         items.push(item);
       };
-      (recentNotes || []).forEach((note) => {
-        row("i-note", "", note.title?.trim() || "Untitled note", `${classNameOf(note.class_id)} · edited ${relativeTime(note.updated_at)}`, () => openNote(note.id), `note-${note.id}`);
-      });
-      if (chat) {
-        const where = chat.classId ? ` in ${classNameOf(chat.classId)}` : "";
-        const question = chat.question.length > 70 ? `${chat.question.slice(0, 70).trim()}…` : chat.question;
-        row("i-chat", "green", `Your NeuroBuddy chat${where}`, `Last question: “${question}”`, null, "chat", "#buddy");
-      }
-      if (paused) {
-        row("i-timer", "amber", timerState.phase === "break" ? "Break paused" : "Focus block paused", `${mmss(timerState.remaining)} left · resume whenever you’re ready`, null, "timer", "#focus-timer");
-      }
+      if (note) tile({ iconId: "i-note", kind: "Note", title: note.title?.trim() || "Untitled note", meta: `${classNameOf(note.class_id)} · ${relativeTime(note.updated_at)}`, onClick: () => openNote(note.id), focusKey: `note-${note.id}` });
+      if (chat) tile({ iconId: "i-buddy", tone: "green", kind: "NeuroBuddy", title: chat.title, meta: relativeTime(chat.updatedAt),
+        onClick: () => goThen("buddy", () => window.dispatchEvent(new CustomEvent("neurofocus:buddy-open", { detail: { id: chat.id } }))), focusKey: "chat" });
       if (lastSession) {
         const minutes = Math.max(1, Math.round(lastSession.tracked_seconds / 60));
-        const focus = lastSession.focus_percent === null || lastSession.focus_percent === undefined ? "" : ` · about ${lastSession.focus_percent}% on screen (estimate)`;
-        row("i-history", "", lastSession.ended_at ? "Your last focus session" : "Your last focus session (unfinished)", `${relativeTime(lastSession.started_at)} · ${minutes} min tracked${focus}`, null, "session", "#progress");
+        const focus = lastSession.focus_percent === null || lastSession.focus_percent === undefined ? "" : ` · ${lastSession.focus_percent}% focus`;
+        tile({ iconId: "i-history", tone: "amber", kind: "Focus session", title: `${minutes} min${focus}`, meta: relativeTime(lastSession.started_at), href: "#progress", focusKey: "session" });
       }
-      if (!items.length) {
-        items.push(el("li", "empty-state", recentNotes === null
-          ? "Loading…"
-          : "Nothing to pick up yet. Notes you write, NeuroBuddy chats and focus sessions will show up here."));
-      }
+      if (!items.length) items.push(el("li", "today-empty", recentNotes === null ? "Loading…" : "Nothing yet. Your notes, chats and sessions will show up here."));
       list.replaceChildren(...items);
     });
   }
@@ -524,7 +471,7 @@ if (app) {
   }
 
   // ---------- NeuroBuddy entry ----------
-  $("#buddyEntryForm").addEventListener("submit", (event) => {
+  $("#buddyEntryForm")?.addEventListener("submit", (event) => {
     event.preventDefault();
     const input = $("#buddyEntryInput");
     const text = input.value.trim();
@@ -573,29 +520,50 @@ if (app) {
     }
   }
 
+  // One tip at a time (the most useful one), a single "going well" line and the way to more.
   function renderCoach() {
-    const winsList = $("#coachWins");
-    const tipsList = $("#coachTips");
-    const basis = $("#coachBasis");
-    const progressBox = $("#coachProgress");
     if (savedSessions === null) return;
     const coaching = sessionsFailed ? null : buildCoaching(savedSessions, habits());
     renderIfChanged("coach", JSON.stringify([coaching, sessionsFailed]), $("#focus-coach"), () => {
+      const title = $("#coachTipTitle");
+      const text = $("#coachTipText");
+      const actionsBox = $("#coachActions");
+      const win = $("#coachWin");
+      const progressBox = $("#coachProgress");
+      const iconBox = $("#coachIcon");
+      actionsBox.replaceChildren();
       if (!coaching) {
-        basis.textContent = "Couldn’t load your saved sessions. Check your connection, then come back to Home.";
-        winsList.replaceChildren(el("li", "empty-state", "Nothing to show yet."));
-        tipsList.replaceChildren(el("li", "empty-state", "Nothing to show yet."));
+        title.textContent = "Couldn’t load your sessions";
+        text.textContent = "Check your connection, then come back to Home.";
         progressBox.hidden = true;
+        win.hidden = true;
         return;
       }
-      basis.textContent = coaching.basis;
       $("#focus-coach").dataset.stage = coaching.stage;
+      const tip = coaching.tips[0];
+      iconBox.replaceChildren(icon(tip?.icon || "i-spark"));
+      iconBox.dataset.tone = tip?.tone || "";
+      title.textContent = tip?.title || "Nothing to change right now";
+      // General (not personal) tips get a short label instead of a sentence saying so.
+      const general = coaching.stage !== "personal";
+      $("#coachTitle").textContent = general ? "Focus coach · general tip" : "Focus coach";
+      text.textContent = (tip?.text || "Keep going the way you are.").replace(/\s*A general tip(, not based on your data)?\.\s*$/, "");
+      if (tip?.action) {
+        const starts = tip.action.kind === "start";
+        const action = button(tip.action.label, "btn-primary", starts ? null : () => runCoachAction(tip.action), starts ? "i-play" : null);
+        if (starts) action.dataset.startFocus = ""; // handled by student-ui.js
+        action.dataset.focusKey = "coach-action";
+        actionsBox.append(action);
+      }
+      const more = el("a", "text-link", "More in My progress");
+      more.href = "#progress";
+      actionsBox.append(more);
 
-      // Until there's enough measured data: what personal suggestions need, and how far along it is.
+      // Until there's enough measured data: one bar towards personal tips.
       progressBox.hidden = !coaching.progress;
       if (coaching.progress) {
         const { sessions, days, minutes } = coaching.progress;
-        const share = Math.min(sessions.done / sessions.needed, days.done / days.needed, minutes.done / minutes.needed);
+        const share = Math.min(1, Math.min(sessions.done / sessions.needed, days.done / days.needed, minutes.done / minutes.needed));
         const meter = el("div", "unlock-meter");
         const fill = el("span");
         fill.style.width = `${Math.round(share * 100)}%`;
@@ -604,32 +572,12 @@ if (app) {
         meter.setAttribute("aria-valuemin", "0");
         meter.setAttribute("aria-valuemax", "100");
         meter.setAttribute("aria-valuenow", String(Math.round(share * 100)));
-        meter.setAttribute("aria-label", "Measured data collected for personal suggestions");
-        progressBox.replaceChildren(
-          el("p", "", `Personal suggestions need ${sessions.needed} sessions on ${days.needed} different days with ${minutes.needed} minutes of measured tracking (time the camera could see your face). So far: ${sessions.done} of ${sessions.needed} sessions, ${days.done} of ${days.needed} days, ${minutes.done} of ${minutes.needed} minutes.`),
-          meter
-        );
+        meter.setAttribute("aria-label", "Progress towards personal tips");
+        progressBox.replaceChildren(el("small", "", `Personal tips unlock after ${sessions.needed} sessions on ${days.needed} days · ${Math.round(share * 100)}% there`), meter);
       }
-
-      const item = (entry, kind, index) => {
-        const li = el("li", `coach-item ${kind}`);
-        if (entry.tone) li.dataset.tone = entry.tone;
-        const body = el("div", "coach-text");
-        body.append(el("b", "", entry.title), el("p", "", entry.text));
-        if (entry.action) {
-          const starts = entry.action.kind === "start";
-          const action = button(entry.action.label, "btn-action", starts ? null : () => runCoachAction(entry.action), starts ? "i-play" : null);
-          if (starts) action.dataset.startFocus = ""; // handled by student-ui.js
-          action.dataset.focusKey = `coach-${kind}-${index}`;
-          body.append(action);
-        }
-        li.append(chipIcon(entry.icon, kind === "win" ? "green" : entry.tone || ""), body);
-        return li;
-      };
-      winsList.replaceChildren(...(coaching.wins.length
-        ? coaching.wins.map((entry, index) => item(entry, "win", index))
-        : [el("li", "empty-state", "Track a session and what’s going well will show up here.")]));
-      tipsList.replaceChildren(...coaching.tips.map((entry, index) => item(entry, "tip", index)));
+      const good = coaching.stage === "personal" ? coaching.wins[0] : null;
+      win.hidden = !good;
+      win.textContent = good ? `Going well: ${good.title}` : "";
     });
   }
   nudgeToggle?.addEventListener("change", renderCoach);
@@ -651,7 +599,8 @@ if (app) {
   function countTo(node, target, format) {
     const from = Number(node.dataset.value || 0);
     node.dataset.value = String(target);
-    if (reducedMotion() || from === target) { node.textContent = format(target); return; }
+    // No animation for reduced motion, or in a background tab (animation frames don't run there).
+    if (reducedMotion() || from === target || document.visibilityState === "hidden") { node.textContent = format(target); return; }
     const started = performance.now();
     const step = (now) => {
       const t = Math.min(1, (now - started) / 900);
@@ -695,16 +644,16 @@ if (app) {
         value.textContent = "—";
         value.dataset.value = "0";
         $("#scoreLevel").textContent = sessionsFailed ? "Couldn’t load" : "No score yet";
-        $("#scoreNote").textContent = sessionsFailed ? "Check your connection" : "Track a focus session to get one";
+        $("#scoreNote").textContent = sessionsFailed ? "Check your connection" : "Track a session to see it";
       } else {
         countTo(value, score, (n) => String(n));
         $("#scoreLevel").textContent = levelFor(score).label;
         $(".score-tile").dataset.level = levelFor(score).key;
         const change = previous === null ? null : score - previous;
-        $("#scoreNote").textContent = !thisWeek.length ? "From the last 30 days"
-          : change === null ? "From this week’s sessions"
+        $("#scoreNote").textContent = !thisWeek.length ? "Last 30 days"
+          : change === null ? "This week"
           : change === 0 ? "Same as last week"
-          : `${change > 0 ? "▲" : "▼"} ${Math.abs(change)} pts vs last week`;
+          : `${change > 0 ? "▲" : "▼"} ${Math.abs(change)} vs last week`;
         $("#scoreNote").dataset.trend = change > 0 ? "up" : change < 0 ? "down" : "";
       }
 
@@ -712,18 +661,22 @@ if (app) {
       countTo($("#glanceFocusTime"), Math.round(weekFocused / 60), (n) => shortDuration(n * 60));
       const top = Math.max(...days.map((d) => d.seconds), 60);
       $("#glanceBars").replaceChildren(...days.map((d, i) => {
-        const bar = el("span", "glance-bar");
-        bar.style.setProperty("--h", `${Math.max(6, Math.round((d.seconds / top) * 100))}%`);
+        const col = el("span", "week-col");
+        if (i === 6) col.dataset.today = "true";
+        const bar = el("span", "week-bar");
+        bar.style.setProperty("--h", `${d.seconds ? Math.max(8, Math.round((d.seconds / top) * 100)) : 0}%`);
         bar.style.setProperty("--i", String(i));
         if (!d.seconds) bar.dataset.empty = "true";
-        if (i === 6) bar.dataset.today = "true";
-        bar.title = `${d.date.toLocaleDateString([], { weekday: "long" })}: ${d.seconds ? `${shortDuration(d.seconds)} focused` : "no sessions"}`;
-        return bar;
+        col.title = `${d.date.toLocaleDateString([], { weekday: "long" })}: ${d.seconds ? `${shortDuration(d.seconds)} focused` : "no sessions"}`;
+        col.append(bar, el("small", "", d.date.toLocaleDateString([], { weekday: "narrow" })));
+        return col;
       }));
       const delta = Math.round((weekFocused - lastWeekFocused) / 60);
-      $("#glanceFocusNote").textContent = !thisWeek.length ? "No sessions in the last 7 days"
-        : !lastWeek.length ? `Across ${plural(thisWeek.length, "session")}`
-        : delta === 0 ? "Same as last week" : `${delta > 0 ? "▲" : "▼"} ${shortDuration(Math.abs(delta) * 60)} vs last week`;
+      const focusNote = $("#glanceFocusNote");
+      focusNote.textContent = !thisWeek.length || !lastWeek.length ? `${plural(thisWeek.length, "session")}`
+        : delta === 0 ? "Same as last week" : `${delta > 0 ? "▲" : "▼"} ${shortDuration(Math.abs(delta) * 60)}`;
+      focusNote.dataset.trend = thisWeek.length && lastWeek.length && delta ? (delta > 0 ? "up" : "down") : "";
+      focusNote.title = thisWeek.length && lastWeek.length ? "Compared with the 7 days before" : "";
 
       // Day streak, with the last 7 days as dots
       countTo($("#glanceStreak"), streak, (n) => plural(n, "day"));
@@ -734,8 +687,8 @@ if (app) {
         if (i === 6) dot.dataset.today = "true";
         return dot;
       }));
-      $("#glanceStreakNote").textContent = streak && !studiedOn.has(today.getTime()) ? "Study today to keep it going"
-        : streak ? "Keep it going!" : "Study today to start a streak";
+      $("#glanceStreakNote").textContent = streak && !studiedOn.has(today.getTime()) ? "Study today to keep it"
+        : streak ? "Keep it going" : "Start one today";
     });
   }
 

@@ -201,7 +201,7 @@ if (app && view) {
         kicker.append(liveDot(), `Live now · since ${clock(next.live.since)}`);
         title.textContent = `${next.item.name} is live`;
         sub.textContent = `${next.live.sharing} of ${plural(next.item.students, "student")} ${next.live.sharing === 1 ? "is" : "are"} sharing their focus right now.`;
-        buttons.append(button("Open live monitor", "btn-primary", () => actions().openClass?.(next.item.id, "live"), "i-live"));
+        buttons.append(button("Open Live focus", "btn-primary", () => actions().openClass?.(next.item.id, "live"), "i-live"));
       } else if (next.kind === "create") {
         setIcon("i-school");
         kicker.textContent = "Get started";
@@ -246,7 +246,7 @@ if (app && view) {
     $("#tOnlineBar").style.width = `${students ? Math.round((online / students) * 100) : 0}%`;
     const sharing = status.live ? `${plural(status.live.sharing, "student")} sharing focus` : "";
     if ($("#tLiveSharing").textContent !== sharing) $("#tLiveSharing").textContent = sharing || " ";
-    $("#sumLiveCard").href = status.live ? "#teacherNext" : "#teacherClassesPanel";
+    $("#sumLiveCard").href = status.live ? "#teacherNext" : "#classes";
 
     if (!data) return;
     const now = Date.now();
@@ -543,7 +543,7 @@ if (app && view) {
     });
   });
 
-  // A new name in My profile updates the greeting (avatars are repainted by profile.js).
+  // A new name in Profile settings updates the greeting (avatars are repainted by profile.js).
   window.addEventListener("neurofocus:profile-updated", renderGreeting);
 
   renderAll();

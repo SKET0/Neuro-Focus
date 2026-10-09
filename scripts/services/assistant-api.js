@@ -1,10 +1,12 @@
 // Calls the learning-assistant Edge Function and streams the answer as it is written.
-// streamAssistant(supabase, payload, onText) -> Promise<full text>; onText(textSoFar) runs as text arrives.
+// streamAssistant(supabase, payload, onText, { signal, onVersion }) -> Promise<full text>; onText(textSoFar)
+// runs as text arrives; onVersion(version) gets the deployed function's version ("" for the first one,
+// which can't read files).
 import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./supabase-client.js";
 
 const NOT_CONNECTED = "NeuroBuddy isn’t connected yet. Deploy the learning-assistant function and add your AI API key secret first.";
 
-export async function streamAssistant(supabase, payload, onText = () => {}, { signal } = {}) {
+export async function streamAssistant(supabase, payload, onText = () => {}, { signal, onVersion } = {}) {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error("Your session expired. Sign in again.");
 
@@ -25,6 +27,7 @@ export async function streamAssistant(supabase, payload, onText = () => {}, { si
     throw new Error("Couldn’t reach NeuroBuddy. Check your internet connection and try again.");
   }
 
+  onVersion?.(response.headers.get("X-NeuroBuddy-Version") || "");
   const type = response.headers.get("Content-Type") || "";
   if (!response.ok || type.includes("application/json")) {
     const details = await response.json().catch(() => null);

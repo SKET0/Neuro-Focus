@@ -1,6 +1,6 @@
 // Appearance: the theme ("default" | "light" | "dark") and accent colour live on <html> as
 // data-theme / data-accent, so every page, dialog and chart picks them up from the theme tokens
-// in styles/theme.css. Students and teachers each choose their own in My profile.
+// in styles/theme.css. Students and teachers each choose their own in Profile settings.
 //
 // The saved choice is also cached on this device for the signed-in account. The student and
 // teacher pages apply that cache before they paint, but only if it belongs to the account signed

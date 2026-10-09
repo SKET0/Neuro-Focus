@@ -22,6 +22,7 @@ if (app && document.querySelector("#classPanelQuizzes")) {
   let shownKey = "";         // what the play area currently shows, so polls don't rebuild it needlessly
   let sending = false;       // an answer is on its way
   let failures = 0;
+  let joinOnOpen = false;    // the student pressed Join quiz in the list
   let listSignature = "";    // what the quiz list currently shows
 
   const status = (text) => { $("#studentQuizStatus").textContent = text; };
@@ -58,10 +59,11 @@ if (app && document.querySelector("#classPanelQuizzes")) {
         : quiz.time_limit_seconds ? `${quiz.time_limit_seconds} s per question` : "No timer"));
       const chip = el("span", "status-chip-sm", STATUS_TEXT[quiz.status]);
       chip.dataset.state = { lobby: "soon", live: "submitted", finished: "marked" }[quiz.status];
-      const button = el("button", quiz.status === "finished" ? "btn-action" : "btn-primary", quiz.status === "finished" ? "Results" : "Open");
+      // An open quiz is joined straight from here (the student's own click); a finished one shows results.
+      const button = el("button", quiz.status === "finished" ? "btn-action" : "btn-primary", quiz.status === "finished" ? "Results" : "Join quiz");
       button.type = "button";
       button.setAttribute("aria-label", `${button.textContent}: ${quiz.title}`);
-      button.addEventListener("click", () => play(quiz.id));
+      button.addEventListener("click", () => play(quiz.id, { join: quiz.status !== "finished" }));
       const actions = el("span", "quiz-row-actions");
       actions.append(button);
       item.append(text, chip, actions);
@@ -79,8 +81,9 @@ if (app && document.querySelector("#classPanelQuizzes")) {
     failures = 0;
   }
 
-  async function play(quizId) {
+  async function play(quizId, { join = false } = {}) {
     stopPlaying();
+    joinOnOpen = join;
     showOnly("play");
     playId = quizId;
     const quiz = quizzes.find((q) => q.id === quizId);
@@ -133,6 +136,7 @@ if (app && document.querySelector("#classPanelQuizzes")) {
       });
       box.append(el("p", "panel-sub", `${quiz.question_count} question${quiz.question_count === 1 ? "" : "s"}${quiz.time_limit_seconds ? ` · ${quiz.time_limit_seconds} s each` : ""} · 1 point per correct answer`), join);
       $("#studentQuizBody").replaceChildren(box);
+      if (joinOnOpen && quiz.status !== "finished") { joinOnOpen = false; join.click(); return; }
       join.focus();
       return;
     }
@@ -303,6 +307,7 @@ if (app && document.querySelector("#classPanelQuizzes")) {
   window.addEventListener("focus", () => { if (active && !playId) void loadQuizzes(); });
   // A quiz the teacher opens appears without the student having to refresh.
   window.setInterval(() => { if (active && !playId && document.visibilityState === "visible") void loadQuizzes(); }, 5000);
-  $("#studentQuizTips").append(infoButton("quizzes", "Press Open, then Join quiz. Each question can be answered once, and the correct answer shows when the question closes. Points are 1 per correct answer — your focus and attention scores are never used."));
+  document.addEventListener("visibilitychange", () => { if (active && !playId && document.visibilityState === "visible") void loadQuizzes(); });
+  $("#studentQuizTips").append(infoButton("quizzes", "Press Join quiz when your teacher opens one. Each question can be answered once, and the correct answer shows when the question closes. Points are 1 per correct answer — your focus and attention scores are never used."));
   followRoute();
 }

@@ -47,11 +47,14 @@
     .topbar-inner { height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
     .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 650; font-size: 15.5px; letter-spacing: -0.2px; white-space: nowrap; }
     .brand-mark {
-      width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center;
-      background: linear-gradient(145deg, #13232b, #0c0c0f); border: 1px solid #1f3a44; color: var(--cyan);
-      box-shadow: 0 0 18px rgba(0, 217, 255, 0.18);
+      width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; flex: none; color: #fff;
+      /* The logo stays black and white in every theme and accent, with a soft white glow */
+      background: radial-gradient(circle at 30% 22%, #202024, #050506 72%); border: 1px solid rgba(255, 255, 255, 0.16);
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55), 0 0 20px rgba(255, 255, 255, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.08);
     }
-    .brand-mark svg { width: 18px; height: 18px; }
+    .brand-mark svg { width: 20px; height: 20px; overflow: visible; filter: drop-shadow(0 0 1.5px rgba(255, 255, 255, 0.95)) drop-shadow(0 0 5px rgba(255, 255, 255, 0.55)); animation: brand-glow 4.5s ease-in-out infinite; }
+    @keyframes brand-glow { 50% { filter: drop-shadow(0 0 2px rgba(255, 255, 255, 1)) drop-shadow(0 0 9px rgba(255, 255, 255, 0.75)); } }
+    @media (prefers-reduced-motion: reduce) { .brand-mark svg { animation: none; } }
     .btn-link { display: inline-flex; align-items: center; gap: 6px; color: var(--text-soft); text-decoration: none; font-size: 13.5px; font-weight: 500; white-space: nowrap; transition: color 0.15s ease; }
     .btn-link:hover { color: var(--text-main); }
     .btn-link .icon { width: 15px; height: 15px; }
@@ -245,10 +248,13 @@
       .back-label { display: none; }
     }
   </style>
+  <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="../assets/images/favicon-64.png" type="image/png" sizes="64x64">
+  <link rel="apple-touch-icon" href="../assets/images/apple-touch-icon.png">
 </head>
 <body>
   <svg width="0" height="0" style="position: absolute" aria-hidden="true">
-    <symbol id="i-brain" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M12 5v13"/></symbol>
+    <symbol id="i-brain" viewBox="632 191 736 736" fill="none" stroke="currentColor" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"><!-- Neuro-Focus logo (assets/images/neuro-focus-logo.svg) --><path d="M790 565 C700 572 655 525 655 465 C655 345 790 245 955 245 C1170 245 1345 390 1345 548 C1345 640 1278 700 1188 722"/><path d="M802 552 C780 455 865 380 990 380 C1140 380 1246 465 1246 572 C1246 630 1214 668 1186 710 C1166 740 1166 770 1168 795"/><path d="M790 565 C850 562 890 540 935 518 C985 495 1025 485 1070 485 C1132 485 1162 515 1162 555 C1162 612 1102 682 1012 682 C932 682 855 640 818 578"/><path d="M1022 688 C1062 712 1100 721 1140 721 C1160 721 1176 718 1188 714"/><circle cx="1175" cy="835" r="38"/></symbol>
     <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></symbol>
     <symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
     <symbol id="i-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 18l-6-6 6-6"/></symbol>
@@ -413,6 +419,6 @@
   </footer>
 
   <script src="../scripts/shared/neural-background.js?v=2"></script>
-  <script type="module" src="../scripts/auth/auth.js?v=5"></script>
+  <script type="module" src="../scripts/auth/auth.js?v=6"></script>
 </body>
 </html>

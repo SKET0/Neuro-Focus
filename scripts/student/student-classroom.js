@@ -1,4 +1,4 @@
-// Student class page: the tabs (Live focus, Posts, Assignments) and the Posts and Assignments
+// Student class page: the tabs (Posts, Assignments, Quizzes, Live focus) and the Posts and Assignments
 // panels. Live focus itself is student-classes.js. Students read their teacher's posts and
 // assignments, upload one file per assignment (replaceable until the deadline) and see their own
 // marks and feedback. They never see classmates' submissions: the database only returns their
@@ -15,10 +15,10 @@ const app = await window.neuroFocusReady;
 if (app && document.querySelector("#view-class")) {
   const { supabase } = app;
   const $ = (selector) => document.querySelector(selector);
-  const TABS = ["live", "posts", "assignments", "quizzes"];
+  const TABS = ["posts", "assignments", "quizzes", "live"];
   const PANELS = { live: "#classPanelLive", posts: "#classPanelPosts", assignments: "#classPanelAssignments", quizzes: "#classPanelQuizzes" };
   let classId = null;
-  let tab = "live";
+  let tab = "posts";
   let assignments = [];
   let mine = new Map(); // assignment id -> my submission
   const openCards = new Set();
@@ -59,9 +59,17 @@ if (app && document.querySelector("#view-class")) {
     const nextClass = window.neuroFocusRouteClassId || null;
     if (nextClass !== classId) { openCards.clear(); assignments = []; mine = new Map(); }
     classId = nextClass;
-    tab = TABS.includes(window.neuroFocusRouteClassTab) ? window.neuroFocusRouteClassTab : "live";
+    tab = TABS.includes(window.neuroFocusRouteClassTab) ? window.neuroFocusRouteClassTab : "posts";
     showTab();
+    showLiveDot();
   }
+  // A dot on the Live focus tab while this class's live session is on, whichever tab is open.
+  function showLiveDot() {
+    const item = window.neuroFocusClassStatus?.classes?.find((entry) => entry.id === classId);
+    $("#classTabLiveDot").hidden = !(item?.live && !item.removed);
+  }
+  window.addEventListener("neurofocus:class-status", showLiveDot);
+  $("#classNotesButton").addEventListener("click", () => { if (classId) window.neuroFocusOpenClassNotes?.(classId); });
   window.addEventListener("neurofocus:viewchange", followRoute);
   window.addEventListener("focus", () => {
     if (window.neuroFocusView !== "class" || !classId) return;
