@@ -1,0 +1,11 @@
+# Netlify (https://www.neurofocus.site). Publishes only the website itself: the report drafts,
+# backend, database, Supabase project files, tests and tools stay out of the public site.
+[build]
+  command = "rm -rf site && mkdir site && cp -R index.html login.html student.html teacher.html pages scripts styles assets site/"
+  publish = "site"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
