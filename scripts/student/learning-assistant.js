@@ -737,6 +737,21 @@ if (app && document.querySelector("#buddyApp")) {
     if (send && text.trim()) els.form.requestSubmit();
   });
   window.addEventListener("neurofocus:buddy-open", (event) => { if (event.detail?.id) openChat(event.detail.id); });
+  // The NeuroBuddy dock (buddy-dock.js) saved its quick chat: take that chat's new copy, leaving the
+  // rest as they are here.
+  window.addEventListener("neurofocus:buddy-stored", (event) => {
+    const id = event.detail?.id;
+    const fresh = loadChats(userId).find((chat) => chat.id === id);
+    if (!fresh) return;
+    const index = chats.findIndex((chat) => chat.id === id);
+    if (index >= 0) chats[index] = fresh;
+    else chats.unshift(fresh);
+    if (current?.id === id) {
+      current = fresh;
+      if (window.neuroFocusView === "buddy") renderChat();
+    }
+    renderList();
+  });
   window.addEventListener("neurofocus:viewchange", (event) => { if (event.detail?.name === "buddy") renderChat(); });
   // Class names arrive after the page opens (student-classes.js).
   window.addEventListener("neurofocus:class-status", () => { renderClassPick(); renderList(); if (!current.messages.length) renderChat(); });

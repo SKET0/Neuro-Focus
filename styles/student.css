@@ -932,11 +932,8 @@ textarea.field-input { resize: vertical; min-height: 120px; line-height: 1.55; }
 }
 
 /* =====================================================================
-   Simpler navigation: one NeuroBuddy button, meeting links, live dot on a tab
+   Simpler navigation: meeting links, live dot on a tab
    ===================================================================== */
-.buddy-button[aria-current] { color: var(--text-main); border-color: color-mix(in srgb, var(--accent) 45%, var(--border-strong)); background: color-mix(in srgb, var(--accent) 9%, var(--surface-raised)); }
-.buddy-button .icon { color: var(--accent); }
-@media (max-width: 640px) { .buddy-button .label-long { display: none; } }
 .meeting-links { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 12px; font-size: 13px; color: var(--text-muted); }
 .meeting-links .text-link { border: 0; background: none; padding: 0; cursor: pointer; font: inherit; font-weight: 600; }
 .buddy-privacy { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12.5px; color: var(--text-muted); }

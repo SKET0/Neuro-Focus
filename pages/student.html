@@ -37,11 +37,12 @@
   </script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <link rel="stylesheet" href="../styles/theme.css?v=1">
-  <link rel="stylesheet" href="../styles/student.css?v=32">
+  <link rel="stylesheet" href="../styles/student.css?v=33">
   <link rel="stylesheet" href="../styles/home.css?v=6">
   <link rel="stylesheet" href="../styles/account.css?v=4">
   <link rel="stylesheet" href="../styles/dashboard-layout.css?v=9">
   <link rel="stylesheet" href="../styles/tour.css?v=3">
+  <link rel="stylesheet" href="../styles/buddy-dock.css?v=1">
   <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="../assets/images/favicon-64.png" type="image/png" sizes="64x64">
   <link rel="apple-touch-icon" href="../assets/images/apple-touch-icon.png">
@@ -153,8 +154,6 @@
           <svg class="icon" aria-hidden="true"><use href="#i-timer"/></svg>
           <span id="focusPillText">Focus</span>
         </a>
-        <!-- NeuroBuddy: the one way in, on every page -->
-        <a class="btn-action buddy-button" href="#buddy" data-view-link="buddy" aria-label="NeuroBuddy"><svg class="icon" aria-hidden="true"><use href="#i-buddy"/></svg><span class="label-long">NeuroBuddy</span></a>
         <!-- Account menu (scripts/shared/profile.js) -->
         <div class="account-menu">
           <button id="accountButton" class="account-button" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="accountMenu">
@@ -1202,7 +1201,7 @@
   <!-- auth-guard.js must load first: the other modules wait on window.neuroFocusReady -->
   <script type="module" src="../scripts/auth/auth-guard.js?v=4"></script>
   <script type="module" src="../scripts/tracking/eye-analyzer.js?v=5"></script>
-  <script type="module" src="../scripts/student/learning-assistant.js?v=13"></script>
+  <script type="module" src="../scripts/student/learning-assistant.js?v=14"></script>
   <script type="module" src="../scripts/student/student-notes.js?v=7"></script>
   <script type="module" src="../scripts/student/student-classes.js?v=20"></script>
   <script type="module" src="../scripts/student/student-focus.js?v=13"></script>
@@ -1215,6 +1214,8 @@
   <script src="../scripts/shared/info-popover.js?v=1"></script>
   <script type="module" src="../scripts/shared/home-background.js?v=1"></script>
   <script type="module" src="../scripts/student/student-sidebar.js?v=1"></script>
-  <script type="module" src="../scripts/student/student-tour.js?v=1"></script>
+  <script type="module" src="../scripts/student/student-tour.js?v=2"></script>
+  <!-- NeuroBuddy's floating button and quick chat, on every page -->
+  <script type="module" src="../scripts/shared/buddy-dock.js?v=1"></script>
 </body>
 </html>

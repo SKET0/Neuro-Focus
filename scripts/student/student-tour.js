@@ -65,9 +65,9 @@ if (app && document.querySelector("#view-dashboard")) {
       before: onHome
     },
     {
-      target: ".header-actions .buddy-button",
+      target: ".buddy-dock-button",
       title: "NeuroBuddy",
-      text: "Your study helper, on every page: ask questions, get explanations or make flashcards.",
+      text: "Your study helper, on every page: tap it for a quick question without leaving what you’re doing, or open the full chat for files, flashcards and all your chats.",
       before: onHome
     },
     {
