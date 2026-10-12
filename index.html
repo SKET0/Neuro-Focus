@@ -12,6 +12,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
   <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/light/style.css">
+  <link rel="stylesheet" href="styles/buddy-dock.css?v=1">
   <style>
     /* Dark neutrals carry the structure; cyan is the brand accent, green means "good", with a little
        violet for depth. The status colours (red, amber) appear only in product previews. */
@@ -132,7 +133,8 @@
     .float-card {
       position: absolute; display: flex; align-items: center; gap: 11px; padding: 11px 14px; border-radius: 12px;
       background: rgba(15, 15, 18, 0.78); border: 1px solid var(--line-strong); backdrop-filter: blur(12px);
-      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5); font-size: 12.5px; color: var(--text-soft); white-space: nowrap;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06); font-size: 12.5px; color: var(--text-soft); white-space: nowrap;
+      transform: translateZ(var(--z, 0px)) rotateX(var(--rx0, 0deg)) rotateY(var(--ry0, 0deg));
       animation: float 8s ease-in-out infinite;
     }
     .float-card strong { display: block; color: var(--text-main); font-weight: 600; font-size: 13px; }
@@ -141,14 +143,19 @@
     .float-icon.green { color: var(--green); background: rgba(34, 197, 94, 0.12); }
     .float-icon.amber { color: var(--amber); background: rgba(245, 183, 72, 0.12); }
     .float-icon i { font-size: 16px; }
-    .fc-live { top: 6%; left: 2%; animation-delay: -1s; }
-    .fc-score { top: 16%; right: 0; animation-delay: -3s; }
-    .fc-nudge { bottom: 18%; left: -2%; animation-delay: -5s; }
-    .fc-buddy { bottom: -3%; right: -2%; animation-delay: -2s; white-space: normal; width: 250px; align-items: flex-start; }
+    .fc-live { top: 6%; left: 2%; animation-delay: -1s; --z: 70px; --rx0: -8deg; --ry0: 16deg; }
+    .fc-score { top: 16%; right: 0; animation-delay: -3s; --z: 40px; --rx0: -5deg; --ry0: -18deg; }
+    .fc-nudge { bottom: 18%; left: -2%; animation-delay: -5s; --z: 110px; --rx0: 7deg; --ry0: 20deg; }
+    .fc-buddy { bottom: -3%; right: -2%; animation-delay: -2s; white-space: normal; width: 250px; align-items: flex-start; --z: 90px; --rx0: 9deg; --ry0: -16deg; }
+    /* The cards share one 3D space that turns gently with the pointer, like the logo behind them (home.js) */
+    .hero-scene {
+      position: absolute; inset: 0; transform-style: preserve-3d;
+      transform: perspective(1100px) rotateX(var(--sx, 0deg)) rotateY(var(--sy, 0deg));
+    }
     .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); animation: pulse 1.8s infinite; flex: none; }
     .meter { width: 92px; height: 5px; border-radius: 4px; background: #232328; overflow: hidden; margin-top: 6px; }
     .meter span { display: block; height: 100%; width: 92%; border-radius: inherit; background: linear-gradient(90deg, #00b8d9, var(--green)); }
-    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+    @keyframes float { 0%, 100% { translate: 0 0; } 50% { translate: 0 -8px; } }
     @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.55); } 70% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
 
     /* ---------- Sections ---------- */
@@ -164,19 +171,18 @@
     .section-head p { font-size: 16px; color: var(--text-muted); line-height: 1.65; }
 
     /* Stats strip */
-    .stats { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--line); border-radius: 16px; background: rgba(15, 15, 18, 0.7); overflow: hidden; }
-    .stat { padding: 26px 26px 24px; border-right: 1px solid var(--line); }
-    .stat:last-child { border-right: 0; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    .stat { padding: 26px 26px 24px; border: 1px solid var(--line); border-radius: 16px; background: rgba(15, 15, 18, 0.75); }
     .stat strong { display: block; font-family: var(--mono); font-size: 30px; font-weight: 500; letter-spacing: -0.04em; line-height: 1.15; margin-bottom: 4px; }
     .stat strong em { font-style: normal; color: var(--cyan); }
     .stat span { font-size: 13px; color: var(--text-muted); }
 
     /* Feature grid */
-    .feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; background: var(--line); gap: 1px; }
-    .feature { position: relative; background: var(--surface); padding: 30px 28px 32px; transition: background 0.2s ease; }
-    .feature:hover { background: #121215; }
+    .feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .feature { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 30px 28px 32px; transition: background 0.2s ease, border-color 0.2s ease; }
+    .feature:hover { background: #121215; border-color: color-mix(in srgb, var(--tone, var(--cyan)) 28%, var(--line)); }
     .feature::before {
-      content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.25s ease;
+      content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity 0.25s ease;
       background: radial-gradient(360px circle at 20% 0%, color-mix(in srgb, var(--tone, var(--cyan)) 9%, transparent), transparent 70%);
     }
     .feature:hover::before { opacity: 1; }
@@ -252,9 +258,9 @@
 
     /* Privacy */
     .split { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 64px; align-items: center; }
-    .privacy-list { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; gap: 1px; background: var(--line); }
-    .privacy-item { padding: 24px; background: var(--surface); }
-    .privacy-item i { font-size: 22px; color: var(--green); margin-bottom: 14px; }
+    .privacy-list { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .privacy-item { padding: 24px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; }
+    .privacy-item i { display: block; font-size: 22px; color: var(--green); margin-bottom: 14px; }
     .privacy-item h3 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
     .privacy-item p { font-size: 13.5px; color: var(--text-muted); line-height: 1.55; }
 
@@ -316,14 +322,32 @@
     .footer-about p { font-size: 13.5px; color: var(--text-muted); margin-top: 16px; max-width: 280px; }
     .footer-bottom { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 22px; font-size: 12.5px; color: var(--text-faint); }
 
+    /* 3D cards (home.js): the card turns toward the pointer, a soft light follows it, and the
+       contents lift off the surface by --lift (0 at rest, 1 while hovered). */
+    [data-tilt] {
+      position: relative; transform-style: preserve-3d;
+      transform: perspective(1000px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+      box-shadow: 0 calc(var(--lift, 0) * 28px) calc(var(--lift, 0) * 60px) rgba(0, 0, 0, calc(var(--lift, 0) * 0.55));
+    }
+    [data-tilt]::after {
+      content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: var(--lift, 0);
+      background: radial-gradient(420px circle at var(--gx, 50%) var(--gy, 50%), rgba(255, 255, 255, 0.07), transparent 45%);
+      transform: translateZ(1px);
+    }
+    .depth-1, .depth-2, .depth-3 { transform: translateZ(calc(var(--lift, 0) * var(--d))); }
+    .depth-1 { --d: 14px; }
+    .depth-2 { --d: 28px; }
+    .depth-3 { --d: 44px; }
+    .problem-card.after[data-tilt] { box-shadow: 0 24px 60px rgba(0, 217, 255, 0.06), 0 calc(var(--lift, 0) * 28px) calc(var(--lift, 0) * 60px) rgba(0, 0, 0, calc(var(--lift, 0) * 0.55)); }
+
     /* Scroll reveal (home.js) */
-    .reveal { opacity: 0; transform: translateY(16px); transition: opacity 0.6s ease, transform 0.6s ease; }
-    .reveal.is-visible { opacity: 1; transform: none; }
+    .reveal { opacity: 0; translate: 0 16px; transition: opacity 0.6s ease, translate 0.6s ease; }
+    .reveal.is-visible { opacity: 1; translate: none; }
 
     @media (prefers-reduced-motion: reduce) {
       html { scroll-behavior: auto; }
       .float-card, .live-dot { animation: none; }
-      .reveal { opacity: 1; transform: none; transition: none; }
+      .reveal { opacity: 1; translate: none; transition: none; }
     }
 
     @media (max-width: 1080px) {
@@ -337,9 +361,7 @@
       .hero-grid { grid-template-columns: 1fr; min-height: 0; padding: 40px 0 24px; gap: 8px; }
       .hero-visual { height: 420px; min-height: 0; }
       .fc-buddy { bottom: 2%; }
-      .stats { grid-template-columns: 1fr 1fr; }
-      .stat:nth-child(2) { border-right: 0; }
-      .stat:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+      .stats { grid-template-columns: 1fr 1fr; gap: 12px; }
       .steps { grid-template-columns: 1fr 1fr; row-gap: 40px; }
       .steps::before { display: none; }
       .role-grid, .split, .problem { grid-template-columns: 1fr; }
@@ -360,6 +382,8 @@
       .footer-grid { grid-template-columns: 1fr; }
       .cta-band { padding: 52px 20px; }
       .hub-card { padding: 24px 20px; }
+      .stat { padding: 20px 18px 18px; }
+      .stat strong { font-size: 26px; }
     }
     @media (max-width: 400px) {
       .nav-actions [data-session="nav-signin"] { display: none; }
@@ -420,6 +444,7 @@
 
         <!-- The animated logo (neural-background.js) is centred on this area -->
         <div class="hero-visual" data-brain-anchor aria-hidden="true">
+          <div class="hero-scene">
           <div class="float-card fc-live">
             <span class="live-dot"></span>
             <div><strong>Live session</strong><small>SE Section A · 24 students</small></div>
@@ -436,6 +461,7 @@
             <span class="float-icon"><i class="ph-light ph-chat-circle-text"></i></span>
             <div><strong>NeuroBuddy</strong><small>“Let’s break photosynthesis into 3 small steps…”</small></div>
           </div>
+          </div>
         </div>
       </div>
     </section>
@@ -443,10 +469,10 @@
     <!-- ================= Stats ================= -->
     <div class="container reveal">
       <div class="stats">
-        <div class="stat"><strong>478</strong><span>facial landmarks tracked per frame</span></div>
-        <div class="stat"><strong>&lt;1<em>s</em></strong><span>from glance to teacher dashboard</span></div>
-        <div class="stat"><strong>0</strong><span>video frames stored or uploaded</span></div>
-        <div class="stat"><strong>24<em>/</em>7</strong><span>AI study support with NeuroBuddy</span></div>
+        <div class="stat" data-tilt="12"><strong class="depth-2">478</strong><span class="depth-1">facial landmarks tracked per frame</span></div>
+        <div class="stat" data-tilt="12"><strong class="depth-2">&lt;1<em>s</em></strong><span class="depth-1">from glance to teacher dashboard</span></div>
+        <div class="stat" data-tilt="12"><strong class="depth-2">0</strong><span class="depth-1">video frames stored or uploaded</span></div>
+        <div class="stat" data-tilt="12"><strong class="depth-2">24<em>/</em>7</strong><span class="depth-1">AI study support with NeuroBuddy</span></div>
       </div>
     </div>
 
@@ -459,35 +485,35 @@
           <p>Attention tracking, adaptive support and live classroom analytics, designed together for neurodivergent learners and the teachers who support them.</p>
         </div>
         <div class="feature-grid reveal">
-          <article class="feature">
-            <div class="feature-icon"><i class="ph-light ph-eye" aria-hidden="true"></i></div>
-            <h3>Real-time attention tracking</h3>
-            <p>MediaPipe reads eye gaze and head pose in the browser and turns them into a live attention score every second.</p>
+          <article class="feature" data-tilt>
+            <div class="feature-icon depth-3"><i class="ph-light ph-eye" aria-hidden="true"></i></div>
+            <h3 class="depth-2">Real-time attention tracking</h3>
+            <p class="depth-1">MediaPipe reads eye gaze and head pose in the browser and turns them into a live attention score every second.</p>
           </article>
-          <article class="feature">
-            <div class="feature-icon"><i class="ph-light ph-broadcast" aria-hidden="true"></i></div>
-            <h3>Live classroom sessions</h3>
-            <p>Teachers start a session in one click. Students get notified, join, and their focus streams to the teacher instantly.</p>
+          <article class="feature" data-tilt>
+            <div class="feature-icon depth-3"><i class="ph-light ph-broadcast" aria-hidden="true"></i></div>
+            <h3 class="depth-2">Live classroom sessions</h3>
+            <p class="depth-1">Teachers start a session in one click. Students get notified, join, and their focus streams to the teacher instantly.</p>
           </article>
-          <article class="feature green">
-            <div class="feature-icon"><i class="ph-light ph-hand-waving" aria-hidden="true"></i></div>
-            <h3>Adaptive re-engagement</h3>
-            <p>When focus slips, students get a gentle micro-task and a reminder of their next step, not a reprimand.</p>
+          <article class="feature green" data-tilt>
+            <div class="feature-icon depth-3"><i class="ph-light ph-hand-waving" aria-hidden="true"></i></div>
+            <h3 class="depth-2">Adaptive re-engagement</h3>
+            <p class="depth-1">When focus slips, students get a gentle micro-task and a reminder of their next step, not a reprimand.</p>
           </article>
-          <article class="feature violet">
-            <div class="feature-icon"><i class="ph-light ph-chat-circle-text" aria-hidden="true"></i></div>
-            <h3>NeuroBuddy AI tutor</h3>
-            <p>A patient study buddy that explains simply, summarises, quizzes and helps students get started when they’re stuck.</p>
+          <article class="feature violet" data-tilt>
+            <div class="feature-icon depth-3"><i class="ph-light ph-chat-circle-text" aria-hidden="true"></i></div>
+            <h3 class="depth-2">NeuroBuddy AI tutor</h3>
+            <p class="depth-1">A patient study buddy that explains simply, summarises, quizzes and helps students get started when they’re stuck.</p>
           </article>
-          <article class="feature green">
-            <div class="feature-icon"><i class="ph-light ph-timer" aria-hidden="true"></i></div>
-            <h3>ADHD-friendly focus tools</h3>
-            <p>Short focus blocks with breaks, micro-goals, a focus timeline and personal history that students own.</p>
+          <article class="feature green" data-tilt>
+            <div class="feature-icon depth-3"><i class="ph-light ph-timer" aria-hidden="true"></i></div>
+            <h3 class="depth-2">ADHD-friendly focus tools</h3>
+            <p class="depth-1">Short focus blocks with breaks, micro-goals, a focus timeline and personal history that students own.</p>
           </article>
-          <article class="feature">
-            <div class="feature-icon"><i class="ph-light ph-chart-line-up" aria-hidden="true"></i></div>
-            <h3>Teacher analytics</h3>
-            <p>Attention curves, heatmaps, distraction alerts, saved session history and CSV reports for every class.</p>
+          <article class="feature" data-tilt>
+            <div class="feature-icon depth-3"><i class="ph-light ph-chart-line-up" aria-hidden="true"></i></div>
+            <h3 class="depth-2">Teacher analytics</h3>
+            <p class="depth-1">Attention curves, heatmaps, distraction alerts, saved session history and CSV reports for every class.</p>
           </article>
         </div>
       </div>
@@ -535,13 +561,13 @@
           <p>Students get tools that help them focus. Teachers get the visibility to step in at the right moment.</p>
         </div>
         <div class="role-grid" id="workspaces">
-          <article class="hub-card green reveal">
+          <article class="hub-card green reveal" data-tilt="6">
             <div>
               <span class="hub-badge"><i class="ph-light ph-student" aria-hidden="true"></i>For students</span>
               <h3 class="hub-title">Student Focus Workspace</h3>
               <p class="hub-desc">A calm space to learn with real-time feedback, gentle nudges and an AI study buddy.</p>
             </div>
-            <div class="mock" aria-hidden="true">
+            <div class="mock depth-3" aria-hidden="true">
               <div class="mock-banner"><span class="live-dot" style="animation: none;"></span>You’re in the live session</div>
               <div class="mock-tiles">
                 <div class="mock-tile"><b>88%</b><small>Live attention</small></div>
@@ -549,32 +575,32 @@
                 <div class="mock-tile"><b>18:40</b><small>Focus timer</small></div>
               </div>
             </div>
-            <ul class="checklist">
+            <ul class="checklist depth-1">
               <li><i class="ph-light ph-check" aria-hidden="true"></i>Join live sessions with one tap; leave anytime</li>
               <li><i class="ph-light ph-check" aria-hidden="true"></i>Focus timer, micro-goals and personal history</li>
               <li><i class="ph-light ph-check" aria-hidden="true"></i>NeuroBuddy for explanations, summaries and quizzes</li>
             </ul>
-            <a class="hub-action" href="pages/student.html" data-session="hub-student">Open Student Workspace <i class="ph-light ph-arrow-right" aria-hidden="true"></i></a>
+            <a class="hub-action depth-2" href="pages/student.html" data-session="hub-student">Open Student Workspace <i class="ph-light ph-arrow-right" aria-hidden="true"></i></a>
           </article>
 
-          <article class="hub-card reveal">
+          <article class="hub-card reveal" data-tilt="6">
             <div>
               <span class="hub-badge"><i class="ph-light ph-chalkboard-teacher" aria-hidden="true"></i>For teachers</span>
               <h3 class="hub-title">Teacher Oversight &amp; Analytics</h3>
               <p class="hub-desc">See who’s engaged, who’s drifting and who needs help, live and after class.</p>
             </div>
-            <div class="mock" aria-hidden="true">
+            <div class="mock depth-3" aria-hidden="true">
               <div class="mock-bar"><strong>SE Section A</strong><span class="pill live"><span class="live-dot" style="width: 6px; height: 6px;"></span>LIVE</span></div>
               <div class="mock-row"><span>Ayesha Khan</span><div class="bar"><span style="width: 91%"></span></div><span class="pill ok">Focused</span></div>
               <div class="mock-row"><span>Hamza Ali</span><div class="bar"><span style="width: 58%; background: var(--amber)"></span></div><span class="pill warn">Drifting</span></div>
               <div class="mock-row"><span>Fatima Noor</span><div class="bar"><span style="width: 34%; background: var(--red)"></span></div><span class="pill bad">Flagged</span></div>
             </div>
-            <ul class="checklist">
+            <ul class="checklist depth-1">
               <li><i class="ph-light ph-check" aria-hidden="true"></i>Create classes, share a code, start a live session</li>
               <li><i class="ph-light ph-check" aria-hidden="true"></i>Attention curves, heatmaps and distraction alerts</li>
               <li><i class="ph-light ph-check" aria-hidden="true"></i>Manage students and export session reports</li>
             </ul>
-            <a class="hub-action" href="pages/teacher.html" data-session="hub-teacher">Open Teacher Dashboard <i class="ph-light ph-arrow-right" aria-hidden="true"></i></a>
+            <a class="hub-action depth-2" href="pages/teacher.html" data-session="hub-teacher">Open Teacher Dashboard <i class="ph-light ph-arrow-right" aria-hidden="true"></i></a>
           </article>
         </div>
       </div>
@@ -589,10 +615,10 @@
           <p>Neuro-Focus was built so students can benefit from AI support without being recorded. The camera feed is processed on their device and immediately discarded; teachers only ever see numbers, and only during sessions students choose to join.</p>
         </div>
         <div class="privacy-list reveal">
-          <div class="privacy-item"><i class="ph-light ph-cpu" aria-hidden="true"></i><h3>On-device processing</h3><p>Face landmarks are computed in the browser. No video is uploaded or stored.</p></div>
-          <div class="privacy-item"><i class="ph-light ph-toggle-right" aria-hidden="true"></i><h3>Student control</h3><p>Sharing happens only in live sessions, and students can pause it anytime.</p></div>
-          <div class="privacy-item"><i class="ph-light ph-lock-simple" aria-hidden="true"></i><h3>Private by default</h3><p>Personal focus history is visible only to the student who owns it.</p></div>
-          <div class="privacy-item"><i class="ph-light ph-shield-check" aria-hidden="true"></i><h3>Secured access</h3><p>Row-level security and private live channels keep class data inside the class.</p></div>
+          <div class="privacy-item" data-tilt="10"><i class="ph-light ph-cpu depth-3" aria-hidden="true"></i><h3 class="depth-2">On-device processing</h3><p class="depth-1">Face landmarks are computed in the browser. No video is uploaded or stored.</p></div>
+          <div class="privacy-item" data-tilt="10"><i class="ph-light ph-toggle-right depth-3" aria-hidden="true"></i><h3 class="depth-2">Student control</h3><p class="depth-1">Sharing happens only in live sessions, and students can pause it anytime.</p></div>
+          <div class="privacy-item" data-tilt="10"><i class="ph-light ph-lock-simple depth-3" aria-hidden="true"></i><h3 class="depth-2">Private by default</h3><p class="depth-1">Personal focus history is visible only to the student who owns it.</p></div>
+          <div class="privacy-item" data-tilt="10"><i class="ph-light ph-shield-check depth-3" aria-hidden="true"></i><h3 class="depth-2">Secured access</h3><p class="depth-1">Row-level security and private live channels keep class data inside the class.</p></div>
         </div>
       </div>
     </section>
@@ -606,18 +632,18 @@
           <p>Students with ADHD struggle most with sustained focus in online classes, and in a crowded video call their distraction goes unnoticed until grades slip.</p>
         </div>
         <div class="problem">
-          <div class="problem-card before reveal">
-            <h3>Typical e-learning platforms</h3>
-            <ul>
+          <div class="problem-card before reveal" data-tilt="5">
+            <h3 class="depth-2">Typical e-learning platforms</h3>
+            <ul class="depth-1">
               <li><i class="ph-light ph-x" aria-hidden="true"></i>Engagement judged by logins, clicks and minutes online</li>
               <li><i class="ph-light ph-x" aria-hidden="true"></i>No live view of who is actually paying attention</li>
               <li><i class="ph-light ph-x" aria-hidden="true"></i>One-size-fits-all design for neurotypical learners</li>
               <li><i class="ph-light ph-x" aria-hidden="true"></i>Teachers find out only after assessments</li>
             </ul>
           </div>
-          <div class="problem-card after reveal">
-            <h3>With Neuro-Focus</h3>
-            <ul>
+          <div class="problem-card after reveal" data-tilt="5">
+            <h3 class="depth-2">With Neuro-Focus</h3>
+            <ul class="depth-1">
               <li><i class="ph-light ph-check" aria-hidden="true"></i>Continuous, AI-based attention scoring from gaze and head pose</li>
               <li><i class="ph-light ph-check" aria-hidden="true"></i>A live classroom dashboard with distraction alerts</li>
               <li><i class="ph-light ph-check" aria-hidden="true"></i>Tools and nudges designed for neurodivergent learners</li>
@@ -722,7 +748,9 @@
 
   <script src="scripts/shared/app.js?v=2"></script>
   <script src="scripts/shared/neural-background.js?v=18"></script>
-  <script src="scripts/home/home.js?v=2"></script>
+  <script src="scripts/home/home.js?v=3"></script>
   <script type="module" src="scripts/home/home-session.js?v=5"></script>
+  <!-- NeuroBuddy's floating button: a quick chat for signed-in students, a sign-in invitation otherwise -->
+  <script type="module" src="scripts/shared/buddy-dock.js?v=1"></script>
 </body>
 </html>
