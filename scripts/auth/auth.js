@@ -114,7 +114,7 @@ if (form) {
     [password, confirm].forEach((input) => { input.type = show ? "text" : "password"; });
     passwordToggle.setAttribute("aria-pressed", String(show));
     passwordToggle.setAttribute("aria-label", show ? "Hide passwords" : "Show passwords");
-    passwordToggle.querySelector("use").setAttribute("href", show ? "#i-eye-off" : "#i-eye");
+    passwordToggle.querySelector("i").className = show ? "ph-light ph-eye-slash" : "ph-light ph-eye";
   });
 
   // ---------- After signing in ----------

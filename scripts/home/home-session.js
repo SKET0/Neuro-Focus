@@ -50,15 +50,6 @@ if (!forwardingReset) try {
       hook("gateway-secondary")?.addEventListener("click", signOut);
       hook("hero-signin")?.remove();
 
-      // "Hello, <first name> 👋" above the hero title
-      const hello = hook("hello");
-      if (hello) {
-        const name = document.createElement("strong");
-        name.textContent = (profile.display_name || "there").trim().split(/\s+/)[0];
-        hello.replaceChildren("Hello, ", name, " 👋");
-        hello.hidden = false;
-      }
-
       const copy = hook("gateway-copy");
       if (copy) copy.textContent = `You're signed in as ${profile.display_name}. Continue to your ${dashboardName.toLowerCase()} or sign out.`;
 
@@ -74,7 +65,10 @@ if (!forwardingReset) try {
         const locked = document.createElement("span");
         locked.className = "hub-action is-locked";
         locked.setAttribute("aria-disabled", "true");
-        locked.textContent = `🔒 ${isTeacher ? "Student" : "Teacher"} account required`;
+        const lock = document.createElement("i");
+        lock.className = "ph-light ph-lock-simple";
+        lock.setAttribute("aria-hidden", "true");
+        locked.append(lock, `${isTeacher ? "Student" : "Teacher"} account required`);
         locked.title = `You're signed in with a ${profile.role} account.`;
         other.replaceWith(locked);
       }

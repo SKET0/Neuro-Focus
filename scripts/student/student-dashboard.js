@@ -10,7 +10,7 @@
 // "neurofocus:class-status"), the timer and steps (student-focus.js) and the profile
 // (student-profile.js). Notes and the latest saved session are read here.
 
-import { buildCoaching, averageFocus, focusedSeconds, sum, levelFor } from "./focus-analysis.js?v=2";
+import { buildCoaching, averageFocus, focusedSeconds, sum, levelFor } from "./focus-analysis.js?v=3";
 import { paintAvatar, greetingName } from "../shared/avatars.js?v=1";
 import { selectWithQuality } from "../shared/tracking-states.js?v=1";
 import { notify } from "../shared/class-live.js?v=9";
@@ -520,66 +520,69 @@ if (app) {
     }
   }
 
-  // One tip at a time (the most useful one), a single "going well" line and the way to more.
+  // One tip at a time (most useful first, "Next tip" for the others), what it's based on, a single
+  // "going well" line and the way to more in My progress.
+  let coachIndex = 0;
+  let coachTips = [];
+  function showCoachTip() {
+    const tip = coachTips[coachIndex];
+    const iconBox = $("#coachIcon");
+    iconBox.replaceChildren(icon(tip?.icon || "i-spark"));
+    iconBox.dataset.tone = tip?.tone || "";
+    $("#coachTipTitle").textContent = tip?.title || "Nothing to change right now";
+    $("#coachTipText").textContent = tip?.text || "Keep going the way you are.";
+    const basis = $("#coachTipBasis");
+    basis.textContent = tip?.basis || "";
+    basis.hidden = !tip?.basis;
+    const actionsBox = $("#coachActions");
+    actionsBox.replaceChildren();
+    if (tip?.action) {
+      const starts = tip.action.kind === "start";
+      const action = button(tip.action.label, "btn-primary", starts ? null : () => runCoachAction(tip.action), starts ? "i-play" : null);
+      if (starts) action.dataset.startFocus = ""; // handled by student-ui.js
+      action.dataset.focusKey = "coach-action";
+      actionsBox.append(action);
+    }
+    if (coachTips.length > 1) {
+      const next = button(`Next tip · ${coachIndex + 1}/${coachTips.length}`, "btn-action coach-next", () => {
+        coachIndex = (coachIndex + 1) % coachTips.length;
+        showCoachTip();
+        $("#focus-coach .coach-next")?.focus();
+      });
+      next.dataset.focusKey = "coach-next";
+      actionsBox.append(next);
+    }
+    const more = el("a", "text-link", "More in My progress");
+    more.href = "#progress";
+    actionsBox.append(more);
+  }
+
   function renderCoach() {
     if (savedSessions === null) return;
     const coaching = sessionsFailed ? null : buildCoaching(savedSessions, habits());
     renderIfChanged("coach", JSON.stringify([coaching, sessionsFailed]), $("#focus-coach"), () => {
-      const title = $("#coachTipTitle");
-      const text = $("#coachTipText");
-      const actionsBox = $("#coachActions");
       const win = $("#coachWin");
-      const progressBox = $("#coachProgress");
-      const iconBox = $("#coachIcon");
-      actionsBox.replaceChildren();
+      $("#coachProgress").hidden = true;
       if (!coaching) {
-        title.textContent = "Couldn’t load your sessions";
-        text.textContent = "Check your connection, then come back to Home.";
-        progressBox.hidden = true;
+        coachTips = [{ icon: "i-flag", title: "Couldn’t load your sessions", text: "Check your connection, then come back to Home." }];
+        coachIndex = 0;
+        showCoachTip();
         win.hidden = true;
         return;
       }
       $("#focus-coach").dataset.stage = coaching.stage;
-      const tip = coaching.tips[0];
-      iconBox.replaceChildren(icon(tip?.icon || "i-spark"));
-      iconBox.dataset.tone = tip?.tone || "";
-      title.textContent = tip?.title || "Nothing to change right now";
-      // General (not personal) tips get a short label instead of a sentence saying so.
-      const general = coaching.stage !== "personal";
-      $("#coachTitle").textContent = general ? "Focus coach · general tip" : "Focus coach";
-      text.textContent = (tip?.text || "Keep going the way you are.").replace(/\s*A general tip(, not based on your data)?\.\s*$/, "");
-      if (tip?.action) {
-        const starts = tip.action.kind === "start";
-        const action = button(tip.action.label, "btn-primary", starts ? null : () => runCoachAction(tip.action), starts ? "i-play" : null);
-        if (starts) action.dataset.startFocus = ""; // handled by student-ui.js
-        action.dataset.focusKey = "coach-action";
-        actionsBox.append(action);
-      }
-      const more = el("a", "text-link", "More in My progress");
-      more.href = "#progress";
-      actionsBox.append(more);
-
-      // Until there's enough measured data: one bar towards personal tips.
-      progressBox.hidden = !coaching.progress;
-      if (coaching.progress) {
-        const { sessions, days, minutes } = coaching.progress;
-        const share = Math.min(1, Math.min(sessions.done / sessions.needed, days.done / days.needed, minutes.done / minutes.needed));
-        const meter = el("div", "unlock-meter");
-        const fill = el("span");
-        fill.style.width = `${Math.round(share * 100)}%`;
-        meter.append(fill);
-        meter.setAttribute("role", "progressbar");
-        meter.setAttribute("aria-valuemin", "0");
-        meter.setAttribute("aria-valuemax", "100");
-        meter.setAttribute("aria-valuenow", String(Math.round(share * 100)));
-        meter.setAttribute("aria-label", "Progress towards personal tips");
-        progressBox.replaceChildren(el("small", "", `Personal tips unlock after ${sessions.needed} sessions on ${days.needed} days · ${Math.round(share * 100)}% there`), meter);
-      }
-      const good = coaching.stage === "personal" ? coaching.wins[0] : null;
+      $("#coachTitle").textContent = coaching.stage === "personal" ? "Focus coach" : "Focus coach · general tips";
+      const current = coachTips[coachIndex]?.title;
+      coachTips = coaching.tips;
+      coachIndex = Math.max(0, coachTips.findIndex((tip) => tip.title === current)); // keep the tip being read
+      showCoachTip();
+      const good = coaching.wins[0];
       win.hidden = !good;
       win.textContent = good ? `Going well: ${good.title}` : "";
     });
   }
+  // My progress shows the same coach and uses these for its buttons (student-history.js).
+  window.neuroFocusCoach = { habits, run: runCoachAction };
   nudgeToggle?.addEventListener("change", renderCoach);
   timerPreset?.addEventListener("change", renderCoach);
 

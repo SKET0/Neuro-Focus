@@ -6,6 +6,11 @@
   <meta name="theme-color" content="#09090b">
   <title>Sign in · Neuro-Focus</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- The same type and icons as the home page: Geist, Geist Mono, Phosphor (light) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/light/style.css">
   <style>
     :root {
       --bg: #09090b;
@@ -21,10 +26,14 @@
       --red: #ef4444;
       --amber: #f5b748;
       --cyan: #00d9ff;
+      --violet: #7c6cff;
       --container: 1200px;
+      --sans: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: var(--sans); }
     body { background: var(--bg); color: var(--text-main); min-height: 100vh; overflow-x: hidden; line-height: 1.6; -webkit-font-smoothing: antialiased; display: flex; flex-direction: column; }
     a { color: inherit; }
     button, input { font: inherit; color: inherit; }
@@ -32,20 +41,20 @@
     :focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; border-radius: 6px; }
     .container { width: min(var(--container), 100% - 48px); margin: 0 auto; }
     .icon { width: 18px; height: 18px; flex: none; }
+    i[class^="ph"] { display: inline-flex; flex: none; line-height: 1; width: auto; height: auto; font-size: 17px; }
 
     /* ---------- Background (neural-background.js) ---------- */
     #bg { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 0; pointer-events: none; opacity: 0.9; }
     .bg-glow {
       position: fixed; inset: 0; z-index: 0; pointer-events: none;
       background:
-        radial-gradient(ellipse 55% 50% at 60% 30%, rgba(0, 217, 255, 0.09), transparent 70%),
-        radial-gradient(ellipse 40% 40% at 10% 90%, rgba(34, 197, 94, 0.05), transparent 70%);
+        radial-gradient(ellipse 80% 90% at 58% 35%, rgba(0, 217, 255, 0.06), rgba(124, 108, 255, 0.025) 45%, transparent 75%);
     }
 
     /* ---------- Header (matches index.html) ---------- */
     .topbar { position: sticky; top: 0; z-index: 100; background: rgba(9, 9, 11, 0.7); backdrop-filter: blur(14px); border-bottom: 1px solid var(--border); }
     .topbar-inner { height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
-    .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 650; font-size: 15.5px; letter-spacing: -0.2px; white-space: nowrap; }
+    .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 600; font-size: 15.5px; letter-spacing: -0.2px; white-space: nowrap; }
     .brand-mark {
       width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; flex: none; color: #fff;
       /* The logo stays black and white in every theme and accent, with a soft white glow */
@@ -57,7 +66,7 @@
     @media (prefers-reduced-motion: reduce) { .brand-mark svg { animation: none; } }
     .btn-link { display: inline-flex; align-items: center; gap: 6px; color: var(--text-soft); text-decoration: none; font-size: 13.5px; font-weight: 500; white-space: nowrap; transition: color 0.15s ease; }
     .btn-link:hover { color: var(--text-main); }
-    .btn-link .icon { width: 15px; height: 15px; }
+    .btn-link .icon { font-size: 15px; }
 
     /* ---------- Layout ---------- */
     main.auth-layout {
@@ -68,19 +77,20 @@
     /* ---------- Intro ---------- */
     .auth-intro { position: relative; isolation: isolate; }
     .auth-intro::before {
-      content: ""; position: absolute; inset: -40px -8px -40px -80px; z-index: -1; pointer-events: none;
-      background: radial-gradient(ellipse at 40% 50%, rgba(9, 9, 11, 0.88) 40%, rgba(9, 9, 11, 0.45) 68%, transparent 84%);
+      /* Fades out fully before its own edges, so it never leaves a hard line across the logo */
+      content: ""; position: absolute; inset: -60px -60px -60px -100px; z-index: -1; pointer-events: none;
+      background: radial-gradient(closest-side at 45% 50%, rgba(9, 9, 11, 0.88) 55%, rgba(9, 9, 11, 0.45) 78%, transparent 100%);
     }
     .eyebrow-pill {
       display: inline-flex; align-items: center; gap: 10px; font-size: 12.5px; font-weight: 500; color: var(--text-soft);
       background: rgba(20, 20, 23, 0.75); border: 1px solid var(--border-strong); border-radius: 999px; padding: 5px 14px 5px 6px; margin-bottom: 22px;
       backdrop-filter: blur(8px);
     }
-    .eyebrow-pill .tag { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: #052e16; background: var(--green); border-radius: 999px; padding: 2px 8px; letter-spacing: 0.3px; }
-    .eyebrow-pill .tag svg { width: 11px; height: 11px; }
-    .auth-title { font-size: clamp(36px, 4.4vw, 54px); font-weight: 750; line-height: 1.06; letter-spacing: -0.035em; margin-bottom: 18px; max-width: 600px; }
+    .eyebrow-pill .tag { display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 10.5px; font-weight: 500; color: #052e16; background: var(--green); border-radius: 999px; padding: 2px 8px; letter-spacing: 0.06em; }
+    .eyebrow-pill .tag i { font-size: 12px; }
+    .auth-title { font-size: clamp(36px, 4.4vw, 54px); font-weight: 600; line-height: 1.06; letter-spacing: -0.04em; margin-bottom: 18px; max-width: 600px; }
     .gradient-text {
-      background: linear-gradient(100deg, #f4f4f5 0%, #9ff6ff 45%, #00d9ff 100%);
+      background: linear-gradient(100deg, #f4f4f5 0%, #9ff6ff 42%, var(--cyan) 75%, #7c9cff 100%);
       -webkit-background-clip: text; background-clip: text; color: transparent;
     }
     .auth-lead { font-size: clamp(15.5px, 1.25vw, 17px); color: var(--text-soft); line-height: 1.65; max-width: 520px; margin-bottom: 28px; }
@@ -96,12 +106,12 @@
       width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; flex: none;
       color: var(--cyan); background: rgba(0, 217, 255, 0.08); border: 1px solid rgba(0, 217, 255, 0.22);
     }
-    .chip-icon svg { width: 18px; height: 18px; }
+    .chip-icon i { font-size: 19px; }
     .chip-icon.green { color: var(--green); background: rgba(34, 197, 94, 0.08); border-color: rgba(34, 197, 94, 0.22); }
 
     .auth-checks { display: flex; flex-wrap: wrap; gap: 8px 20px; list-style: none; font-size: 13px; color: var(--text-muted); }
     .auth-checks li { display: inline-flex; align-items: center; gap: 7px; }
-    .auth-checks svg { width: 15px; height: 15px; color: var(--green); }
+    .auth-checks i { font-size: 15px; color: var(--green); }
 
     /* ---------- Form card (matches dashboard .panel-card) ---------- */
     .auth-card {
@@ -114,7 +124,7 @@
       background: linear-gradient(90deg, transparent, rgba(0, 217, 255, 0.55), transparent);
     }
     .card-head { display: flex; align-items: center; gap: 14px; }
-    .card-head h2 { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; line-height: 1.25; }
+    .card-head h2 { font-size: 20px; font-weight: 600; letter-spacing: -0.3px; line-height: 1.25; }
     .card-head p { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
 
     .segmented {
@@ -132,7 +142,7 @@
     .field-label { display: flex; flex-direction: column; gap: 8px; font-size: 11.5px; text-transform: uppercase; color: var(--text-muted); font-weight: 650; letter-spacing: 0.6px; }
     .field-label .hint { text-transform: none; letter-spacing: 0; font-weight: 400; font-size: 12px; color: #6b6b75; }
     .field-wrap { position: relative; display: flex; align-items: center; }
-    .field-wrap > .icon { position: absolute; left: 13px; width: 16px; height: 16px; color: #5d5d67; pointer-events: none; transition: color 0.15s ease; }
+    .field-wrap > .icon { position: absolute; left: 13px; font-size: 17px; color: #5d5d67; pointer-events: none; transition: color 0.15s ease; }
     .field-wrap:focus-within > .icon { color: var(--cyan); }
     .field-input {
       width: 100%; background: var(--bg-raised); border: 1px solid var(--border-strong); border-radius: 10px;
@@ -147,7 +157,7 @@
       color: var(--text-muted); display: grid; place-items: center; cursor: pointer; transition: background 0.15s ease, color 0.15s ease;
     }
     .reveal-toggle:hover { background: #1c1c21; color: var(--text-main); }
-    .reveal-toggle svg { width: 16px; height: 16px; }
+    .reveal-toggle i { font-size: 17px; }
 
     /* Role picker (sign-up only) */
     .role-picker { border: 0; display: flex; flex-direction: column; gap: 8px; }
@@ -160,7 +170,7 @@
     }
     .role-option:hover { border-color: #3a3a42; background: #121215; }
     .role-option .chip-icon { width: 30px; height: 30px; border-radius: 8px; }
-    .role-option .chip-icon svg { width: 16px; height: 16px; }
+    .role-option .chip-icon i { font-size: 17px; }
     .role-option b { display: block; font-size: 13.5px; font-weight: 650; }
     .role-option small { display: block; font-size: 12px; color: var(--text-muted); line-height: 1.45; }
     .role-option.active { border-color: rgba(0, 217, 255, 0.5); background: rgba(0, 217, 255, 0.05); box-shadow: 0 0 0 3px rgba(0, 217, 255, 0.07); }
@@ -189,7 +199,7 @@
       display: flex; align-items: flex-start; gap: 10px; font-size: 13px; color: var(--text-soft); line-height: 1.5;
       background: rgba(0, 217, 255, 0.05); border: 1px solid rgba(0, 217, 255, 0.18); border-radius: 10px; padding: 10px 12px;
     }
-    .form-message .icon { width: 16px; height: 16px; color: var(--cyan); margin-top: 2px; }
+    .form-message .icon { font-size: 17px; color: var(--cyan); margin-top: 1px; }
     .form-message[data-state="error"] { color: #fecaca; background: rgba(239, 68, 68, 0.07); border-color: rgba(239, 68, 68, 0.3); }
     .form-message[data-state="error"] .icon { color: #f87171; }
     .form-message[data-state="success"] { color: #bbf7d0; background: rgba(34, 197, 94, 0.07); border-color: rgba(34, 197, 94, 0.3); }
@@ -198,11 +208,11 @@
     .btn-primary {
       display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 4px;
       background: var(--text-main); color: #09090b; border: 0; border-radius: 10px; padding: 13px 18px; font-size: 14.5px; font-weight: 600; cursor: pointer;
-      box-shadow: 0 0 0 1px rgba(255,255,255,0.1), 0 8px 24px rgba(0, 217, 255, 0.12);
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.1), 0 8px 24px rgba(0, 217, 255, 0.14);
       transition: background 0.15s ease, box-shadow 0.15s ease;
     }
-    .btn-primary .icon { width: 16px; height: 16px; transition: transform 0.15s ease; }
-    .btn-primary:hover { background: #fff; box-shadow: 0 0 0 1px rgba(255,255,255,0.2), 0 10px 30px rgba(0, 217, 255, 0.22); }
+    .btn-primary .icon { font-size: 16px; transition: transform 0.15s ease; }
+    .btn-primary:hover { background: #fff; box-shadow: 0 0 0 1px rgba(255,255,255,0.2), 0 10px 30px rgba(0, 217, 255, 0.24); }
     .btn-primary:hover .icon { transform: translateX(2px); }
     .btn-primary:disabled { opacity: 0.6; cursor: progress; }
     .btn-primary:disabled .icon { display: none; }
@@ -215,7 +225,7 @@
     .text-button { background: none; border: 0; padding: 0; color: var(--cyan); font-weight: 600; cursor: pointer; }
     .text-button:hover { text-decoration: underline; text-underline-offset: 3px; }
     .fine-print { display: flex; align-items: center; justify-content: center; gap: 7px; font-size: 12px; color: #6b6b75; text-align: center; }
-    .fine-print svg { width: 13px; height: 13px; color: var(--green); }
+    .fine-print i { font-size: 14px; color: var(--green); }
 
     /* ---------- Footer ---------- */
     footer { position: relative; z-index: 1; border-top: 1px solid var(--border); background: rgba(9, 9, 11, 0.7); }
@@ -255,18 +265,6 @@
 <body>
   <svg width="0" height="0" style="position: absolute" aria-hidden="true">
     <symbol id="i-brain" viewBox="632 191 736 736" fill="none" stroke="currentColor" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"><!-- Neuro-Focus logo (assets/images/neuro-focus-logo.svg) --><path d="M790 565 C700 572 655 525 655 465 C655 345 790 245 955 245 C1170 245 1345 390 1345 548 C1345 640 1278 700 1188 722"/><path d="M802 552 C780 455 865 380 990 380 C1140 380 1246 465 1246 572 C1246 630 1214 668 1186 710 C1166 740 1166 770 1168 795"/><path d="M790 565 C850 562 890 540 935 518 C985 495 1025 485 1070 485 C1132 485 1162 515 1162 555 C1162 612 1102 682 1012 682 C932 682 855 640 818 578"/><path d="M1022 688 C1062 712 1100 721 1140 721 C1160 721 1176 718 1188 714"/><circle cx="1175" cy="835" r="38"/></symbol>
-    <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></symbol>
-    <symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
-    <symbol id="i-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 18l-6-6 6-6"/></symbol>
-    <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
-    <symbol id="i-mail" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></symbol>
-    <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
-    <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></symbol>
-    <symbol id="i-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.6 5.1A10.6 10.6 0 0 1 12 5c6.5 0 10 7 10 7a17.6 17.6 0 0 1-2.6 3.6M6.6 6.6C3.9 8.4 2 12 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18"/></symbol>
-    <symbol id="i-book" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5Z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></symbol>
-    <symbol id="i-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></symbol>
-    <symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
-    <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></symbol>
   </svg>
 
   <div class="bg-glow" aria-hidden="true"></div>
@@ -278,13 +276,13 @@
         <span class="brand-mark"><svg><use href="#i-brain"/></svg></span>
         <span>Neuro-Focus</span>
       </a>
-      <a class="btn-link" href="../index.html"><svg class="icon"><use href="#i-back"/></svg><span class="back-label">Back to home</span></a>
+      <a class="btn-link" href="../index.html"><i class="ph-light ph-arrow-left icon" aria-hidden="true"></i><span class="back-label">Back to home</span></a>
     </div>
   </header>
 
   <main class="container auth-layout">
     <section class="auth-intro" aria-labelledby="introTitle">
-      <p class="eyebrow-pill"><span class="tag"><svg><use href="#i-shield"/></svg>PRIVATE</span> Video never leaves your device</p>
+      <p class="eyebrow-pill"><span class="tag"><i class="ph-light ph-shield-check" aria-hidden="true"></i>PRIVATE</span> Video never leaves your device</p>
       <h1 class="auth-title" id="introTitle">
         <span data-modes="login">Welcome back to <span class="gradient-text">focused learning.</span></span>
         <span data-modes="signup" hidden>Start learning with <span class="gradient-text">focus that adapts.</span></span>
@@ -295,24 +293,24 @@
       </p>
       <div class="role-list">
         <div class="role-row">
-          <span class="chip-icon green"><svg><use href="#i-book"/></svg></span>
+          <span class="chip-icon green"><i class="ph-light ph-student" aria-hidden="true"></i></span>
           <div><b>Students</b><small>Focus sessions, NeuroBuddy study help, class notes and your focus history.</small></div>
         </div>
         <div class="role-row">
-          <span class="chip-icon"><svg><use href="#i-chart"/></svg></span>
+          <span class="chip-icon"><i class="ph-light ph-chalkboard-teacher" aria-hidden="true"></i></span>
           <div><b>Teachers</b><small>Live class monitor, student roster, session history and join codes.</small></div>
         </div>
       </div>
       <ul class="auth-checks">
-        <li><svg><use href="#i-check"/></svg>Runs in the browser</li>
-        <li><svg><use href="#i-check"/></svg>Scores shared only in live sessions</li>
-        <li><svg><use href="#i-check"/></svg>Built for ADHD learners</li>
+        <li><i class="ph-light ph-check" aria-hidden="true"></i>Runs in the browser</li>
+        <li><i class="ph-light ph-check" aria-hidden="true"></i>Scores shared only in live sessions</li>
+        <li><i class="ph-light ph-check" aria-hidden="true"></i>Built for ADHD learners</li>
       </ul>
     </section>
 
     <section class="auth-card" aria-labelledby="auth-title">
       <div class="card-head">
-        <span class="chip-icon"><svg><use href="#i-lock"/></svg></span>
+        <span class="chip-icon"><i class="ph-light ph-lock-simple" aria-hidden="true"></i></span>
         <div>
           <h2 id="auth-title">Sign in</h2>
           <p id="authSubtitle">Use the email and password for your account.</p>
@@ -337,11 +335,11 @@
           <legend>I'm joining as</legend>
           <div class="role-options">
             <button class="role-option active" type="button" data-role="student">
-              <span class="chip-icon green"><svg><use href="#i-book"/></svg></span>
+              <span class="chip-icon green"><i class="ph-light ph-student" aria-hidden="true"></i></span>
               <span><b>Student</b><small>Join classes with a code</small></span>
             </button>
             <button class="role-option" type="button" data-role="teacher">
-              <span class="chip-icon"><svg><use href="#i-chart"/></svg></span>
+              <span class="chip-icon"><i class="ph-light ph-chalkboard-teacher" aria-hidden="true"></i></span>
               <span><b>Teacher</b><small>Needs approval first</small></span>
             </button>
           </div>
@@ -350,14 +348,14 @@
         <div class="field-label" data-modes="signup" hidden>
           <label for="fullNameField">Full name</label>
           <span class="field-wrap">
-            <svg class="icon"><use href="#i-user"/></svg>
+            <i class="ph-light ph-user icon" aria-hidden="true"></i>
             <input id="fullNameField" class="field-input" name="fullName" type="text" autocomplete="name" placeholder="Your full name" required disabled>
           </span>
         </div>
         <div class="field-label" data-modes="login signup forgot">
           <label for="emailField">Email address</label>
           <span class="field-wrap">
-            <svg class="icon"><use href="#i-mail"/></svg>
+            <i class="ph-light ph-envelope-simple icon" aria-hidden="true"></i>
             <input id="emailField" class="field-input" name="email" type="email" autocomplete="email" placeholder="name@school.edu" required>
           </span>
         </div>
@@ -367,23 +365,23 @@
             <button class="text-button small" type="button" data-mode-link="forgot" data-modes="login">Forgot password?</button>
           </span>
           <span class="field-wrap">
-            <svg class="icon"><use href="#i-lock"/></svg>
+            <i class="ph-light ph-lock-simple icon" aria-hidden="true"></i>
             <input id="passwordField" class="field-input has-toggle" name="password" type="password" autocomplete="current-password" minlength="8" placeholder="Your password" required>
-            <button class="reveal-toggle" id="passwordToggle" type="button" aria-label="Show password" aria-pressed="false"><svg><use href="#i-eye"/></svg></button>
+            <button class="reveal-toggle" id="passwordToggle" type="button" aria-label="Show password" aria-pressed="false"><i class="ph-light ph-eye" aria-hidden="true"></i></button>
           </span>
           <span class="hint" data-modes="signup reset" hidden>At least 8 characters.</span>
         </div>
         <div class="field-label" data-modes="signup reset" hidden>
           <label for="confirmField">Confirm password</label>
           <span class="field-wrap">
-            <svg class="icon"><use href="#i-lock"/></svg>
+            <i class="ph-light ph-lock-simple icon" aria-hidden="true"></i>
             <input id="confirmField" class="field-input" name="confirmPassword" type="password" autocomplete="new-password" minlength="8" placeholder="Type it again" required disabled>
           </span>
           <span class="hint match-hint" id="matchHint" aria-live="polite"></span>
         </div>
 
         <div class="form-message" id="authMessageBox" hidden>
-          <svg class="icon"><use href="#i-info"/></svg>
+          <i class="ph-light ph-info icon" aria-hidden="true"></i>
           <div>
             <span id="authMessage" role="status" aria-live="polite"></span>
             <button class="text-button message-action" type="button" id="authMessageAction" hidden></button>
@@ -393,7 +391,7 @@
         <button class="btn-primary" type="submit">
           <span class="spinner" aria-hidden="true"></span>
           <span id="submitLabel">Sign in</span>
-          <svg class="icon"><use href="#i-arrow"/></svg>
+          <i class="ph-light ph-arrow-right icon" aria-hidden="true"></i>
         </button>
       </form>
 
@@ -402,7 +400,7 @@
         <p class="switch-line" data-modes="signup" hidden>Already have an account? <button class="text-button" type="button" data-mode-link="login">Sign in</button></p>
         <p class="switch-line" data-modes="forgot" hidden>Remembered it? <button class="text-button" type="button" data-mode-link="login">Back to sign in</button></p>
         <p class="switch-line" data-modes="reset" hidden>Changed your mind? <button class="text-button" type="button" id="cancelReset">Cancel and sign out</button></p>
-        <p class="fine-print"><svg><use href="#i-shield"/></svg>Secured with Supabase Auth</p>
+        <p class="fine-print"><i class="ph-light ph-shield-check" aria-hidden="true"></i>Secured with Supabase Auth</p>
       </div>
     </section>
   </main>
@@ -418,7 +416,7 @@
     </div>
   </footer>
 
-  <script src="../scripts/shared/neural-background.js?v=2"></script>
-  <script type="module" src="../scripts/auth/auth.js?v=6"></script>
+  <script src="../scripts/shared/neural-background.js?v=18"></script>
+  <script type="module" src="../scripts/auth/auth.js?v=7"></script>
 </body>
 </html>

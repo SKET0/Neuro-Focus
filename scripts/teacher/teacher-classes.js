@@ -7,6 +7,7 @@ import {
   openClassChannel, onlineStudentIds, confirmAction, notify, copyText, missingDatabaseUpdates, showSetupBanner, isMissingSql
 } from "../shared/class-live.js?v=9";
 import { paintAvatar, avatarUrls } from "../shared/avatars.js?v=1";
+import { classHue } from "../shared/class-colors.js?v=1";
 
 const app = await window.neuroFocusReady;
 
@@ -22,20 +23,19 @@ if (app) {
   const SETUP_TEXT = "Run the class management database update first (see README).";
 
   let classes = [];
+  let classesLoaded = false;
   let roster = [];                 // members of the open class: { id, name, joinedAt }
   let rosterLoadedFor = "";
   let selectedId = "";
   let view = "classes";             // "classes" (Home), "list" (the Classes page), "class" (one class), "profile" (Profile settings),
                                    // "all-students" or "report" (attendance across classes, teacher-overview.js)
-  // The Demo (teacher-demo.js) is a separate page with sample data only.
   const OVERVIEWS = {
     list: { address: "#classes", label: "Classes" },
     "all-students": { address: "#students", label: "All students", underClasses: true },
-    report: { address: "#attendance-report", label: "Attendance report", underClasses: true },
-    demo: { address: "#demo", label: "Demo — sample data" }
+    report: { address: "#attendance-report", label: "Attendance report", underClasses: true }
   };
-  // The sidebar has three places: Home, Classes (every class page sits under it) and Demo.
-  const NAV_FOR_VIEW = { list: "classes", "all-students": "classes", report: "classes", demo: "demo" };
+  // Sidebar entry for each page; a class page marks its own class in the sidebar's class list.
+  const NAV_FOR_VIEW = { list: "classes", "all-students": "all-students", report: "attendance-report" };
   let tab = "posts";
   // A class opens on Live focus while its session is live, otherwise on Posts.
   const defaultTab = (classId) => (live?.classId === classId ? "live" : "posts");
@@ -99,6 +99,7 @@ if (app) {
       live = null;
       saveLive();
     }
+    classesLoaded = true;
     watchChannels();
     renderClassGrid();
     if (view === "class") {
@@ -384,14 +385,11 @@ if (app) {
   function renderSummary() {
     const set = (selector, value) => { const el = $(selector); if (el) el.textContent = value; };
     const totalOnline = classes.reduce((sum, item) => sum + (online.get(item.id)?.size || 0), 0);
-    const liveClass = live ? classes.find((item) => item.id === live.classId) : null;
     set("#sumClasses", String(classes.length));
     set("#sumClassesLine", classes.length ? `${classes.length} ${classes.length === 1 ? "class" : "classes"} · ${plural(classes.reduce((sum, item) => sum + item.memberCount, 0), "student")}` : "No classes yet");
     set("#sumStudents", String(classes.reduce((sum, item) => sum + item.memberCount, 0)));
     set("#sumOnline", String(totalOnline));
-    set("#sumLive", liveClass ? "Live" : "Off");
-    set("#sumLiveSub", liveClass ? `${liveClass.name} since ${clock(live.since)}` : "Open a class to start one");
-    $("#sumLiveCard")?.setAttribute("data-live", String(Boolean(liveClass)));
+    renderSidebarClasses();
     publishStatus();
   }
 
@@ -421,11 +419,63 @@ if (app) {
     }
   }
 
-  // Sidebar: Home, Classes and Demo are fixed; a running session gets a "Live now" shortcut.
+  // Sidebar: the fixed pages (with counts), a "Live now" shortcut while a session runs, and every
+  // class with who's online and a live dot. The open class is marked.
+  let sidebarKey = "";
   function renderSidebarClasses() {
     const liveClass = live ? classes.find((item) => item.id === live.classId) : null;
     $("#navLiveNow").hidden = !liveClass;
     $("#navLiveClass").textContent = liveClass?.name || "";
+    const students = classes.reduce((sum, item) => sum + item.memberCount, 0);
+    $("#navClassCount").textContent = classes.length ? String(classes.length) : "";
+    $("#navStudentCount").textContent = students ? String(students) : "";
+    const openId = view === "class" ? selectedId : "";
+    const key = JSON.stringify([classesLoaded, openId, live?.classId, classes.map((item) => [item.id, item.name, item.memberCount, online.get(item.id)?.size || 0])]);
+    if (key === sidebarKey) return;
+    sidebarKey = key;
+    const box = $("#sidebarClasses");
+    const focusedId = box.contains(document.activeElement) ? document.activeElement.dataset.classId : null;
+    if (!classesLoaded || !classes.length) {
+      const empty = document.createElement("p");
+      empty.className = "sidebar-empty";
+      empty.textContent = classesLoaded ? "No classes yet. Press + to create one." : "Loading…";
+      box.replaceChildren(empty);
+      return;
+    }
+    box.replaceChildren(...classes.map((item) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "nav-item sidebar-class";
+      button.dataset.classId = item.id;
+      button.dataset.open = String(item.id === openId);
+      if (item.id === openId) button.setAttribute("aria-current", "page");
+      const count = online.get(item.id)?.size || 0;
+      button.title = `${item.name} · ${plural(item.memberCount, "student")}${count ? `, ${count} online` : ""}`;
+      const initial = document.createElement("span");
+      initial.className = "cs-badge";
+      initial.style.setProperty("--hue", String(classHue(item.id)));
+      initial.setAttribute("aria-hidden", "true");
+      initial.textContent = initialOf(item.name);
+      const name = document.createElement("span");
+      name.className = "name";
+      name.textContent = item.name;
+      button.append(initial, name);
+      if (live?.classId === item.id) {
+        const dot = document.createElement("span");
+        dot.className = "nav-live";
+        dot.innerHTML = '<span class="live-dot"></span><span class="sr-only">, live now</span>';
+        button.append(dot);
+      } else if (count) {
+        const badge = document.createElement("span");
+        badge.className = "nav-online";
+        badge.textContent = String(count);
+        badge.setAttribute("aria-label", `${count} online`);
+        button.append(badge);
+      }
+      button.addEventListener("click", () => openClass(item.id, defaultTab(item.id)));
+      return button;
+    }));
+    if (focusedId) box.querySelector(`[data-class-id="${CSS.escape(focusedId)}"]`)?.focus();
   }
 
   function renderClassGrid() {
@@ -706,17 +756,15 @@ if (app) {
     $("#profileView").hidden = !inProfile;
     $("#allStudentsView").hidden = overview !== "all-students";
     $("#reportView").hidden = overview !== "report";
-    $("#demoView").hidden = overview !== "demo";
-    // The CSV is the open class's live student table: shown on class pages only (never in the Demo).
+    // The CSV is the open class's live student table: shown on class pages only.
     document.querySelectorAll("[data-export-report]").forEach((button) => { button.hidden = !inClass; });
     renderSidebarClasses();
     syncAddress();
     document.querySelectorAll("[data-nav]").forEach((button) => {
       const target = button.dataset.nav;
-      const page = inProfile ? "profile" : inClass ? "classes" : overview ? NAV_FOR_VIEW[overview] : "home";
+      const page = inProfile ? "profile" : inClass ? "" : overview ? NAV_FOR_VIEW[overview] : "home";
       if (button.classList.contains("nav-item") || button.classList.contains("user-card")) {
-        // The page's own entry is current; pages inside Classes keep Classes highlighted.
-        if (target === page) button.setAttribute("aria-current", overview === "list" || page !== "classes" ? "page" : "true");
+        if (target === page) button.setAttribute("aria-current", "page");
         else button.removeAttribute("aria-current");
       }
     });
@@ -828,7 +876,6 @@ if (app) {
     if (hash === "profile" || hash === "profile-appearance") showProfile(hash === "profile" ? "" : hash);
     else if (hash === "all-students") showOverview("all-students");
     else if (hash === "attendance-report") showOverview("report");
-    else if (hash === "demo") showOverview("demo");
     else if (hash === "classes") showOverview("list");
     else showClasses();
   };
@@ -1098,7 +1145,6 @@ if (app) {
       else if (target === "profile" || target === "profile-appearance") window.neuroFocusNavigate(target);
       else if (target === "all-students") showOverview("all-students");
       else if (target === "attendance-report") showOverview("report");
-      else if (target === "demo") showOverview("demo");
       else if (selected()) openClass(selectedId, target);
     });
   });
@@ -1252,7 +1298,7 @@ if (app) {
     void keepSessionAlive();
     // Reopen the page in the address (after a refresh or from a link); otherwise land on the live
     // monitor if a session is running, or on Home.
-    const linked = /^#(class|classes|profile|students|attendance-report|demo)/.test(window.location.hash) && routeTo(window.location.hash);
+    const linked = /^#(class|classes|profile|students|attendance-report)/.test(window.location.hash) && routeTo(window.location.hash);
     if (linked) { /* done */ }
     else if (live && classes.some((item) => item.id === live.classId)) openClass(live.classId, "live");
     else showClasses();

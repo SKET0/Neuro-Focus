@@ -213,29 +213,55 @@ const session = (daysAgo, usableMin, focus, extra = {}) => ({
   ok("older sessions (no quality info) are recognised", !hasQualityInfo(older) && hasQualityInfo(newer));
   ok("averages are weighted by measured time", averageFocus([newer, session(1, 30, 60)]) === 65);
 }
-section("Focus Coach is careful with little data");
+section("Focus Coach: practical tips from any amount of history");
 const BANNED = /stayed on task|proof|lock in|improves focus|helps you focus|you focus best|great work/i;
 const textOf = (c) => [c.basis, ...c.wins, ...c.tips].map((x) => (typeof x === "string" ? x : `${x.title} ${x.text}`)).join(" ");
+const titles = (c) => c.tips.map((t) => t.title).join(" | ");
+const settled = { nudgesOn: true, stepsPlanned: true, timerPreset: "25-5" };
 {
+  const none = buildCoaching([], { nudgesOn: false }, now);
+  ok("no sessions → general tips, labelled as general", none.stage === "starter" && /general/i.test(none.basis) && none.tips.every((t) => t.basis === "General tip"));
+  ok("general nudge tip doesn't claim it works", /hasn’t measured/.test(textOf(none)) && !BANNED.test(textOf(none)));
+
   const one = buildCoaching([session(0, 25, 90)], {}, now);
-  ok("one session → general tips, not personal", one.stage === "starter");
-  ok("general tips are labelled as general", /general/i.test(one.basis));
-  const short = buildCoaching([session(0, 1, 90), session(1, 1, 90), session(2, 1, 90)], {}, now);
-  ok("three sessions with three minutes in total → still general", short.stage === "starter" && evidenceFor([session(0, 1, 90), session(1, 1, 90), session(2, 1, 90)]).minutes < COACH_MINIMUM.minutes);
-  const sameDay = Array.from({ length: 6 }, () => session(0, 20, 80));
-  ok("many sessions on one day → still general (needs 3 days)", buildCoaching(sameDay, {}, now).stage === "starter");
-  const oldOnly = Array.from({ length: 8 }, (_, i) => ({ started_at: new Date(now - i * DAY).toISOString(), tracked_seconds: 1800, focus_percent: 70, lapses: 1 }));
-  ok("older sessions without tracking-quality info don't unlock personal suggestions", buildCoaching(oldOnly, {}, now).stage === "starter");
-  ok("no unevaluated effectiveness claims in general tips", !BANNED.test(textOf(one)) && /hasn’t measured/.test(textOf(buildCoaching([], { nudgesOn: false }, now))));
+  ok("one session is enough for personal tips (no 5-session minimum)", one.stage === "personal", one.basis);
+  ok("the basis says how many sessions it uses", /Based on 1 session/.test(one.basis));
+  ok("every tip says what it's based on", one.tips.length > 0 && one.tips.every((t) => typeof t.basis === "string" && t.basis.length > 0), JSON.stringify(one.tips.map((t) => t.basis)));
+
+  const missed = buildCoaching([session(0, 10, 80, { tracked_seconds: 1500 })], settled, now);
+  ok("camera couldn't see much of the last session → that tip comes first", /camera missed/i.test(missed.tips[0]?.title || ""), titles(missed));
+  ok("…and it's based on the last session", missed.tips[0]?.basis === "From your last session");
+
+  const gap = buildCoaching([session(6, 20, 80)], settled, now);
+  ok("a long gap → a gentle restart tip with a start button", /6 days/.test(gap.tips[0]?.title || "") && gap.tips[0].action?.kind === "start", titles(gap));
+
+  const short = buildCoaching([session(0, 4, 80, { tracked_seconds: 300 })], settled, now);
+  ok("a very short last session → suggest a full 15-minute block", /last session was 5 min/.test(titles(short)), titles(short));
+
+  const drifting = buildCoaching([session(0, 20, 60, { lapses: 8 })], { stepsPlanned: true, timerPreset: "25-5" }, now);
+  const look = drifting.tips.find((t) => /looked away/i.test(t.title));
+  ok("frequent look-aways with nudges off → offers nudges", look?.action?.kind === "nudges", titles(drifting));
+  ok("look-away tip notes it isn't always a problem", /isn’t always a problem/.test(look?.text || ""));
+
+  const at = (daysAgo, hour, usableMin, focus) => ({ ...session(daysAgo, usableMin, focus), started_at: new Date(Date.UTC(2026, 9, 6 - daysAgo, hour)).toISOString() });
+  const times = buildCoaching([at(0, 9, 15, 85), at(1, 15, 15, 60)], settled, now);
+  const timeTip = times.tips.find((t) => /highest/.test(t.title));
+  ok("time of day from just 2 sessions → shown, but as an early sign", Boolean(timeTip) && /early sign/i.test(timeTip.text), titles(times));
+
+  const lengths = buildCoaching([session(0, 50, 55, { tracked_seconds: 3000 }), session(1, 20, 80), session(2, 20, 78)], { nudgesOn: true, stepsPlanned: true, timerPreset: "45-10" }, now);
+  ok("long sessions with lower estimates → suggest 25-minute blocks", lengths.tips.some((t) => /Long sessions/.test(t.title) && t.action?.value === "25-5"), titles(lengths));
+
+  const all = [one, missed, gap, short, drifting, times, lengths];
+  ok("no overclaiming wording in any tip", all.every((c) => !BANNED.test(textOf(c))), all.map(textOf).join(" ").match(BANNED)?.[0] || "");
+  ok("always at least one practical tip", all.every((c) => c.tips.length >= 1));
 }
 {
   const enough = [session(0, 15, 82), session(1, 15, 78, { hourOffset: 2 }), session(2, 15, 80), session(3, 15, 76), session(4, 15, 81)];
-  const coach = buildCoaching(enough, { nudgesOn: true, stepsPlanned: true, timerPreset: "25-5" }, now);
-  ok("5 sessions on 5 days with 75 measured minutes → personal suggestions", coach.stage === "personal", coach.basis);
-  ok("personal suggestions say they are estimates, not conclusions", /estimates, not conclusions/.test(coach.basis));
-  ok("no overclaiming wording", !BANNED.test(textOf(coach)), textOf(coach).match(BANNED)?.[0] || "");
+  const coach = buildCoaching(enough, settled, now);
+  ok("with more sessions, wins appear (e.g. studying on several days)", coach.wins.some((w) => /of the last 7 days/.test(w.title)), JSON.stringify(coach.wins.map((w) => w.title)));
+  ok("personal tips say they are estimates, not conclusions", /not conclusions/.test(coach.basis));
   const { evidence, insights } = buildInsights(enough);
-  ok("My progress insights use the same minimum", evidence.enough && Array.isArray(insights));
+  ok("My progress insights still use their minimum", evidence.enough && Array.isArray(insights));
 }
 {
   // Time-of-day comparisons need 3 sessions and 20 measured minutes on each side.

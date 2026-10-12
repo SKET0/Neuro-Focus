@@ -37,10 +37,11 @@
   </script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <link rel="stylesheet" href="../styles/theme.css?v=1">
-  <link rel="stylesheet" href="../styles/teacher.css?v=7">
-  <link rel="stylesheet" href="../styles/dashboard-layout.css?v=8">
-  <link rel="stylesheet" href="../styles/home.css?v=4">
+  <link rel="stylesheet" href="../styles/teacher.css?v=10">
+  <link rel="stylesheet" href="../styles/dashboard-layout.css?v=9">
+  <link rel="stylesheet" href="../styles/home.css?v=6">
   <link rel="stylesheet" href="../styles/account.css?v=4">
+  <link rel="stylesheet" href="../styles/tour.css?v=3">
   <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="../assets/images/favicon-64.png" type="image/png" sizes="64x64">
   <link rel="apple-touch-icon" href="../assets/images/apple-touch-icon.png">
@@ -99,13 +100,36 @@
       </a>
 
       <nav class="nav-group" aria-label="Teaching">
-        <button class="nav-item" type="button" data-nav="home"><svg class="icon"><use href="#i-home"/></svg>Home</button>
+        <button class="nav-item" type="button" data-nav="home"><svg class="icon"><use href="#i-home"/></svg>Home<span class="nav-count nav-alert" id="navToDo" title="Submissions to mark"></span></button>
         <!-- Shown while a live session is running (teacher-classes.js) -->
         <button class="nav-item nav-live-now" type="button" id="navLiveNow" hidden><svg class="icon"><use href="#i-live"/></svg><span class="name">Live now · <span id="navLiveClass"></span></span><span class="nav-live"><span class="live-dot"></span></span></button>
-        <button class="nav-item" type="button" data-nav="classes"><svg class="icon"><use href="#i-school"/></svg>Classes</button>
-        <!-- The demo: sample data only (teacher-demo.js). Kept apart from real classes. -->
-        <button class="nav-item nav-demo" type="button" data-nav="demo"><svg class="icon"><use href="#i-grid4"/></svg>Demo<span class="nav-demo-tag">Sample data</span></button>
+        <button class="nav-item" type="button" data-nav="classes"><svg class="icon"><use href="#i-school"/></svg>Classes<span class="nav-count" id="navClassCount"></span></button>
+        <button class="nav-item" type="button" data-nav="all-students"><svg class="icon"><use href="#i-users"/></svg>All students<span class="nav-count" id="navStudentCount"></span></button>
+        <button class="nav-item" type="button" data-nav="attendance-report"><svg class="icon"><use href="#i-attendance"/></svg>Attendance report</button>
       </nav>
+
+      <!-- Every class, with who's online and a live dot (teacher-classes.js) -->
+      <nav class="nav-group" aria-labelledby="navClassesLabel">
+        <div class="nav-label" id="navClassesLabel">Your classes<button class="nav-add" type="button" data-nav="new-class" aria-label="New class" title="New class">+</button></div>
+        <div class="sidebar-classes" id="sidebarClasses"><p class="sidebar-empty">Loading…</p></div>
+      </nav>
+    </div>
+
+    <div class="sidebar-foot">
+      <!-- The guided tour (scripts/shared/tour.js) -->
+      <div class="tour-card" id="tourCard">
+        <span class="chip-icon"><svg><use href="#i-spark"/></svg></span>
+        <div>
+          <b id="tourCardTitle">New here?</b>
+          <small id="tourCardText">Take a one-minute tour of your dashboard.</small>
+        </div>
+        <button class="btn-action" type="button" data-start-tour>Take the tour</button>
+      </div>
+      <button class="user-card" type="button" data-nav="profile" title="Profile settings">
+        <span class="nf-avatar" data-profile-avatar></span>
+        <div><b data-profile-name>Teacher</b><small>Profile settings</small></div>
+        <svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg>
+      </button>
     </div>
 
   </aside>
@@ -141,137 +165,105 @@
     </header>
 
     <div class="portal-main">
-      <!-- ================= Home (teacher-home.js) ================= -->
-      <section id="classesView" class="stack view" data-live-background aria-labelledby="classesTitle">
-        <section class="home-hero" aria-labelledby="classesTitle">
-          <div class="home-hero-art" aria-hidden="true">
-            <svg viewBox="0 0 560 320" fill="none">
-              <g stroke="currentColor" stroke-opacity="0.22" stroke-width="1.2">
-                <path d="M30 250 150 170 262 214 360 104 470 146 548 70"/>
-                <path d="M150 170 214 74 360 104 420 30"/>
-                <path d="M262 214 334 292 470 146 528 250"/>
-                <path d="M214 74 306 22"/>
-                <path d="M90 300 150 170"/>
-              </g>
-              <g fill="currentColor">
-                <circle cx="150" cy="170" r="4" fill-opacity="0.55"/>
-                <circle cx="262" cy="214" r="3" fill-opacity="0.45"/>
-                <circle cx="360" cy="104" r="5" fill-opacity="0.6"/>
-                <circle cx="470" cy="146" r="4" fill-opacity="0.5"/>
-                <circle cx="214" cy="74" r="3" fill-opacity="0.4"/>
-                <circle cx="334" cy="292" r="3" fill-opacity="0.35"/>
-                <circle cx="548" cy="70" r="3" fill-opacity="0.4"/>
-                <circle cx="420" cy="30" r="2.5" fill-opacity="0.35"/>
-              </g>
-            </svg>
+      <!-- ================= Home (teacher-home.js) =================
+           Kept short on purpose: a live-session banner (only while live), the welcome with quick
+           actions, a class switcher beside one "Needs your attention" list, and insights plus
+           recent activity folded away under "More". -->
+      <section id="classesView" class="stack view teacher-home" data-live-background aria-labelledby="classesTitle">
+        <section class="live-banner home-card" id="tLiveBanner" hidden aria-live="polite" aria-labelledby="tLiveTitle">
+          <span class="live-banner-icon" aria-hidden="true"><svg><use href="#i-live"/></svg></span>
+          <div class="live-banner-text">
+            <p class="live-banner-kicker"><span class="live-dot"></span>Live now</p>
+            <h2 id="tLiveTitle">Live session running</h2>
+            <p id="tLiveSub"></p>
           </div>
+          <button class="btn-primary" type="button" id="tLiveOpen"><svg class="icon"><use href="#i-live"/></svg>Open live monitor</button>
+        </section>
+
+        <section class="home-hero teacher-hero" aria-labelledby="classesTitle">
           <div class="home-hero-inner">
             <div class="home-hero-hello">
               <button class="hero-avatar" type="button" data-nav="profile" title="Open Profile settings">
-                <span class="nf-avatar xl" data-profile-avatar></span>
-                <span class="hero-avatar-edit" aria-hidden="true"><svg class="icon"><use href="#i-pencil"/></svg></span>
+                <span class="nf-avatar lg" data-profile-avatar></span>
                 <span class="sr-only">Open Profile settings</span>
               </button>
               <div class="hero-copy">
-                <p class="eyebrow-pill"><span class="tag">Today</span><span id="todayLabel">Today</span></p>
+                <p class="hero-date" id="todayLabel">Today</p>
                 <h1 class="welcome-title" id="classesTitle">Welcome back</h1>
                 <p class="hero-lead" id="teacherLead">Here’s how your classes are doing.</p>
               </div>
             </div>
 
-            <!-- The one main action: return to a live session, create a class, share a code, or go live -->
-            <section class="next-card" id="teacherNext" data-kind="loading" aria-labelledby="tNextTitle" aria-live="polite" aria-busy="true">
-              <span class="next-icon" id="tNextIcon" aria-hidden="true"><svg><use href="#i-spark"/></svg></span>
-              <div class="next-kicker" id="tNextKicker">Up next</div>
-              <h2 class="next-title" id="tNextTitle">Getting your classes ready…</h2>
-              <p class="next-sub" id="tNextSub"></p>
-              <div class="next-buttons" id="tNextButtons"><span class="next-skeleton"></span><span class="next-skeleton short"></span></div>
-            </section>
+            <!-- Quick actions: pick a class (if you have more than one) and land on the right form -->
+            <div class="quick-actions" role="group" aria-label="Quick actions">
+              <button class="quick-action" type="button" data-quick="live" id="quickLive"><span class="chip-icon red"><svg><use href="#i-live"/></svg></span><b id="quickLiveLabel">Go live</b></button>
+              <button class="quick-action" type="button" data-quick="post"><span class="chip-icon"><svg><use href="#i-megaphone"/></svg></span><b>New post</b></button>
+              <button class="quick-action" type="button" data-quick="assignment"><span class="chip-icon green"><svg><use href="#i-assignment"/></svg></span><b>New assignment</b></button>
+              <button class="quick-action" type="button" data-quick="quiz"><span class="chip-icon amber"><svg><use href="#i-quiz"/></svg></span><b>New quiz</b></button>
+            </div>
           </div>
         </section>
 
-        <!-- At a glance (teacher-home.js; students, online and live numbers from teacher-classes.js) -->
-        <section class="glance" aria-label="Your classes at a glance">
-          <a class="glance-tile score-tile home-card" style="--d: 1" href="#teacherInsights" aria-describedby="tScoreNote">
-            <span class="score-ring" aria-hidden="true">
-              <svg viewBox="0 0 120 120">
-                <defs>
-                  <linearGradient id="scoreGradient" x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0%" style="stop-color: var(--accent)"/>
-                    <stop offset="100%" style="stop-color: var(--green)"/>
-                  </linearGradient>
-                </defs>
-                <circle class="score-track" cx="60" cy="60" r="50"/>
-                <circle class="score-fill" id="tScoreRing" cx="60" cy="60" r="50"/>
-              </svg>
-              <span class="score-center"><strong id="tScoreValue">—</strong><small>focus</small></span>
-            </span>
-            <span class="glance-text">
-              <span class="glance-label">Class focus</span>
-              <b class="glance-value-sm" id="tScoreLevel">Loading…</b>
-              <small class="glance-note" id="tScoreNote">&nbsp;</small>
-            </span>
-          </a>
-          <a class="glance-tile home-card" style="--d: 2" href="#recentSessions">
-            <span class="glance-label"><svg class="icon" aria-hidden="true"><use href="#i-attendance"/></svg>Attendance</span>
-            <b class="glance-value" id="tAttendance">—</b>
-            <span class="glance-bars" id="tAttendanceBars" aria-hidden="true"></span>
-            <small class="glance-note" id="tAttendanceNote">&nbsp;</small>
-          </a>
-          <a class="glance-tile home-card" style="--d: 3" href="#classes">
-            <span class="glance-label"><svg class="icon" aria-hidden="true"><use href="#i-users"/></svg>Students</span>
-            <b class="glance-value" id="sumStudents">—</b>
-            <span class="online-meter" aria-hidden="true"><span id="tOnlineBar"></span></span>
-            <small class="glance-note"><span id="sumOnline">0</span> online now · <span id="sumClasses">—</span> classes</small>
-          </a>
-          <a class="glance-tile live-tile home-card" style="--d: 4" href="#teacherNext" id="sumLiveCard">
-            <span class="glance-label"><svg class="icon" aria-hidden="true"><use href="#i-live"/></svg>Live session</span>
-            <b class="glance-value" id="sumLive">Off</b>
-            <small class="glance-note" id="tLiveSharing">&nbsp;</small>
-            <small class="glance-note" id="sumLiveSub">Open a class to start one</small>
-          </a>
-        </section>
-
-        <div class="home-pair">
-          <section style="--d: 6" class="panel-card home-card" id="checkInPanel" aria-labelledby="checkInTitle">
+        <div class="home-main">
+          <!-- Class switcher: pick a class to see how it's doing and act on it (teacher-home.js) -->
+          <section style="--d: 2" class="panel-card home-card class-switcher" id="tClassesPanel" aria-labelledby="tClassesTitle">
             <div class="panel-head">
               <div>
-                <h2 class="panel-title" id="checkInTitle"><span class="chip-icon amber"><svg><use href="#i-flag"/></svg></span>Students to check in with</h2>
-                <p class="panel-sub">From attendance and live-session focus in the last 30 days.</p>
+                <h2 class="panel-title" id="tClassesTitle"><span class="chip-icon"><svg><use href="#i-school"/></svg></span>Your classes</h2>
+                <p class="panel-sub">Pick a class to see how it’s doing.</p>
               </div>
+              <button class="text-link" type="button" data-nav="classes">All classes<svg class="icon"><use href="#i-chevron"/></svg></button>
             </div>
-            <ul class="coach-list" id="checkInList"><li class="empty-state">Loading…</li></ul>
+            <div class="cs-strip">
+              <div class="cs-tabs" role="tablist" aria-label="Your classes" id="tClassTabs"></div>
+              <button class="cs-add" type="button" data-nav="new-class" title="New class" aria-label="New class"><svg class="icon"><use href="#i-plus"/></svg></button>
+            </div>
+            <div class="cs-detail" id="tClassDetail" role="tabpanel"><p class="empty-state">Loading classes…</p></div>
           </section>
 
-          <section style="--d: 7" class="panel-card home-card" id="recentSessions" aria-labelledby="recentSessionsTitle">
+          <!-- One list: marking, reminders, invites and students to check in with, most urgent first -->
+          <section style="--d: 3" class="panel-card home-card" id="tTodoPanel" aria-labelledby="tTodoTitle">
             <div class="panel-head">
               <div>
-                <h2 class="panel-title" id="recentSessionsTitle"><span class="chip-icon green"><svg><use href="#i-history"/></svg></span>Recent sessions</h2>
-                <p class="panel-sub">Your latest live sessions. Open one to see its attendance.</p>
+                <h2 class="panel-title" id="tTodoTitle"><span class="chip-icon amber"><svg><use href="#i-bell"/></svg></span>Needs your attention <span class="count-badge" id="tTodoCount" hidden></span></h2>
+                <p class="panel-sub">Most urgent first. Each one takes you straight there.</p>
               </div>
             </div>
-            <ul class="continue-list" id="recentSessionList"><li class="empty-state">Loading…</li></ul>
+            <ul class="todo-list" id="tTodo"><li class="empty-state">Loading…</li></ul>
           </section>
         </div>
 
-          <section style="--d: 8" class="panel-card home-card coach-card" id="teacherInsights" aria-labelledby="teacherInsightsTitle">
-            <div class="panel-head">
-              <div>
-                <h2 class="panel-title" id="teacherInsightsTitle"><span class="chip-icon green"><svg><use href="#i-spark"/></svg></span>Class insights</h2>
-                <p class="panel-sub" id="tInsightsBasis">Looking at your sessions…</p>
-              </div>
-            </div>
-            <div class="coach-grid">
-              <div class="coach-col" aria-labelledby="tWinsTitle">
-                <h3 class="coach-heading" id="tWinsTitle"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Going well</h3>
-                <ul class="coach-list" id="tWins"><li class="empty-state">Loading…</li></ul>
-              </div>
-              <div class="coach-col" aria-labelledby="tTipsTitle">
-                <h3 class="coach-heading tips" id="tTipsTitle"><svg class="icon" aria-hidden="true"><use href="#i-rocket"/></svg>Try next</h3>
-                <ul class="coach-list" id="tTips"><li class="empty-state">Loading…</li></ul>
-              </div>
-            </div>
-          </section>
+        <!-- Folded away by default: insights and recent activity -->
+        <details style="--d: 4" class="home-more home-card" id="tMore">
+          <summary>
+            <span class="chip-icon green"><svg><use href="#i-spark"/></svg></span>
+            <span class="home-more-text"><b>Insights and recent activity</b><small id="tMoreSub">What’s going well, what’s worth a look, and the latest submissions and sessions.</small></span>
+            <svg class="icon home-more-chevron" aria-hidden="true"><use href="#i-chevron-down"/></svg>
+          </summary>
+          <div class="home-more-body">
+            <section aria-labelledby="teacherInsightsTitle" id="teacherInsights">
+              <h3 class="more-heading" id="teacherInsightsTitle">Class insights</h3>
+              <p class="panel-sub" id="tInsightsBasis">Looking at your sessions…</p>
+              <ul class="coach-list" id="tWins"></ul>
+              <ul class="coach-list" id="tTips"></ul>
+            </section>
+            <section aria-labelledby="tActivityTitle">
+              <h3 class="more-heading" id="tActivityTitle">Recent activity</h3>
+              <p class="panel-sub">Submissions, live sessions, posts and quizzes from the last two weeks.</p>
+              <ul class="activity-list" id="tActivity"><li class="empty-state">Loading…</li></ul>
+            </section>
+          </div>
+        </details>
+
+        <!-- Pick a class for a quick action (teacher-home.js) -->
+        <dialog class="nf-dialog pick-dialog" id="pickClassDialog" aria-labelledby="pickClassTitle">
+          <form method="dialog">
+            <h2 id="pickClassTitle">Choose a class</h2>
+            <p id="pickClassSub">Pick the class this is for.</p>
+            <ul class="pick-list" id="pickClassList"></ul>
+            <div class="nf-dialog-actions"><button class="btn-action" value="cancel">Cancel</button></div>
+          </form>
+        </dialog>
       </section>
 
       <!-- ================= Classes (teacher-classes.js): every class, plus pages across classes ================= -->
@@ -495,107 +487,6 @@
         </section>
       </section>
 
-      <!-- ================= Demo (teacher-demo.js) =================
-           Sample students and generated readings, to show how the live monitor works. It has no
-           database access and sends nothing: no attendance, history or class records, ever. -->
-      <section class="stack view demo-view" id="demoView" hidden aria-labelledby="demoTitle">
-        <div class="demo-ribbon" role="note"><span class="demo-tag">Demo — sample data</span><span>Sample students and generated readings. Nothing here is real, saved, exported or sent.</span></div>
-
-        <section class="home-hero page-hero demo-hero" aria-labelledby="demoTitle">
-          <div class="page-hero-inner">
-            <div class="hero-copy">
-              <p class="eyebrow-pill"><span class="tag demo-pill">Demo</span><span>Not connected to any class</span></p>
-              <h1 class="welcome-title" id="demoTitle">Live focus demo</h1>
-              <p class="hero-lead">See how the live monitor shows a class: estimates, check-in alerts and the tracking states (unavailable, on a break) with eight sample students.</p>
-            </div>
-            <div class="page-hero-actions">
-              <button id="demoToggle" class="btn-primary" type="button">Start demo</button>
-              <button id="demoLookAway" class="btn-action" type="button">Sample look-away</button>
-              <button id="demoReset" class="btn-action" type="button">Reset</button>
-              <label class="demo-speed">Speed
-                <select id="demoSpeed" class="field-select">
-                  <option value="1000">1 reading / s</option>
-                  <option value="2000" selected>1 reading / 2 s</option>
-                  <option value="500">2 readings / s</option>
-                </select>
-              </label>
-            </div>
-          </div>
-        </section>
-
-        <div class="stat-grid">
-          <article class="stat-card">
-            <span class="stat-label">Class average (sample)</span>
-            <span class="chip-icon"><svg><use href="#i-eye"/></svg></span>
-            <strong id="demoAverage">—</strong>
-            <small id="demoAverageNote">Press Start demo</small>
-          </article>
-          <article class="stat-card">
-            <span class="stat-label">Mostly on screen</span>
-            <span class="chip-icon green"><svg><use href="#i-users"/></svg></span>
-            <strong id="demoFocused">—</strong>
-            <small id="demoFocusedNote">&nbsp;</small>
-          </article>
-          <article class="stat-card">
-            <span class="stat-label">Check-in alerts</span>
-            <span class="chip-icon red"><svg><use href="#i-flag"/></svg></span>
-            <strong id="demoFlags">0</strong>
-            <small>Estimated below 45% for 2+ readings</small>
-          </article>
-          <article class="stat-card">
-            <span class="stat-label">Demo time</span>
-            <span class="chip-icon amber"><svg><use href="#i-timer"/></svg></span>
-            <strong id="demoTime">00:00</strong>
-            <small>Generated, not a real session</small>
-          </article>
-        </div>
-
-        <div class="analytics-grid">
-          <div class="panel-card">
-            <div class="panel-head">
-              <div>
-                <div class="panel-title"><span class="chip-icon"><svg><use href="#i-chart"/></svg></span>Attention curve (sample)</div>
-                <div class="panel-sub">Sample class average vs. lowest sample student. Gaps are times no sample student could be measured.</div>
-              </div>
-            </div>
-            <div class="chart-box"><canvas id="demoChart" aria-label="Sample class attention over time" role="img"></canvas></div>
-          </div>
-          <div class="panel-card">
-            <div class="panel-head">
-              <div>
-                <div class="panel-title"><span class="chip-icon red"><svg><use href="#i-bell"/></svg></span>Check-in alerts (sample)</div>
-                <div class="panel-sub">How alerts look when estimates stay low.</div>
-              </div>
-            </div>
-            <ul class="alert-feed" id="demoAlerts"><li class="empty-state">No sample alerts yet.</li></ul>
-          </div>
-        </div>
-
-        <div class="panel-card">
-          <div class="panel-head">
-            <div>
-              <div class="panel-title"><span class="chip-icon"><svg><use href="#i-users"/></svg></span>Sample students</div>
-              <div class="panel-sub">Lowest estimate first. These are made-up students, not anyone in your classes.</div>
-            </div>
-          </div>
-          <div class="table-scroll">
-            <table class="data-table">
-              <thead><tr><th>Sample student</th><th>Attention (estimate)</th><th>Status</th></tr></thead>
-              <tbody id="demoRows"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <div class="panel-card">
-          <div class="panel-head">
-            <div>
-              <div class="panel-title"><span class="chip-icon"><svg><use href="#i-grid4"/></svg></span>Engagement heatmap (sample)</div>
-              <div class="panel-sub">Each cell is one sample reading, oldest to newest. Empty cells: not measured.</div>
-            </div>
-          </div>
-          <div class="heatmap-scroll"><div class="heatmap" id="demoHeatmap"></div></div>
-        </div>
-      </section>
 
       <!-- ================= Profile settings (scripts/shared/profile.js, account-security.js) ================= -->
       <section class="stack view" id="profileView" hidden aria-labelledby="profilePageTitle">
@@ -832,7 +723,6 @@
               </div>
               <div class="mode-row">
                 <span class="sim-badge" id="liveStatusBadge">Not live</span>
-                <button class="text-link" type="button" data-nav="demo">Try the demo with sample data</button>
               </div>
             </div>
 
@@ -1276,16 +1166,16 @@
   <script src="../scripts/shared/dashboard-nav.js?v=3"></script>
   <script src="../scripts/teacher/teacher-ui.js?v=3"></script>
   <script type="module" src="../scripts/auth/auth-guard.js?v=4"></script>
-  <script type="module" src="../scripts/teacher/teacher-classes.js?v=21"></script>
+  <script type="module" src="../scripts/teacher/teacher-classes.js?v=25"></script>
   <script type="module" src="../scripts/teacher/teacher-attendance.js?v=4"></script>
-  <script type="module" src="../scripts/teacher/teacher-analytics.js?v=8"></script>
+  <script type="module" src="../scripts/teacher/teacher-analytics.js?v=9"></script>
   <script type="module" src="../scripts/shared/profile.js?v=5"></script>
   <script type="module" src="../scripts/shared/account-security.js?v=1"></script>
-  <script type="module" src="../scripts/teacher/teacher-home.js?v=5"></script>
-  <script type="module" src="../scripts/teacher/teacher-overview.js?v=2"></script>
-  <script type="module" src="../scripts/teacher/teacher-demo.js?v=1"></script>
-  <script type="module" src="../scripts/teacher/teacher-classroom.js?v=2"></script>
+  <script type="module" src="../scripts/teacher/teacher-home.js?v=10"></script>
+  <script type="module" src="../scripts/teacher/teacher-overview.js?v=3"></script>
+  <script type="module" src="../scripts/teacher/teacher-classroom.js?v=3"></script>
   <script type="module" src="../scripts/teacher/teacher-quizzes.js?v=1"></script>
+  <script type="module" src="../scripts/teacher/teacher-tour.js?v=3"></script>
   <script src="../scripts/shared/info-popover.js?v=1"></script>
   <script type="module" src="../scripts/shared/home-background.js?v=1"></script>
 </body>

@@ -18,6 +18,53 @@
 a.brand-box { color: inherit; text-decoration: none; border-radius: 8px 8px 0 0; transition: background 0.15s ease; }
 a.brand-box:hover { background: var(--nf-hover, #17171b); }
 
+/* ---------- Sidebar parts both dashboards share ----------
+   Counts and badges on the links, the "Your classes" list (one colour per class, the same as the
+   teacher Home's class switcher; .cs-badge is in styles/home.css), and the footer with the guided
+   tour card (scripts/shared/tour.js) and the profile card. */
+.nav-count { margin-left: auto; font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; background: var(--surface-hover); border: 1px solid var(--border); border-radius: 999px; padding: 0 7px; }
+.nav-count:empty { display: none; }
+.nav-count.nav-alert { color: #3a2300; background: var(--amber); border-color: transparent; font-weight: 700; }
+.nav-live { margin-left: auto; display: inline-flex; }
+.nav-online { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 650; color: var(--success-text); font-variant-numeric: tabular-nums; }
+.nav-online::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+.nav-live-now { color: var(--danger-text); }
+.nav-live-now .icon { color: var(--red); }
+.nav-live-now:hover { color: var(--danger-text); background: color-mix(in srgb, var(--red) 8%, transparent); }
+.nav-label { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.nav-add {
+  width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--border-strong); background: transparent; flex: none;
+  color: var(--text-soft); display: grid; place-items: center; cursor: pointer; font-size: 15px; line-height: 1;
+}
+.nav-add:hover { background: var(--surface-hover); color: var(--text-main); }
+.sidebar-classes { display: flex; flex-direction: column; gap: 2px; }
+.sidebar-class .name, .nav-live-now .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-class .cs-badge { width: 22px; height: 22px; border-radius: 7px; font-size: 11px; }
+.sidebar-class[aria-current] .cs-badge { box-shadow: 0 0 0 2px var(--surface-hover), 0 0 0 3px hsl(var(--hue) 70% 60% / 0.6); }
+.sidebar-empty { font-size: 12.5px; color: var(--text-muted); padding: 2px 10px 6px; }
+.sidebar-foot { display: flex; flex-direction: column; gap: 10px; padding-top: 16px; }
+.sidebar-foot .user-card {
+  display: flex; align-items: center; gap: 10px; width: 100%; margin: 0; padding: 10px; border-radius: 12px; border: 1px solid var(--border);
+  background: var(--surface-2); font: inherit; color: inherit; text-align: left; text-decoration: none; cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.sidebar-foot .user-card:hover { border-color: var(--border-hover); background: var(--surface-raised); }
+.sidebar-foot .user-card[aria-current] { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+.sidebar-foot .user-card > div { flex: 1; min-width: 0; }
+.sidebar-foot .user-card b { display: block; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-foot .user-card small { display: block; font-size: 11.5px; color: var(--text-muted); }
+.sidebar-foot .user-card > .icon { width: 15px; height: 15px; color: var(--text-muted); }
+.tour-card {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; padding: 12px; border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border));
+  background: radial-gradient(ellipse 80% 90% at 0% 0%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 70%), var(--surface-2);
+}
+.tour-card .chip-icon { width: 30px; height: 30px; border-radius: 9px; }
+.tour-card .chip-icon svg { width: 15px; height: 15px; }
+.tour-card b { display: block; font-size: 13px; font-weight: 650; }
+.tour-card small { display: block; font-size: 11.5px; color: var(--text-muted); line-height: 1.4; margin-top: 1px; }
+.tour-card .btn-action { grid-column: 1 / -1; width: 100%; }
+
 .nav-toggle {
   display: none; align-items: center; justify-content: center; width: 34px; height: 34px; flex: none;
   background: var(--nf-hover, #1c1c20); color: var(--text-main); border: 1px solid var(--border); border-radius: 7px;

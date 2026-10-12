@@ -7,278 +7,317 @@
   <meta name="description" content="Neuro-Focus measures real-time attention with on-device computer vision, re-engages students when focus slips, and gives teachers a live view of their classroom, without recording video.">
   <title>Neuro-Focus | Real-time attention support for neurodivergent learners</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- Type: Geist, with Geist Mono for numbers and labels. Icons: Phosphor (light weight). -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/light/style.css">
   <style>
+    /* Dark neutrals carry the structure; cyan is the brand accent, green means "good", with a little
+       violet for depth. The status colours (red, amber) appear only in product previews. */
     :root {
-      --bg: #09090b;
-      --bg-raised: #0e0e11;
-      --card: #141417;
-      --card-hover: #19191d;
-      --border: #222226;
-      --border-strong: #2e2e34;
-      --text-main: #f4f4f5;
-      --text-soft: #b4b4bc;
-      --text-muted: #82828c;
+      --cyan: #00d9ff;
+      --ice: #9ff6ff;
       --green: #22c55e;
+      --violet: #7c6cff;
       --red: #ef4444;
       --amber: #f5b748;
-      --cyan: #00d9ff;
-      --container: 1200px;
+      --bg: #09090b;
+      --surface: #0f0f12;
+      --card: #131316;
+      --card-hover: #18181c;
+      --line: #1f1f24;
+      --line-strong: #2c2c33;
+      --text-main: #f5f5f6;
+      --text-soft: #b6b6bd;
+      --text-muted: #85858e;
+      --text-faint: #5c5c66;
+      --container: 1160px;
+      --sans: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
-    body { background: var(--bg); color: var(--text-main); min-height: 100vh; overflow-x: hidden; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+    body { font-family: var(--sans); background: var(--bg); color: var(--text-main); min-height: 100vh; overflow-x: hidden; line-height: 1.6; -webkit-font-smoothing: antialiased; }
     a { color: inherit; }
     [hidden] { display: none !important; }
     :focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; border-radius: 6px; }
     .container { width: min(var(--container), 100% - 48px); margin: 0 auto; }
-    .icon { width: 18px; height: 18px; flex: none; }
+    i[class^="ph"] { display: inline-flex; flex: none; line-height: 1; }
 
     /* ---------- Header ---------- */
     .topbar {
       position: sticky; top: 0; z-index: 100; border-bottom: 1px solid transparent;
       transition: background 0.2s ease, border-color 0.2s ease, backdrop-filter 0.2s ease;
     }
-    .topbar.is-scrolled { background: rgba(9, 9, 11, 0.82); backdrop-filter: blur(14px); border-bottom-color: var(--border); }
+    .topbar.is-scrolled { background: rgba(9, 9, 11, 0.8); backdrop-filter: blur(14px); border-bottom-color: var(--line); }
     .topbar-inner { height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
-    .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 650; font-size: 15.5px; letter-spacing: -0.2px; white-space: nowrap; }
+    .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 600; font-size: 15.5px; letter-spacing: -0.2px; white-space: nowrap; }
     .brand-mark {
       width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; flex: none; color: #fff;
-      /* The logo stays black and white in every theme and accent, with a soft white glow */
       background: radial-gradient(circle at 30% 22%, #202024, #050506 72%); border: 1px solid rgba(255, 255, 255, 0.16);
-      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55), 0 0 20px rgba(255, 255, 255, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55), 0 0 20px rgba(255, 255, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.08);
     }
-    .brand-mark svg { width: 20px; height: 20px; overflow: visible; filter: drop-shadow(0 0 1.5px rgba(255, 255, 255, 0.95)) drop-shadow(0 0 5px rgba(255, 255, 255, 0.55)); animation: brand-glow 4.5s ease-in-out infinite; }
-    @keyframes brand-glow { 50% { filter: drop-shadow(0 0 2px rgba(255, 255, 255, 1)) drop-shadow(0 0 9px rgba(255, 255, 255, 0.75)); } }
-    @media (prefers-reduced-motion: reduce) { .brand-mark svg { animation: none; } }
-    .center-nav { display: flex; align-items: center; gap: 28px; }
+    .brand-mark svg { width: 20px; height: 20px; overflow: visible; filter: drop-shadow(0 0 1.5px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 5px rgba(255, 255, 255, 0.45)); }
+    .center-nav { display: flex; align-items: center; gap: 30px; }
     .center-nav a { color: var(--text-muted); text-decoration: none; font-size: 13.5px; font-weight: 500; transition: color 0.15s ease; }
     .center-nav a:hover { color: var(--text-main); }
-    .nav-actions { display: flex; align-items: center; gap: 16px; }
+    .nav-actions { display: flex; align-items: center; gap: 18px; }
     .btn-link { color: var(--text-soft); text-decoration: none; font-size: 13.5px; font-weight: 500; white-space: nowrap; }
     .btn-link:hover { color: var(--text-main); }
 
     .btn {
       display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; white-space: nowrap;
-      font-size: 14px; font-weight: 600; border-radius: 9px; padding: 11px 18px; border: 1px solid transparent;
-      transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+      font-size: 14px; font-weight: 600; border-radius: 10px; padding: 11px 18px; border: 1px solid transparent;
+      transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
     }
-    .btn .icon { width: 16px; height: 16px; transition: transform 0.15s ease; }
-    .btn:hover .icon { transform: translateX(2px); }
-    .btn-primary { background: var(--text-main); color: #09090b; box-shadow: 0 0 0 1px rgba(255,255,255,0.1), 0 8px 24px rgba(0, 217, 255, 0.12); }
-    .btn-primary:hover { background: #fff; box-shadow: 0 0 0 1px rgba(255,255,255,0.2), 0 10px 30px rgba(0, 217, 255, 0.22); }
-    .btn-ghost { background: rgba(20, 20, 23, 0.7); color: var(--text-main); border-color: var(--border-strong); backdrop-filter: blur(8px); }
+    .btn i { font-size: 16px; transition: transform 0.15s ease; }
+    .btn:hover i { transform: translateX(2px); }
+    .btn-primary { background: var(--text-main); color: #09090b; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1), 0 8px 24px rgba(0, 217, 255, 0.14); }
+    .btn-primary:hover { background: #fff; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2), 0 10px 30px rgba(0, 217, 255, 0.26); }
+    .btn-ghost { background: rgba(19, 19, 22, 0.7); color: var(--text-main); border-color: var(--line-strong); backdrop-filter: blur(8px); }
     .btn-ghost:hover { background: var(--card-hover); border-color: #3a3a42; }
     .btn-sm { font-size: 13px; padding: 8px 14px; border-radius: 8px; }
 
     /* ---------- Hero ---------- */
     .hero { position: relative; isolation: isolate; overflow: hidden; margin-top: -64px; padding-top: 64px; }
     #bg { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; opacity: 0.9; }
+    /* One very soft wash of colour behind the hero: no grid, no visible shapes */
     .hero-glow {
       position: absolute; inset: 0; z-index: -2; pointer-events: none;
-      background:
-        radial-gradient(ellipse 60% 55% at 74% 42%, rgba(0, 217, 255, 0.10), transparent 70%),
-        radial-gradient(ellipse 40% 40% at 12% 85%, rgba(34, 197, 94, 0.05), transparent 70%);
+      background: radial-gradient(ellipse 80% 90% at 72% 40%, rgba(0, 217, 255, 0.07), rgba(124, 108, 255, 0.03) 45%, transparent 75%);
+    }
+    /* A faint grid behind the hero, fading out at the edges */
+    .hero-grid-lines {
+      position: absolute; inset: 0; z-index: -2; pointer-events: none;
+      background-image: linear-gradient(rgba(140, 230, 255, 0.045) 1px, transparent 1px), linear-gradient(90deg, rgba(140, 230, 255, 0.045) 1px, transparent 1px);
+      background-size: 64px 64px; background-position: center top;
+      -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000 30%, transparent 80%);
+      mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000 30%, transparent 80%);
     }
     .hero::after {
       content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 140px; z-index: -1; pointer-events: none;
       background: linear-gradient(to bottom, transparent, var(--bg));
     }
-    .hero-grid { display: grid; grid-template-columns: 1.05fr 1fr; gap: 32px; align-items: center; min-height: min(760px, calc(100vh - 64px)); padding: 48px 0 72px; }
+    .hero-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: center; min-height: min(760px, calc(100vh - 64px)); padding: 56px 0 72px; }
     .hero-copy { position: relative; z-index: 1; }
     .hero-copy::before {
-      content: ""; position: absolute; inset: -40px -8px -40px -80px; z-index: -1; pointer-events: none;
-      background: radial-gradient(ellipse at 40% 50%, rgba(9, 9, 11, 0.85) 40%, rgba(9, 9, 11, 0.4) 68%, transparent 84%);
+      /* Fades out fully before its own edges, so it never leaves a hard line across the logo */
+      content: ""; position: absolute; inset: -60px -60px -60px -100px; z-index: -1; pointer-events: none;
+      background: radial-gradient(closest-side at 45% 50%, rgba(9, 9, 11, 0.85) 55%, rgba(9, 9, 11, 0.4) 78%, transparent 100%);
     }
     .eyebrow-pill {
       display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font-size: 12.5px; font-weight: 500; color: var(--text-soft);
-      background: rgba(20, 20, 23, 0.75); border: 1px solid var(--border-strong); border-radius: 999px; padding: 5px 14px 5px 6px; margin-bottom: 24px;
+      background: rgba(19, 19, 22, 0.75); border: 1px solid var(--line-strong); border-radius: 999px; padding: 4px 12px 4px 4px; margin-bottom: 26px;
       backdrop-filter: blur(8px); transition: border-color 0.15s ease;
     }
     .eyebrow-pill:hover { border-color: #3a3a42; }
-    .eyebrow-pill .tag { font-size: 11px; font-weight: 700; color: #052e16; background: var(--green); border-radius: 999px; padding: 2px 8px; letter-spacing: 0.3px; }
-    .hero-hello { font-size: 19px; font-weight: 600; letter-spacing: -0.3px; margin-bottom: 10px; }
-    .hero-hello strong { color: var(--cyan); }
-    .hero-title { font-size: clamp(40px, 5.2vw, 64px); font-weight: 750; line-height: 1.04; letter-spacing: -0.035em; margin-bottom: 22px; }
+    .eyebrow-pill .tag { font-family: var(--mono); font-size: 10.5px; font-weight: 500; letter-spacing: 0.06em; color: #052e16; background: var(--green); border-radius: 999px; padding: 2px 8px; }
+    .eyebrow-pill i { font-size: 13px; color: var(--text-muted); }
+    .hero-title { font-size: clamp(40px, 5vw, 62px); font-weight: 600; line-height: 1.04; letter-spacing: -0.04em; margin-bottom: 22px; }
     .gradient-text {
-      background: linear-gradient(100deg, #f4f4f5 0%, #9ff6ff 45%, #00d9ff 100%);
+      background: linear-gradient(100deg, #f4f4f5 0%, var(--ice) 42%, var(--cyan) 75%, #7c9cff 100%);
       -webkit-background-clip: text; background-clip: text; color: transparent;
     }
-    .hero-lead { font-size: clamp(16px, 1.35vw, 18px); color: var(--text-soft); line-height: 1.65; max-width: 540px; margin-bottom: 32px; }
-    .hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 28px; }
+    .hero-lead { font-size: clamp(16px, 1.3vw, 17.5px); color: var(--text-soft); line-height: 1.65; max-width: 520px; margin-bottom: 34px; }
+    .hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 30px; }
     .hero-actions .btn { padding: 13px 22px; font-size: 14.5px; }
-    .hero-checks { display: flex; flex-wrap: wrap; gap: 8px 20px; list-style: none; font-size: 13px; color: var(--text-muted); }
+    .hero-checks { display: flex; flex-wrap: wrap; gap: 8px 22px; list-style: none; font-size: 13px; color: var(--text-muted); }
     .hero-checks li { display: inline-flex; align-items: center; gap: 7px; }
-    .hero-checks svg { width: 15px; height: 15px; color: var(--green); }
+    .hero-checks i { font-size: 15px; color: var(--green); }
 
-    /* Brain stage with floating live cards */
-    .hero-visual { position: relative; height: min(560px, 62vh); min-height: 420px; }
+    /* Logo stage with a few quiet product cards around it */
+    .hero-visual { position: relative; height: min(560px, 62vh); min-height: 440px; }
     .float-card {
-      position: absolute; display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 12px;
-      background: rgba(17, 17, 20, 0.72); border: 1px solid var(--border-strong); backdrop-filter: blur(12px);
-      box-shadow: 0 14px 36px rgba(0, 0, 0, 0.45); font-size: 12.5px; color: var(--text-soft); white-space: nowrap;
-      animation: float 7s ease-in-out infinite;
+      position: absolute; display: flex; align-items: center; gap: 11px; padding: 11px 14px; border-radius: 12px;
+      background: rgba(15, 15, 18, 0.78); border: 1px solid var(--line-strong); backdrop-filter: blur(12px);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5); font-size: 12.5px; color: var(--text-soft); white-space: nowrap;
+      animation: float 8s ease-in-out infinite;
     }
-    .float-card strong { color: var(--text-main); font-weight: 600; }
-    .float-card small { display: block; font-size: 11px; color: var(--text-muted); }
-    .float-icon { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; flex: none; }
-    .float-icon svg { width: 16px; height: 16px; }
+    .float-card strong { display: block; color: var(--text-main); font-weight: 600; font-size: 13px; }
+    .float-card small { display: block; font-size: 11.5px; color: var(--text-muted); }
+    .float-icon { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; flex: none; color: var(--cyan); background: rgba(0, 217, 255, 0.1); }
+    .float-icon.green { color: var(--green); background: rgba(34, 197, 94, 0.12); }
+    .float-icon.amber { color: var(--amber); background: rgba(245, 183, 72, 0.12); }
+    .float-icon i { font-size: 16px; }
     .fc-live { top: 6%; left: 2%; animation-delay: -1s; }
     .fc-score { top: 16%; right: 0; animation-delay: -3s; }
-    .fc-alert { bottom: 18%; left: -2%; animation-delay: -5s; }
-    .fc-buddy { bottom: 4%; right: 4%; animation-delay: -2s; white-space: normal; width: 250px; align-items: flex-start; }
+    .fc-nudge { bottom: 18%; left: -2%; animation-delay: -5s; }
+    .fc-buddy { bottom: -3%; right: -2%; animation-delay: -2s; white-space: normal; width: 250px; align-items: flex-start; }
     .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); animation: pulse 1.8s infinite; flex: none; }
-    .meter { width: 86px; height: 6px; border-radius: 4px; background: #232328; overflow: hidden; margin-top: 5px; }
-    .meter span { display: block; height: 100%; width: 92%; border-radius: 4px; background: linear-gradient(90deg, #00b8d9, #22c55e); }
-    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+    .meter { width: 92px; height: 5px; border-radius: 4px; background: #232328; overflow: hidden; margin-top: 6px; }
+    .meter span { display: block; height: 100%; width: 92%; border-radius: inherit; background: linear-gradient(90deg, #00b8d9, var(--green)); }
+    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
     @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.55); } 70% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
 
     /* ---------- Sections ---------- */
-    section.block { padding: 96px 0; position: relative; }
+    section.block { padding: 112px 0; position: relative; }
     section[id], #workspaces { scroll-margin-top: 64px; }
-    .section-head { max-width: 680px; margin: 0 auto 56px; text-align: center; }
+    .section-head { max-width: 640px; margin: 0 auto 56px; text-align: center; }
     .section-head.left { margin-left: 0; text-align: left; }
-    .kicker { display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--cyan); margin-bottom: 12px; }
-    .section-head h2 { font-size: clamp(28px, 3.2vw, 40px); font-weight: 700; letter-spacing: -0.03em; line-height: 1.12; margin-bottom: 14px; }
-    .section-head p { font-size: 16.5px; color: var(--text-muted); line-height: 1.65; }
+    .kicker { display: inline-flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 11.5px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: var(--cyan); margin-bottom: 16px; }
+    .kicker b { font-weight: 500; color: var(--text-muted); }
+    .kicker::after { content: ""; width: 28px; height: 1px; background: linear-gradient(90deg, rgba(0, 217, 255, 0.5), transparent); }
+    .section-head:not(.left) .kicker::before { content: ""; width: 28px; height: 1px; background: linear-gradient(90deg, transparent, rgba(0, 217, 255, 0.5)); }
+    .section-head h2 { font-size: clamp(28px, 3.2vw, 40px); font-weight: 600; letter-spacing: -0.035em; line-height: 1.12; margin-bottom: 14px; }
+    .section-head p { font-size: 16px; color: var(--text-muted); line-height: 1.65; }
 
     /* Stats strip */
-    .stats { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--border); border-radius: 16px; background: rgba(14, 14, 17, 0.7); overflow: hidden; }
-    .stat { padding: 26px 24px; border-right: 1px solid var(--border); }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--line); border-radius: 16px; background: rgba(15, 15, 18, 0.7); overflow: hidden; }
+    .stat { padding: 26px 26px 24px; border-right: 1px solid var(--line); }
     .stat:last-child { border-right: 0; }
-    .stat strong { display: block; font-size: 32px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; }
+    .stat strong { display: block; font-family: var(--mono); font-size: 30px; font-weight: 500; letter-spacing: -0.04em; line-height: 1.15; margin-bottom: 4px; }
     .stat strong em { font-style: normal; color: var(--cyan); }
     .stat span { font-size: 13px; color: var(--text-muted); }
 
     /* Feature grid */
-    .feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-    .feature {
-      position: relative; background: linear-gradient(180deg, #141417, #111114); border: 1px solid var(--border); border-radius: 16px;
-      padding: 26px; transition: border-color 0.2s ease, transform 0.2s ease;
+    .feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; background: var(--line); gap: 1px; }
+    .feature { position: relative; background: var(--surface); padding: 30px 28px 32px; transition: background 0.2s ease; }
+    .feature:hover { background: #121215; }
+    .feature::before {
+      content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.25s ease;
+      background: radial-gradient(360px circle at 20% 0%, color-mix(in srgb, var(--tone, var(--cyan)) 9%, transparent), transparent 70%);
     }
-    .feature:hover { border-color: #33333b; transform: translateY(-2px); }
+    .feature:hover::before { opacity: 1; }
     .feature-icon {
-      width: 42px; height: 42px; border-radius: 11px; display: grid; place-items: center; margin-bottom: 18px;
-      color: var(--cyan); background: rgba(0, 217, 255, 0.08); border: 1px solid rgba(0, 217, 255, 0.22);
+      position: relative; width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; margin-bottom: 22px;
+      color: var(--tone, var(--cyan)); background: color-mix(in srgb, var(--tone, var(--cyan)) 9%, transparent);
+      border: 1px solid color-mix(in srgb, var(--tone, var(--cyan)) 24%, transparent);
     }
-    .feature-icon svg { width: 21px; height: 21px; }
-    .feature h3 { font-size: 16.5px; font-weight: 650; letter-spacing: -0.2px; margin-bottom: 8px; }
+    .feature.green { --tone: var(--green); }
+    .feature.violet { --tone: var(--violet); }
+    .feature-icon i { font-size: 21px; }
+    .feature h3 { font-size: 16px; font-weight: 600; letter-spacing: -0.2px; margin-bottom: 8px; }
     .feature p { font-size: 14px; color: var(--text-muted); line-height: 1.6; }
 
     /* How it works */
-    .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; counter-reset: step; position: relative; }
-    .steps::before {
-      content: ""; position: absolute; top: 22px; left: 12%; right: 12%; height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(0, 217, 255, 0.45), rgba(0, 217, 255, 0.45), transparent);
-    }
-    .step { position: relative; text-align: center; padding: 0 8px; }
+    .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; position: relative; }
+    .steps::before { content: ""; position: absolute; top: 20px; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(0, 217, 255, 0.45) 12%, rgba(124, 108, 255, 0.4) 50%, rgba(34, 197, 94, 0.45) 88%, transparent); }
+    .step { position: relative; padding-right: 12px; }
     .step-num {
-      width: 44px; height: 44px; margin: 0 auto 18px; border-radius: 50%; display: grid; place-items: center; position: relative;
-      background: var(--bg); border: 1px solid rgba(0, 217, 255, 0.45); color: var(--cyan); font-weight: 700; font-size: 15px;
-      box-shadow: 0 0 22px rgba(0, 217, 255, 0.18);
+      position: relative; display: inline-grid; place-items: center; width: 40px; height: 40px; margin-bottom: 22px; border-radius: 50%;
+      font-family: var(--mono); font-size: 12.5px; font-weight: 500; color: var(--cyan); background: var(--bg); border: 1px solid rgba(0, 217, 255, 0.45);
+      box-shadow: 0 0 22px rgba(0, 217, 255, 0.16);
     }
-    .step h3 { font-size: 15.5px; font-weight: 650; margin-bottom: 6px; }
+    .step h3 { display: flex; align-items: center; gap: 8px; font-size: 15.5px; font-weight: 600; margin-bottom: 6px; }
+    .step h3 i { font-size: 17px; color: var(--cyan); }
     .step p { font-size: 13.5px; color: var(--text-muted); line-height: 1.6; }
 
     /* Roles */
     .role-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
     .hub-card {
-      background: linear-gradient(180deg, #141417, #101013); border: 1px solid var(--border); border-radius: 18px;
-      padding: 30px; display: flex; flex-direction: column; gap: 22px;
+      background: var(--surface); border: 1px solid var(--line); border-radius: 18px;
+      padding: 30px; display: flex; flex-direction: column; gap: 24px;
     }
-    .hub-badge { display: inline-block; font-size: 11.5px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.8px; color: var(--cyan); }
-    .hub-yours { font-size: 11.5px; font-weight: 700; color: var(--green); margin-left: 8px; text-transform: uppercase; letter-spacing: 0.6px; }
-    .hub-title { font-size: 22px; font-weight: 700; letter-spacing: -0.4px; margin: 8px 0 8px; }
+    .hub-badge { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11.5px; text-transform: uppercase; font-weight: 500; letter-spacing: 0.1em; color: var(--cyan); }
+    .hub-badge i { font-size: 15px; }
+    .hub-card.green .hub-badge { color: var(--green); }
+    .hub-yours { font-family: var(--mono); font-size: 11px; font-weight: 500; color: var(--green); margin-left: 8px; text-transform: uppercase; letter-spacing: 0.08em; }
+    .hub-title { font-size: 22px; font-weight: 600; letter-spacing: -0.5px; margin: 10px 0 8px; }
     .hub-desc { font-size: 14.5px; color: var(--text-muted); line-height: 1.6; }
-    .checklist { list-style: none; display: grid; gap: 9px; font-size: 14px; color: var(--text-soft); }
+    .checklist { list-style: none; display: grid; gap: 10px; font-size: 14px; color: var(--text-soft); }
     .checklist li { display: flex; gap: 10px; align-items: flex-start; }
-    .checklist svg { width: 16px; height: 16px; color: var(--green); margin-top: 3px; flex: none; }
+    .checklist i { font-size: 16px; color: var(--green); margin-top: 3px; }
     .hub-action {
-      display: inline-flex; align-items: center; gap: 8px; text-decoration: none; font-size: 13.5px; font-weight: 600;
-      color: var(--text-main); background: #1c1c20; border: 1px solid var(--border-strong); padding: 10px 16px; border-radius: 9px;
+      display: inline-flex; align-items: center; gap: 8px; text-decoration: none; font-size: 13.5px; font-weight: 600; margin-top: auto;
+      color: var(--text-main); background: #19191d; border: 1px solid var(--line-strong); padding: 10px 16px; border-radius: 10px;
       width: fit-content; transition: background 0.15s ease, border-color 0.15s ease;
     }
-    .hub-action:hover { background: #26262b; border-color: #3a3a42; }
+    .hub-action i { font-size: 15px; transition: transform 0.15s ease; }
+    .hub-action:hover { background: #222227; border-color: #3a3a42; }
+    .hub-action:hover i { transform: translateX(2px); }
     .hub-action.is-locked { color: var(--text-muted); background: transparent; border-style: dashed; cursor: not-allowed; }
 
-    /* Mini product previews */
-    .mock {
-      border: 1px solid var(--border); border-radius: 12px; background: #0c0c0e; padding: 14px; display: grid; gap: 10px;
-      font-size: 12px; color: var(--text-soft);
-    }
+    /* Mini product previews (greyscale, like the rest) */
+    .mock { border: 1px solid var(--line); border-radius: 12px; background: #0b0b0d; padding: 14px; display: grid; gap: 10px; font-size: 12px; color: var(--text-soft); }
     .mock-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-    .mock-banner { display: flex; align-items: center; gap: 8px; padding: 9px 11px; border-radius: 8px; border-left: 3px solid var(--green); background: rgba(34, 197, 94, 0.08); color: #86efac; font-weight: 600; }
+    .mock-bar strong { color: var(--text-main); font-weight: 600; }
+    .mock-banner { display: flex; align-items: center; gap: 9px; padding: 9px 11px; border-radius: 8px; border-left: 3px solid var(--green); background: rgba(34, 197, 94, 0.08); color: #86efac; font-weight: 600; }
+    .mock-banner .live-dot { background: var(--green); }
     .mock-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-    .mock-tile { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
-    .mock-tile b { display: block; font-size: 17px; color: var(--text-main); }
+    .mock-tile { border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; }
+    .mock-tile b { display: block; font-family: var(--mono); font-size: 16px; font-weight: 500; color: var(--text-main); }
     .mock-tile small { color: var(--text-muted); font-size: 10.5px; }
-    .mock-row { display: grid; grid-template-columns: 1fr 90px 64px; align-items: center; gap: 10px; padding: 6px 2px; border-bottom: 1px solid #1a1a1e; }
+    .mock-row { display: grid; grid-template-columns: 1fr 90px 68px; align-items: center; gap: 10px; padding: 7px 2px; border-bottom: 1px solid #18181c; }
     .mock-row:last-child { border-bottom: 0; }
-    .bar { height: 5px; border-radius: 3px; background: #232328; overflow: hidden; }
+    .bar { height: 4px; border-radius: 3px; background: #222227; overflow: hidden; }
     .bar span { display: block; height: 100%; border-radius: 3px; background: var(--cyan); }
-    .pill { font-size: 10.5px; font-weight: 600; text-align: center; border-radius: 999px; padding: 2px 6px; border: 1px solid; }
-    .pill.ok { color: var(--green); border-color: rgba(34,197,94,0.3); background: rgba(34,197,94,0.08); }
-    .pill.warn { color: var(--amber); border-color: rgba(245,183,72,0.3); background: rgba(245,183,72,0.08); }
-    .pill.bad { color: #fca5a5; border-color: rgba(239,68,68,0.3); background: rgba(239,68,68,0.08); }
+    .pill { font-family: var(--mono); font-size: 10px; font-weight: 500; text-align: center; border-radius: 999px; padding: 2px 6px; border: 1px solid; letter-spacing: 0.02em; }
+    .pill.ok { color: var(--green); border-color: rgba(34, 197, 94, 0.3); background: rgba(34, 197, 94, 0.08); }
+    .pill.warn { color: var(--amber); border-color: rgba(245, 183, 72, 0.3); background: rgba(245, 183, 72, 0.08); }
+    .pill.bad { color: #fca5a5; border-color: rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.08); }
+    .pill.live { display: inline-flex; align-items: center; gap: 6px; color: #fca5a5; border-color: rgba(239, 68, 68, 0.35); background: rgba(239, 68, 68, 0.08); }
+    .pill.live .live-dot { width: 6px; height: 6px; }
 
     /* Privacy */
-    .split { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 56px; align-items: center; }
-    .privacy-list { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-    .privacy-item { border: 1px solid var(--border); border-radius: 14px; padding: 20px; background: rgba(20, 20, 23, 0.6); }
-    .privacy-item svg { width: 20px; height: 20px; color: var(--green); margin-bottom: 10px; }
-    .privacy-item h3 { font-size: 15px; font-weight: 650; margin-bottom: 4px; }
+    .split { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 64px; align-items: center; }
+    .privacy-list { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; gap: 1px; background: var(--line); }
+    .privacy-item { padding: 24px; background: var(--surface); }
+    .privacy-item i { font-size: 22px; color: var(--green); margin-bottom: 14px; }
+    .privacy-item h3 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
     .privacy-item p { font-size: 13.5px; color: var(--text-muted); line-height: 1.55; }
 
     /* Why it matters */
     .problem { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-    .problem-card { border-radius: 16px; padding: 28px; border: 1px solid var(--border); background: rgba(20, 20, 23, 0.6); }
-    .problem-card.before { border-color: rgba(239, 68, 68, 0.22); }
-    .problem-card.after { border-color: rgba(0, 217, 255, 0.25); background: linear-gradient(180deg, rgba(0, 217, 255, 0.05), rgba(20, 20, 23, 0.6)); }
-    .problem-card h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin-bottom: 14px; }
+    .problem-card { border-radius: 16px; padding: 30px; border: 1px solid var(--line); background: var(--surface); }
+    .problem-card.before { border-color: rgba(239, 68, 68, 0.2); }
+    .problem-card.after { border-color: rgba(0, 217, 255, 0.3); background: linear-gradient(180deg, rgba(0, 217, 255, 0.06), var(--surface)); box-shadow: 0 24px 60px rgba(0, 217, 255, 0.06); }
+    .problem-card h3 { font-family: var(--mono); font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.12em; font-weight: 500; margin-bottom: 18px; color: var(--text-muted); }
     .problem-card.before h3 { color: #fca5a5; }
     .problem-card.after h3 { color: var(--cyan); }
-    .problem-card ul { list-style: none; display: grid; gap: 10px; font-size: 14.5px; color: var(--text-soft); }
-    .problem-card li { display: flex; gap: 10px; }
-    .problem-card li::before { flex: none; font-weight: 700; }
-    .problem-card.before li::before { content: "✕"; color: #f87171; }
-    .problem-card.after li::before { content: "✓"; color: var(--green); }
+    .problem-card ul { list-style: none; display: grid; gap: 12px; font-size: 14.5px; color: var(--text-muted); }
+    .problem-card.after ul { color: var(--text-soft); }
+    .problem-card li { display: flex; gap: 12px; align-items: flex-start; }
+    .problem-card li i { font-size: 16px; margin-top: 3px; }
+    .problem-card.before li i { color: #f87171; }
+    .problem-card.after li i { color: var(--green); }
 
     /* FAQ */
-    .faq { max-width: 820px; margin: 0 auto; display: grid; gap: 10px; }
-    .faq details { border: 1px solid var(--border); border-radius: 12px; background: rgba(20, 20, 23, 0.6); }
+    .faq { max-width: 780px; margin: 0 auto; border-top: 1px solid var(--line); }
+    .faq details { border-bottom: 1px solid var(--line); }
     .faq summary {
-      list-style: none; cursor: pointer; padding: 18px 22px; font-size: 15px; font-weight: 600;
-      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+      list-style: none; cursor: pointer; padding: 22px 4px; font-size: 15.5px; font-weight: 500;
+      display: flex; align-items: center; justify-content: space-between; gap: 16px; transition: color 0.15s ease;
     }
+    .faq summary:hover { color: #fff; }
     .faq summary::-webkit-details-marker { display: none; }
-    .faq summary::after { content: "+"; font-size: 20px; font-weight: 400; color: var(--text-muted); transition: transform 0.2s ease; }
-    .faq details[open] summary::after { transform: rotate(45deg); }
-    .faq details p { padding: 0 22px 20px; font-size: 14.5px; color: var(--text-muted); line-height: 1.65; }
+    .faq summary i { font-size: 18px; color: var(--text-muted); transition: transform 0.2s ease; }
+    .faq details[open] summary i { transform: rotate(45deg); color: var(--cyan); }
+    .faq details p { padding: 0 4px 24px; font-size: 14.5px; color: var(--text-muted); line-height: 1.7; max-width: 680px; }
 
     /* Final call to action */
     .cta-band {
-      position: relative; overflow: hidden; border-radius: 22px; padding: 64px 32px; text-align: center;
-      border: 1px solid rgba(0, 217, 255, 0.22);
+      position: relative; overflow: hidden; isolation: isolate; border-radius: 22px; padding: 72px 32px; text-align: center;
+      border: 1px solid rgba(0, 217, 255, 0.24);
       background:
-        radial-gradient(ellipse 70% 120% at 50% 0%, rgba(0, 217, 255, 0.14), transparent 65%),
-        linear-gradient(180deg, #111216, #0c0c0f);
+        radial-gradient(ellipse 70% 120% at 50% 0%, rgba(0, 217, 255, 0.16), transparent 65%),
+        radial-gradient(ellipse 40% 60% at 85% 100%, rgba(124, 108, 255, 0.1), transparent 70%),
+        #0d0d10;
     }
-    .cta-band h2 { font-size: clamp(28px, 3.4vw, 42px); font-weight: 700; letter-spacing: -0.03em; line-height: 1.12; margin-bottom: 14px; }
-    .cta-band p { font-size: 16.5px; color: var(--text-muted); max-width: 560px; margin: 0 auto 28px; }
+    .cta-band::before {
+      content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+      background-image: linear-gradient(rgba(140, 230, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(140, 230, 255, 0.05) 1px, transparent 1px);
+      background-size: 48px 48px; -webkit-mask-image: radial-gradient(ellipse 60% 80% at 50% 0%, #000, transparent 75%); mask-image: radial-gradient(ellipse 60% 80% at 50% 0%, #000, transparent 75%);
+    }
+    .cta-mark { width: 52px; height: 52px; margin: 0 auto 22px; border-radius: 14px; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55), 0 0 40px rgba(0, 217, 255, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.08); }
+    .cta-mark svg { width: 30px; height: 30px; }
+    .cta-band h2 { font-size: clamp(28px, 3.4vw, 42px); font-weight: 600; letter-spacing: -0.035em; line-height: 1.12; margin-bottom: 14px; }
+    .cta-band p { font-size: 16px; color: var(--text-muted); max-width: 520px; margin: 0 auto 30px; }
     .cta-band .hero-actions { justify-content: center; margin-bottom: 0; }
 
     /* Footer */
-    footer { border-top: 1px solid var(--border); padding: 56px 0 28px; margin-top: 40px; }
-    .footer-grid { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1.3fr; gap: 32px; margin-bottom: 40px; }
-    .footer-grid h4 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-main); margin-bottom: 14px; }
-    .footer-grid ul { list-style: none; display: grid; gap: 9px; font-size: 13.5px; color: var(--text-muted); }
-    .footer-grid a { text-decoration: none; color: var(--text-muted); }
+    footer { border-top: 1px solid var(--line); padding: 64px 0 28px; margin-top: 48px; }
+    .footer-grid { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1.3fr; gap: 32px; margin-bottom: 44px; }
+    .footer-grid h4 { font-family: var(--mono); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-muted); margin-bottom: 16px; }
+    .footer-grid ul { list-style: none; display: grid; gap: 10px; font-size: 13.5px; color: var(--text-muted); }
+    .footer-grid a { text-decoration: none; color: var(--text-soft); }
     .footer-grid a:hover { color: var(--text-main); }
-    .footer-about p { font-size: 13.5px; color: var(--text-muted); margin-top: 14px; max-width: 280px; }
-    .footer-bottom { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; border-top: 1px solid var(--border); padding-top: 22px; font-size: 12.5px; color: var(--text-muted); }
+    .footer-about p { font-size: 13.5px; color: var(--text-muted); margin-top: 16px; max-width: 280px; }
+    .footer-bottom { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 22px; font-size: 12.5px; color: var(--text-faint); }
 
     /* Scroll reveal (home.js) */
-    .reveal { opacity: 0; transform: translateY(18px); transition: opacity 0.6s ease, transform 0.6s ease; }
+    .reveal { opacity: 0; transform: translateY(16px); transition: opacity 0.6s ease, transform 0.6s ease; }
     .reveal.is-visible { opacity: 1; transform: none; }
 
     @media (prefers-reduced-motion: reduce) {
@@ -297,14 +336,15 @@
       .center-nav { display: none; }
       .hero-grid { grid-template-columns: 1fr; min-height: 0; padding: 40px 0 24px; gap: 8px; }
       .hero-visual { height: 420px; min-height: 0; }
+      .fc-buddy { bottom: 2%; }
       .stats { grid-template-columns: 1fr 1fr; }
       .stat:nth-child(2) { border-right: 0; }
-      .stat:nth-child(-n+2) { border-bottom: 1px solid var(--border); }
-      .steps { grid-template-columns: 1fr 1fr; row-gap: 36px; }
+      .stat:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+      .steps { grid-template-columns: 1fr 1fr; row-gap: 40px; }
       .steps::before { display: none; }
       .role-grid, .split, .problem { grid-template-columns: 1fr; }
-      .split { gap: 32px; }
-      section.block { padding: 72px 0; }
+      .split { gap: 36px; }
+      section.block { padding: 80px 0; }
     }
 
     @media (max-width: 600px) {
@@ -313,12 +353,13 @@
       .nav-actions .btn-sm { padding: 7px 11px; }
       .feature-grid, .privacy-list, .steps { grid-template-columns: 1fr; }
       .hero-actions .btn { flex: 1 1 auto; }
-      .fc-live { left: 0; }
-      .fc-alert { left: 0; }
-      .fc-buddy { width: 220px; right: 0; }
-      .mock-row { grid-template-columns: 1fr 70px 60px; }
+      .fc-score { right: 0; }
+      .fc-nudge { left: 0; }
+      .fc-buddy { display: none; } /* three cards are enough on a phone */
+      .mock-row { grid-template-columns: 1fr 64px 62px; }
       .footer-grid { grid-template-columns: 1fr; }
-      .cta-band { padding: 48px 20px; }
+      .cta-band { padding: 52px 20px; }
+      .hub-card { padding: 24px 20px; }
     }
     @media (max-width: 400px) {
       .nav-actions [data-session="nav-signin"] { display: none; }
@@ -330,20 +371,7 @@
 </head>
 <body>
   <svg width="0" height="0" style="position: absolute" aria-hidden="true">
-    <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></symbol>
-    <symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
     <symbol id="i-brain" viewBox="632 191 736 736" fill="none" stroke="currentColor" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"><!-- Neuro-Focus logo (assets/images/neuro-focus-logo.svg) --><path d="M790 565 C700 572 655 525 655 465 C655 345 790 245 955 245 C1170 245 1345 390 1345 548 C1345 640 1278 700 1188 722"/><path d="M802 552 C780 455 865 380 990 380 C1140 380 1246 465 1246 572 C1246 630 1214 668 1186 710 C1166 740 1166 770 1168 795"/><path d="M790 565 C850 562 890 540 935 518 C985 495 1025 485 1070 485 C1132 485 1162 515 1162 555 C1162 612 1102 682 1012 682 C932 682 855 640 818 578"/><path d="M1022 688 C1062 712 1100 721 1140 721 C1160 721 1176 718 1188 714"/><circle cx="1175" cy="835" r="38"/></symbol>
-    <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></symbol>
-    <symbol id="i-live" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.9 19.1a10 10 0 0 1 0-14.2M19.1 4.9a10 10 0 0 1 0 14.2M7.8 16.2a6 6 0 0 1 0-8.4M16.2 7.8a6 6 0 0 1 0 8.4"/><circle cx="12" cy="12" r="2"/></symbol>
-    <symbol id="i-spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8Z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8Z"/></symbol>
-    <symbol id="i-chat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/><path d="M8.5 11h.01M12 11h.01M15.5 11h.01"/></symbol>
-    <symbol id="i-timer" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></symbol>
-    <symbol id="i-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></symbol>
-    <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
-    <symbol id="i-cpu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></symbol>
-    <symbol id="i-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="10" rx="5"/><circle cx="16" cy="12" r="3"/></symbol>
-    <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></symbol>
-    <symbol id="i-flag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22V4M4 4h12l-2 4 2 4H4"/></symbol>
   </svg>
 
   <header class="topbar" id="topbar">
@@ -370,42 +398,42 @@
     <!-- ================= Hero ================= -->
     <section class="hero" aria-labelledby="heroTitle">
       <div class="hero-glow" aria-hidden="true"></div>
+      <div class="hero-grid-lines" aria-hidden="true"></div>
       <canvas id="bg" aria-hidden="true"></canvas>
       <div class="container hero-grid">
         <div class="hero-copy">
-          <a class="eyebrow-pill" href="#classrooms"><span class="tag">NEW</span> Live classroom sessions are here</a>
-          <p class="hero-hello" data-session="hello" hidden></p>
+          <a class="eyebrow-pill" href="#classrooms"><span class="tag">NEW</span> Live classroom sessions are here <i class="ph-light ph-arrow-right" aria-hidden="true"></i></a>
           <h1 class="hero-title" id="heroTitle">Adaptive focus for <span class="gradient-text">neurodivergent minds.</span></h1>
           <p class="hero-lead">
             Neuro-Focus measures attention in real time with on-device computer vision, gently re-engages students when focus slips, and gives teachers a live view of their classroom, without ever recording video.
           </p>
           <div class="hero-actions">
-            <a class="btn btn-primary" href="pages/login.html?mode=signup" data-session="hero-cta"><span>Get started free</span><svg class="icon"><use href="#i-arrow"/></svg></a>
+            <a class="btn btn-primary" href="pages/login.html?mode=signup" data-session="hero-cta"><span>Get started free</span><i class="ph-light ph-arrow-right" aria-hidden="true"></i></a>
             <a class="btn btn-ghost" href="pages/login.html" data-session="hero-signin"><span>Sign in</span></a>
           </div>
           <ul class="hero-checks">
-            <li><svg><use href="#i-check"/></svg>Video never leaves the device</li>
-            <li><svg><use href="#i-check"/></svg>Runs in the browser</li>
-            <li><svg><use href="#i-check"/></svg>Built for ADHD learners</li>
+            <li><i class="ph-light ph-video-camera-slash" aria-hidden="true"></i>Video never leaves the device</li>
+            <li><i class="ph-light ph-browser" aria-hidden="true"></i>Runs in the browser</li>
+            <li><i class="ph-light ph-brain" aria-hidden="true"></i>Built for ADHD learners</li>
           </ul>
         </div>
 
-        <!-- The animated brain (neural-background.js) is centred on this area -->
+        <!-- The animated logo (neural-background.js) is centred on this area -->
         <div class="hero-visual" data-brain-anchor aria-hidden="true">
           <div class="float-card fc-live">
             <span class="live-dot"></span>
             <div><strong>Live session</strong><small>SE Section A · 24 students</small></div>
           </div>
           <div class="float-card fc-score">
-            <span class="float-icon" style="background: rgba(34,197,94,0.12); color: var(--green);"><svg><use href="#i-eye"/></svg></span>
+            <span class="float-icon green"><i class="ph-light ph-eye"></i></span>
             <div><strong>92% attention</strong><small>Focused · 6 min streak</small><div class="meter"><span></span></div></div>
           </div>
-          <div class="float-card fc-alert">
-            <span class="float-icon" style="background: rgba(245,183,72,0.12); color: var(--amber);"><svg><use href="#i-flag"/></svg></span>
-            <div><strong>Focus lapse detected</strong><small>Gentle nudge sent · 4s ago</small></div>
+          <div class="float-card fc-nudge">
+            <span class="float-icon amber"><i class="ph-light ph-hand-waving"></i></span>
+            <div><strong>Gentle nudge sent</strong><small>Focus lapse · 4 s ago</small></div>
           </div>
           <div class="float-card fc-buddy">
-            <span class="float-icon" style="background: rgba(0,217,255,0.1); color: var(--cyan);"><svg><use href="#i-chat"/></svg></span>
+            <span class="float-icon"><i class="ph-light ph-chat-circle-text"></i></span>
             <div><strong>NeuroBuddy</strong><small>“Let’s break photosynthesis into 3 small steps…”</small></div>
           </div>
         </div>
@@ -426,38 +454,38 @@
     <section class="block" id="features">
       <div class="container">
         <div class="section-head reveal">
-          <span class="kicker">Features</span>
+          <span class="kicker"><b>01</b> Features</span>
           <h2>Everything a focused online classroom needs</h2>
           <p>Attention tracking, adaptive support and live classroom analytics, designed together for neurodivergent learners and the teachers who support them.</p>
         </div>
-        <div class="feature-grid">
-          <article class="feature reveal">
-            <div class="feature-icon"><svg><use href="#i-eye"/></svg></div>
+        <div class="feature-grid reveal">
+          <article class="feature">
+            <div class="feature-icon"><i class="ph-light ph-eye" aria-hidden="true"></i></div>
             <h3>Real-time attention tracking</h3>
             <p>MediaPipe reads eye gaze and head pose in the browser and turns them into a live attention score every second.</p>
           </article>
-          <article class="feature reveal">
-            <div class="feature-icon"><svg><use href="#i-live"/></svg></div>
+          <article class="feature">
+            <div class="feature-icon"><i class="ph-light ph-broadcast" aria-hidden="true"></i></div>
             <h3>Live classroom sessions</h3>
             <p>Teachers start a session in one click. Students get notified, join, and their focus streams to the teacher instantly.</p>
           </article>
-          <article class="feature reveal">
-            <div class="feature-icon"><svg><use href="#i-spark"/></svg></div>
+          <article class="feature green">
+            <div class="feature-icon"><i class="ph-light ph-hand-waving" aria-hidden="true"></i></div>
             <h3>Adaptive re-engagement</h3>
             <p>When focus slips, students get a gentle micro-task and a reminder of their next step, not a reprimand.</p>
           </article>
-          <article class="feature reveal">
-            <div class="feature-icon"><svg><use href="#i-chat"/></svg></div>
+          <article class="feature violet">
+            <div class="feature-icon"><i class="ph-light ph-chat-circle-text" aria-hidden="true"></i></div>
             <h3>NeuroBuddy AI tutor</h3>
             <p>A patient study buddy that explains simply, summarises, quizzes and helps students get started when they’re stuck.</p>
           </article>
-          <article class="feature reveal">
-            <div class="feature-icon"><svg><use href="#i-timer"/></svg></div>
+          <article class="feature green">
+            <div class="feature-icon"><i class="ph-light ph-timer" aria-hidden="true"></i></div>
             <h3>ADHD-friendly focus tools</h3>
             <p>Short focus blocks with breaks, micro-goals, a focus timeline and personal history that students own.</p>
           </article>
-          <article class="feature reveal">
-            <div class="feature-icon"><svg><use href="#i-chart"/></svg></div>
+          <article class="feature">
+            <div class="feature-icon"><i class="ph-light ph-chart-line-up" aria-hidden="true"></i></div>
             <h3>Teacher analytics</h3>
             <p>Attention curves, heatmaps, distraction alerts, saved session history and CSV reports for every class.</p>
           </article>
@@ -469,29 +497,29 @@
     <section class="block" id="how">
       <div class="container">
         <div class="section-head reveal">
-          <span class="kicker">How it works</span>
+          <span class="kicker"><b>02</b> How it works</span>
           <h2>From a glance to an insight in under a second</h2>
           <p>All of the computer vision runs on the student’s own device. Only a handful of numbers ever travel to the teacher.</p>
         </div>
         <div class="steps">
           <div class="step reveal">
-            <div class="step-num">1</div>
-            <h3>Camera stays local</h3>
+            <div class="step-num">01</div>
+            <h3><i class="ph-light ph-webcam" aria-hidden="true"></i>Camera stays local</h3>
             <p>The browser reads webcam frames on-device through the MediaStream API. Nothing is recorded.</p>
           </div>
           <div class="step reveal">
-            <div class="step-num">2</div>
-            <h3>Landmarks extracted</h3>
+            <div class="step-num">02</div>
+            <h3><i class="ph-light ph-scan" aria-hidden="true"></i>Landmarks extracted</h3>
             <p>MediaPipe Face Mesh maps 478 points to measure gaze direction and head orientation.</p>
           </div>
           <div class="step reveal">
-            <div class="step-num">3</div>
-            <h3>Attention scored</h3>
+            <div class="step-num">03</div>
+            <h3><i class="ph-light ph-gauge" aria-hidden="true"></i>Attention scored</h3>
             <p>A sliding window of behaviour is classified into Focused, Drifting or Distracted, with LSTM models in Phase 2.</p>
           </div>
           <div class="step reveal">
-            <div class="step-num">4</div>
-            <h3>Support in real time</h3>
+            <div class="step-num">04</div>
+            <h3><i class="ph-light ph-lifebuoy" aria-hidden="true"></i>Support in real time</h3>
             <p>Teachers see live scores and alerts; students get adaptive nudges and NeuroBuddy help.</p>
           </div>
         </div>
@@ -502,19 +530,19 @@
     <section class="block" id="classrooms">
       <div class="container">
         <div class="section-head reveal">
-          <span class="kicker">For classrooms</span>
+          <span class="kicker"><b>03</b> For classrooms</span>
           <h2>Two workspaces, one shared goal</h2>
           <p>Students get tools that help them focus. Teachers get the visibility to step in at the right moment.</p>
         </div>
         <div class="role-grid" id="workspaces">
-          <article class="hub-card reveal">
+          <article class="hub-card green reveal">
             <div>
-              <span class="hub-badge">For students</span>
+              <span class="hub-badge"><i class="ph-light ph-student" aria-hidden="true"></i>For students</span>
               <h3 class="hub-title">Student Focus Workspace</h3>
               <p class="hub-desc">A calm space to learn with real-time feedback, gentle nudges and an AI study buddy.</p>
             </div>
             <div class="mock" aria-hidden="true">
-              <div class="mock-banner"><span class="live-dot" style="background: var(--green); animation: none;"></span>You’re in the live session</div>
+              <div class="mock-banner"><span class="live-dot" style="animation: none;"></span>You’re in the live session</div>
               <div class="mock-tiles">
                 <div class="mock-tile"><b>88%</b><small>Live attention</small></div>
                 <div class="mock-tile"><b>6:12</b><small>Focus streak</small></div>
@@ -522,31 +550,31 @@
               </div>
             </div>
             <ul class="checklist">
-              <li><svg><use href="#i-check"/></svg>Join live sessions with one tap; leave anytime</li>
-              <li><svg><use href="#i-check"/></svg>Focus timer, micro-goals and personal history</li>
-              <li><svg><use href="#i-check"/></svg>NeuroBuddy for explanations, summaries and quizzes</li>
+              <li><i class="ph-light ph-check" aria-hidden="true"></i>Join live sessions with one tap; leave anytime</li>
+              <li><i class="ph-light ph-check" aria-hidden="true"></i>Focus timer, micro-goals and personal history</li>
+              <li><i class="ph-light ph-check" aria-hidden="true"></i>NeuroBuddy for explanations, summaries and quizzes</li>
             </ul>
-            <a class="hub-action" href="pages/student.html" data-session="hub-student">Open Student Workspace <svg class="icon"><use href="#i-arrow"/></svg></a>
+            <a class="hub-action" href="pages/student.html" data-session="hub-student">Open Student Workspace <i class="ph-light ph-arrow-right" aria-hidden="true"></i></a>
           </article>
 
           <article class="hub-card reveal">
             <div>
-              <span class="hub-badge">For teachers</span>
+              <span class="hub-badge"><i class="ph-light ph-chalkboard-teacher" aria-hidden="true"></i>For teachers</span>
               <h3 class="hub-title">Teacher Oversight &amp; Analytics</h3>
               <p class="hub-desc">See who’s engaged, who’s drifting and who needs help, live and after class.</p>
             </div>
             <div class="mock" aria-hidden="true">
-              <div class="mock-bar"><strong style="color: var(--text-main)">SE Section A</strong><span class="pill bad" style="display: inline-flex; gap: 6px; align-items: center;"><span class="live-dot" style="width: 6px; height: 6px; animation: none;"></span>LIVE</span></div>
+              <div class="mock-bar"><strong>SE Section A</strong><span class="pill live"><span class="live-dot" style="width: 6px; height: 6px;"></span>LIVE</span></div>
               <div class="mock-row"><span>Ayesha Khan</span><div class="bar"><span style="width: 91%"></span></div><span class="pill ok">Focused</span></div>
               <div class="mock-row"><span>Hamza Ali</span><div class="bar"><span style="width: 58%; background: var(--amber)"></span></div><span class="pill warn">Drifting</span></div>
               <div class="mock-row"><span>Fatima Noor</span><div class="bar"><span style="width: 34%; background: var(--red)"></span></div><span class="pill bad">Flagged</span></div>
             </div>
             <ul class="checklist">
-              <li><svg><use href="#i-check"/></svg>Create classes, share a code, start a live session</li>
-              <li><svg><use href="#i-check"/></svg>Attention curves, heatmaps and distraction alerts</li>
-              <li><svg><use href="#i-check"/></svg>Manage students and export session reports</li>
+              <li><i class="ph-light ph-check" aria-hidden="true"></i>Create classes, share a code, start a live session</li>
+              <li><i class="ph-light ph-check" aria-hidden="true"></i>Attention curves, heatmaps and distraction alerts</li>
+              <li><i class="ph-light ph-check" aria-hidden="true"></i>Manage students and export session reports</li>
             </ul>
-            <a class="hub-action" href="pages/teacher.html" data-session="hub-teacher">Open Teacher Dashboard <svg class="icon"><use href="#i-arrow"/></svg></a>
+            <a class="hub-action" href="pages/teacher.html" data-session="hub-teacher">Open Teacher Dashboard <i class="ph-light ph-arrow-right" aria-hidden="true"></i></a>
           </article>
         </div>
       </div>
@@ -556,15 +584,15 @@
     <section class="block" id="privacy">
       <div class="container split">
         <div class="section-head left reveal" style="margin-bottom: 0;">
-          <span class="kicker">Privacy by design</span>
+          <span class="kicker"><b>04</b> Privacy by design</span>
           <h2>Attention insights without surveillance</h2>
           <p>Neuro-Focus was built so students can benefit from AI support without being recorded. The camera feed is processed on their device and immediately discarded; teachers only ever see numbers, and only during sessions students choose to join.</p>
         </div>
-        <div class="privacy-list">
-          <div class="privacy-item reveal"><svg><use href="#i-cpu"/></svg><h3>On-device processing</h3><p>Face landmarks are computed in the browser. No video is uploaded or stored.</p></div>
-          <div class="privacy-item reveal"><svg><use href="#i-toggle"/></svg><h3>Student control</h3><p>Sharing happens only in live sessions, and students can pause it anytime.</p></div>
-          <div class="privacy-item reveal"><svg><use href="#i-lock"/></svg><h3>Private by default</h3><p>Personal focus history is visible only to the student who owns it.</p></div>
-          <div class="privacy-item reveal"><svg><use href="#i-shield"/></svg><h3>Secured access</h3><p>Row-level security and private live channels keep class data inside the class.</p></div>
+        <div class="privacy-list reveal">
+          <div class="privacy-item"><i class="ph-light ph-cpu" aria-hidden="true"></i><h3>On-device processing</h3><p>Face landmarks are computed in the browser. No video is uploaded or stored.</p></div>
+          <div class="privacy-item"><i class="ph-light ph-toggle-right" aria-hidden="true"></i><h3>Student control</h3><p>Sharing happens only in live sessions, and students can pause it anytime.</p></div>
+          <div class="privacy-item"><i class="ph-light ph-lock-simple" aria-hidden="true"></i><h3>Private by default</h3><p>Personal focus history is visible only to the student who owns it.</p></div>
+          <div class="privacy-item"><i class="ph-light ph-shield-check" aria-hidden="true"></i><h3>Secured access</h3><p>Row-level security and private live channels keep class data inside the class.</p></div>
         </div>
       </div>
     </section>
@@ -573,7 +601,7 @@
     <section class="block" id="mission">
       <div class="container">
         <div class="section-head reveal">
-          <span class="kicker">Why it matters</span>
+          <span class="kicker"><b>05</b> Why it matters</span>
           <h2>Logins and clicks don’t measure attention</h2>
           <p>Students with ADHD struggle most with sustained focus in online classes, and in a crowded video call their distraction goes unnoticed until grades slip.</p>
         </div>
@@ -581,19 +609,19 @@
           <div class="problem-card before reveal">
             <h3>Typical e-learning platforms</h3>
             <ul>
-              <li>Engagement judged by logins, clicks and minutes online</li>
-              <li>No live view of who is actually paying attention</li>
-              <li>One-size-fits-all design for neurotypical learners</li>
-              <li>Teachers find out only after assessments</li>
+              <li><i class="ph-light ph-x" aria-hidden="true"></i>Engagement judged by logins, clicks and minutes online</li>
+              <li><i class="ph-light ph-x" aria-hidden="true"></i>No live view of who is actually paying attention</li>
+              <li><i class="ph-light ph-x" aria-hidden="true"></i>One-size-fits-all design for neurotypical learners</li>
+              <li><i class="ph-light ph-x" aria-hidden="true"></i>Teachers find out only after assessments</li>
             </ul>
           </div>
           <div class="problem-card after reveal">
             <h3>With Neuro-Focus</h3>
             <ul>
-              <li>Continuous, AI-based attention scoring from gaze and head pose</li>
-              <li>A live classroom dashboard with distraction alerts</li>
-              <li>Tools and nudges designed for neurodivergent learners</li>
-              <li>Early, supportive intervention while learning happens</li>
+              <li><i class="ph-light ph-check" aria-hidden="true"></i>Continuous, AI-based attention scoring from gaze and head pose</li>
+              <li><i class="ph-light ph-check" aria-hidden="true"></i>A live classroom dashboard with distraction alerts</li>
+              <li><i class="ph-light ph-check" aria-hidden="true"></i>Tools and nudges designed for neurodivergent learners</li>
+              <li><i class="ph-light ph-check" aria-hidden="true"></i>Early, supportive intervention while learning happens</li>
             </ul>
           </div>
         </div>
@@ -604,28 +632,28 @@
     <section class="block" id="faq">
       <div class="container">
         <div class="section-head reveal">
-          <span class="kicker">FAQ</span>
+          <span class="kicker"><b>06</b> FAQ</span>
           <h2>Questions, answered</h2>
         </div>
         <div class="faq reveal">
           <details>
-            <summary>Does Neuro-Focus record my webcam?</summary>
+            <summary>Does Neuro-Focus record my webcam?<i class="ph-light ph-plus" aria-hidden="true"></i></summary>
             <p>No. Video is analysed frame by frame inside your browser and never leaves your device. Only an attention score, a focus state and a session focus percentage are shared, and only during a live session you join.</p>
           </details>
           <details>
-            <summary>Who can see my attention data?</summary>
+            <summary>Who can see my attention data?<i class="ph-light ph-plus" aria-hidden="true"></i></summary>
             <p>During a live session, only the teacher of that class sees your live scores. Your personal history from tracking on your own is visible only to you. Classmates never see each other’s data.</p>
           </details>
           <details>
-            <summary>What do I need to use it?</summary>
+            <summary>What do I need to use it?<i class="ph-light ph-plus" aria-hidden="true"></i></summary>
             <p>A laptop or desktop with a webcam and a modern browser such as Chrome, Edge, Safari or Firefox. There is nothing to install.</p>
           </details>
           <details>
-            <summary>How do teachers and students connect?</summary>
+            <summary>How do teachers and students connect?<i class="ph-light ph-plus" aria-hidden="true"></i></summary>
             <p>Teachers create a class and share its join code. Students enter the code, and when the teacher starts a live session they get a notification to join.</p>
           </details>
           <details>
-            <summary>Is this a medical or diagnostic tool?</summary>
+            <summary>Is this a medical or diagnostic tool?<i class="ph-light ph-plus" aria-hidden="true"></i></summary>
             <p>No. Neuro-Focus supports attention during learning; it does not diagnose ADHD or any other condition.</p>
           </details>
         </div>
@@ -633,13 +661,14 @@
     </section>
 
     <!-- ================= Call to action ================= -->
-    <section class="block" style="padding-top: 24px;">
+    <section class="block" style="padding-top: 16px;">
       <div class="container">
         <div class="cta-band reveal">
+          <span class="brand-mark cta-mark" aria-hidden="true"><svg><use href="#i-brain"/></svg></span>
           <h2>Bring focus back to your online classroom</h2>
           <p>Create a free account and run your first live session in minutes.</p>
           <div class="hero-actions">
-            <a class="btn btn-primary" href="pages/login.html?mode=signup"><span>Get started free</span><svg class="icon"><use href="#i-arrow"/></svg></a>
+            <a class="btn btn-primary" href="pages/login.html?mode=signup"><span>Get started free</span><i class="ph-light ph-arrow-right" aria-hidden="true"></i></a>
             <a class="btn btn-ghost" href="pages/login.html"><span>Sign in</span></a>
           </div>
         </div>
@@ -692,8 +721,8 @@
   </footer>
 
   <script src="scripts/shared/app.js?v=2"></script>
-  <script src="scripts/shared/neural-background.js?v=2"></script>
-  <script src="scripts/home/home.js?v=1"></script>
-  <script type="module" src="scripts/home/home-session.js?v=3"></script>
+  <script src="scripts/shared/neural-background.js?v=18"></script>
+  <script src="scripts/home/home.js?v=2"></script>
+  <script type="module" src="scripts/home/home-session.js?v=5"></script>
 </body>
 </html>

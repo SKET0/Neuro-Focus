@@ -347,6 +347,27 @@ if (app && document.querySelector("#tab-posts")) {
     if (tab === "assignments" && openAssignmentId && editingMarks()) return;
     refresh();
   });
+  // The teacher Home (teacher-home.js) opens a class first, then calls these: one assignment's
+  // submissions, the assignment form, or the post form (optionally pre-filled, e.g. a reminder).
+  window.neuroFocusClassroom = {
+    openAssignment(id) {
+      openAssignmentId = id;
+      if (assignments.some((a) => a.id === id)) renderDetail();
+    },
+    newAssignment() {
+      closeDetail();
+      $("#assignmentComposer").open = true;
+      $("#assignmentComposer").scrollIntoView({ block: "center" });
+      $("#assignmentTitle").focus();
+    },
+    newPost({ title = "", body = "" } = {}) {
+      if (title) $("#postTitle").value = title;
+      if (body) $("#postBody").value = body;
+      $("#postForm").scrollIntoView({ block: "center" });
+      $("#postBody").focus();
+    }
+  };
+
   // The class page may have opened before this module loaded: start from where it is now.
   classId = window.neuroFocusClass?.id || classId;
   if (window.neuroFocusView === "class") tab = window.neuroFocusClassTab || "";

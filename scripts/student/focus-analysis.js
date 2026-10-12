@@ -166,111 +166,137 @@ export function buildInsights(current) {
 }
 
 // ---------- Home: the Focus coach ----------
-// sessions: finished saved sessions, newest first. habits: what the student has set up right now
-// ({ nudgesOn, stepsPlanned, timerPreset }). Returns what the tracker recorded, what might be worth
-// trying (each tip can carry an action the Home page knows how to run) and what it is based on.
-export function buildCoaching(sessions, habits = {}, now = Date.now()) {
-  const recent = sessions.filter((s) => now - new Date(s.started_at) < 30 * DAY);
-  const evidence = evidenceFor(recent);
-  const lastWeek = sessions.filter((s) => now - new Date(s.started_at) < 7 * DAY);
-  const activeDays = new Set(lastWeek.map((s) => new Date(s.started_at).toDateString())).size;
-  const daysSinceLast = sessions.length ? Math.floor((now - new Date(sessions[0].started_at)) / DAY) : null;
-  const wins = [];
+// Practical tips from whatever history there is, from a single session up: nothing is held back
+// until a minimum is reached. Every tip says what it is based on ("From your last session",
+// "From 4 sessions"), and fewer sessions mean softer wording ("an early sign"). Tips are
+// suggestions to try, never claims that something improves focus (Neuro-Focus hasn't measured
+// that). With no sessions at all, general tips are shown and labelled as general.
+// sessions: finished saved sessions, newest first. habits: { nudgesOn, stepsPlanned, timerPreset }.
+// Returns { stage: "starter" | "personal", basis, wins, tips, evidence }; tips carry an optional
+// action the Home page knows how to run ({ kind: "start" | "preset" | "nudges" | "step" }).
+const COACH_GROUP = { sessions: 1, minutes: 5, difference: 8 }; // time-of-day / length comparisons
+const minutesOf = (s) => (s.tracked_seconds || 0) / 60;
+const measuredShare = (s) => (hasQualityInfo(s) && s.tracked_seconds ? s.usable_seconds / s.tracked_seconds : null);
+const sessionsPhrase = (n) => (n === 1 ? "From your last session" : `From ${n} sessions`);
+const tentative = (n) => (n <= 2 ? "An early sign, so see if it holds." : n <= 4 ? "A possible pattern so far." : "");
+
+function generalTips(habits) {
   const tips = [];
-  const progress = {
-    sessions: { done: Math.min(evidence.sessions, COACH_MINIMUM.sessions), needed: COACH_MINIMUM.sessions },
-    days: { done: Math.min(evidence.days, COACH_MINIMUM.days), needed: COACH_MINIMUM.days },
-    minutes: { done: Math.min(evidence.minutes, COACH_MINIMUM.minutes), needed: COACH_MINIMUM.minutes }
-  };
+  if (habits.timerPreset !== "15-3" && habits.timerPreset !== "10-2") {
+    tips.push({ icon: "i-timer", title: "Start with short blocks", text: "15 minutes of work and a 3-minute break is easier to begin than one long stretch.", action: { kind: "preset", value: "15-3", label: "Use 15-minute blocks" }, basis: "General tip" });
+  }
+  if (!habits.stepsPlanned) tips.push({ icon: "i-list", title: "Write 2–3 tiny steps first", text: "“Read page 12” is easier to start than “study biology”.", action: { kind: "step", label: "Add a step" }, basis: "General tip" });
+  if (!habits.nudgesOn) tips.push({ icon: "i-spark", title: "Try gentle nudges", text: "Get a soft reminder when the tracker thinks you’ve looked away. Neuro-Focus hasn’t measured whether they help, so see if they suit you.", action: { kind: "nudges", label: "Turn nudges on" }, basis: "General tip" });
+  tips.push({ icon: "i-eye", title: "Help the tracker see you", text: "Face the screen with light in front of you, not behind. Time the camera can’t see isn’t counted.", basis: "General tip" });
+  return tips;
+}
 
-  // ----- Not enough measured data yet: general tips, clearly labelled as general -----
-  if (!evidence.enough) {
-    if (sessions.length) {
-      wins.push({ icon: "i-check", title: `${plural(sessions.length, "session")} recorded so far`, text: `${mins(sum(sessions, measuredSeconds))} of measured tracking saved.` });
-    }
-    if (habits.stepsPlanned) wins.push({ icon: "i-list", title: "You’ve planned your steps", text: "Your next steps are written down in Today." });
-    if (habits.nudgesOn) wins.push({ icon: "i-spark", title: "Nudges are on", text: "You’ll get a gentle reminder if the tracker estimates you’ve looked away for a few seconds." });
-
-    if (habits.timerPreset !== "15-3" && habits.timerPreset !== "10-2") {
-      tips.push({ icon: "i-timer", title: "Try short blocks", text: "Many students find 15 minutes of work and a 3-minute break easier to stick with than one long stretch. A general tip, not based on your data.", action: { kind: "preset", value: "15-3", label: "Use 15-minute blocks" } });
-    }
-    if (!habits.stepsPlanned) {
-      tips.push({ icon: "i-list", title: "Write 2–3 tiny steps first", text: "“Read page 12” is often easier to begin than “study biology”. A general tip.", action: { kind: "step", label: "Add a step" } });
-    }
-    if (!habits.nudgesOn) {
-      tips.push({ icon: "i-spark", title: "Nudges are off", text: "Turn them on if you’d like a gentle reminder when the tracker estimates you’ve looked away. Neuro-Focus hasn’t measured whether they help, so see if they suit you.", action: { kind: "nudges", label: "Turn nudges on" } });
-    }
-    tips.push({ icon: "i-eye", title: "Help the tracker measure", text: "Keep your face in view and well lit, with no one else in the picture. Time the camera can’t measure isn’t counted at all." });
-    return {
-      stage: "starter",
-      basis: `General tips, not based on your data · personal suggestions need ${EVIDENCE_RULE} in the last 30 days`,
-      evidence,
-      progress,
-      wins,
-      tips: tips.slice(0, 3)
-    };
+export function buildCoaching(sessions, habits = {}, now = Date.now()) {
+  const recent = sessions.filter((s) => now - new Date(s.started_at) < 30 * DAY && (s.tracked_seconds || 0) >= 60);
+  const scored = recent.filter(hasFocus);
+  const evidence = evidenceFor(recent);
+  if (!recent.length) {
+    const wins = [];
+    if (habits.stepsPlanned) wins.push({ icon: "i-list", title: "Your steps are planned", text: "Your next steps are written down in Today." });
+    return { stage: "starter", basis: "General tips · track a focus session and tips will be based on it", evidence, wins, tips: generalTips(habits).slice(0, 4) };
   }
 
-  // ----- Personal: tentative, from their measured sessions in the last 30 days -----
-  const used = evidence.used;
-  const trend = trendOf(used);
-  const rate = lookAwayRate(used);
-  const times = compareGroups(used, timeOfDay);
-  const lengths = compareGroups(used, lengthOf);
-  const average = averageFocus(used);
-  const bestStreak = used.reduce((top, s) => Math.max(top, s.best_streak_seconds || 0), 0);
+  const last = recent[0];
+  const n = scored.length;
+  const lastWeek = recent.filter((s) => now - new Date(s.started_at) < 7 * DAY);
+  const activeDays = new Set(lastWeek.map((s) => new Date(s.started_at).toDateString())).size;
+  const daysSinceLast = Math.floor((now - new Date(last.started_at)) / DAY);
+  const average = averageFocus(scored);
+  const candidates = []; // { priority, ...tip }
+  const wins = [];
+  const add = (priority, tip) => candidates.push({ priority, ...tip });
 
-  if (activeDays >= 3) wins.push({ icon: "i-calendar", title: `You studied on ${activeDays} of the last 7 days`, text: "Recorded in your saved sessions." });
-  if (trend?.direction === "up") wins.push({ icon: "i-trend", title: "Recorded on-screen time has gone up", text: `Estimated ${trend.after}% recently, compared with ${trend.before}% earlier.` });
-  if (average !== null && average >= 75) wins.push({ icon: "i-check", title: `About ${average}% of measured time on screen`, text: `The tracker’s estimate across ${mins(evidence.minutes * 60)} of measured tracking.` });
-  if (rate && (!rate.episodes || rate.every >= 10)) {
-    wins.push(rate.episodes
-      ? { icon: "i-target", title: `Looked away 4s+ about once every ${rate.every} minutes`, text: `Recorded across ${mins(rate.minutes * 60)} of measured tracking.` }
-      : { icon: "i-target", title: "No 4-second look-aways recorded", text: `Across ${mins(rate.minutes * 60)} of measured tracking.` });
+  // Coming back after a gap
+  if (daysSinceLast >= 3) {
+    add(85, { icon: "i-rocket", title: `It’s been ${daysSinceLast} days since your last session`, text: "Ease back in with one short 15-minute block. Getting started is the hardest part.", action: { kind: "start", label: "Start a focus session" }, basis: "From your session history" });
   }
+
+  // The camera couldn't see much of the last session
+  const share = measuredShare(last);
+  if (share !== null && share < 0.65 && minutesOf(last) >= 3) {
+    add(90, { icon: "i-eye", tone: "amber", title: "The camera missed part of your last session", text: `It could see you for about ${Math.round(share * 100)}% of the ${mins(last.tracked_seconds)}. Face the screen with light in front of you, so more of your time counts.`, basis: "From your last session" });
+  }
+
+  // Looking away often (last session, or across sessions when there are several)
+  const lookSource = n >= 3 ? scored : [last];
+  const lookMinutes = sum(lookSource, measuredSeconds) / 60;
+  const lookEpisodes = sum(lookSource, (s) => s.lapses || 0);
+  const lookEvery = lookEpisodes ? lookMinutes / lookEpisodes : null;
+  if (lookEvery !== null && lookMinutes >= 5 && lookEvery < 6) {
+    const every = Math.max(1, Math.round(lookEvery));
+    const base = `The tracker recorded you looking away for 4+ seconds about every ${plural(every, "minute")}${lookSource.length === 1 ? " in your last session" : ""}. Reading notes counts too, so this isn’t always a problem.`;
+    const basis = sessionsPhrase(lookSource.length);
+    if (!habits.nudgesOn) add(80, { icon: "i-spark", title: "You looked away quite often", text: `${base} Gentle nudges can remind you when you drift; see if they suit you.`, action: { kind: "nudges", label: "Turn nudges on" }, basis });
+    else if (!habits.stepsPlanned) add(78, { icon: "i-list", title: "You looked away quite often", text: `${base} Writing your next step down can make it quicker to restart.`, action: { kind: "step", label: "Add a step" }, basis });
+    else if (habits.timerPreset !== "15-3") add(76, { icon: "i-timer", title: "You looked away quite often", text: `${base} Shorter blocks with a break might feel easier.`, action: { kind: "preset", value: "15-3", label: "Use 15-minute blocks" }, basis });
+  } else if (lookEvery === null && lookMinutes >= 10) {
+    wins.push({ icon: "i-target", title: "No 4-second look-aways recorded", text: `${sessionsPhrase(lookSource.length)}, across ${mins(lookMinutes * 60)}.` });
+  }
+
+  // Very short last session
+  if (minutesOf(last) < 8 && daysSinceLast < 3) {
+    add(70, { icon: "i-timer", title: `Your last session was ${mins(last.tracked_seconds)}`, text: "Short sessions are a fine start. Next time, aim for one full 15-minute block with a break after.", action: habits.timerPreset === "15-3" ? { kind: "start", label: "Start 15 minutes" } : { kind: "preset", value: "15-3", label: "Use 15-minute blocks" }, basis: "From your last session" });
+  }
+
+  // Long sessions vs shorter ones (or long sessions with lower estimates)
+  const long = scored.filter((s) => minutesOf(s) >= 40);
+  const shorter = scored.filter((s) => minutesOf(s) < 40);
+  const longAvg = averageFocus(long);
+  const shortAvg = averageFocus(shorter);
+  if (long.length && shorter.length && longAvg !== null && shortAvg !== null && shortAvg - longAvg >= COACH_GROUP.difference) {
+    add(74, { icon: "i-timer", title: "Long sessions have gone less well", text: `Sessions over 40 minutes were about ${longAvg}% on screen, against ${shortAvg}% for shorter ones. Try 25-minute blocks with a 5-minute break. ${tentative(n)}`.trim(), action: habits.timerPreset !== "25-5" ? { kind: "preset", value: "25-5", label: "Use 25-minute blocks" } : null, basis: sessionsPhrase(n) });
+  } else if (long.length && !shorter.length && longAvg !== null && longAvg < 65) {
+    add(66, { icon: "i-timer", title: "Your sessions are long", text: `They average over 40 minutes, at about ${longAvg}% on screen. A short break every 25 minutes might make them easier.`, action: habits.timerPreset !== "25-5" ? { kind: "preset", value: "25-5", label: "Use 25-minute blocks" } : null, basis: sessionsPhrase(n) });
+  }
+
+  // Time of day: which part of the day has gone best so far
+  const times = compareGroups(scored, timeOfDay, COACH_GROUP);
   if (times) {
     const best = TIMES.find((t) => t.key === times.best.key);
     const worst = TIMES.find((t) => t.key === times.worst.key);
-    wins.push({ icon: "i-sun", title: `Higher estimates ${best.phrase}`, text: `${times.best.avg}% then, against ${times.worst.avg}% ${worst.phrase}. Possibly a pattern; worth testing for yourself.` });
+    add(60, { icon: "i-sun", title: `Your estimates are highest ${best.phrase}`, text: `About ${times.best.avg}% on screen ${best.phrase}, against ${times.worst.avg}% ${worst.phrase}. Try your hardest work ${best.phrase} when you can. ${tentative(times.best.count + times.worst.count)}`.trim(), basis: sessionsPhrase(times.best.count + times.worst.count) });
   }
-  if (bestStreak >= 600) wins.push({ icon: "i-flame", title: `Longest stretch recorded on screen: ${mins(bestStreak)}`, text: "A continuous stretch the tracker estimated as looking at the screen." });
 
-  // What might be worth trying, most relevant first. Suggestions, not conclusions.
-  if (daysSinceLast !== null && daysSinceLast >= 4) {
-    tips.push({ icon: "i-rocket", title: `It’s been ${daysSinceLast} days since your last session`, text: "Starting small, like one 10–15 minute block, can make it easier to get going again.", action: { kind: "start", label: "Start a focus session" } });
-  }
-  if (trend?.direction === "down") {
-    tips.push({ icon: "i-flag", tone: "amber", title: "Recorded on-screen time has gone down", text: `Estimated ${trend.after}% recently, down from ${trend.before}%. This could be lighting or the kind of work. If it matches how you felt, shorter blocks might be worth a try.`, action: habits.timerPreset !== "15-3" ? { kind: "preset", value: "15-3", label: "Try 15-minute blocks" } : null });
-  }
-  if (rate && rate.episodes && rate.every < 10) {
-    const base = `The tracker recorded looking away for 4+ seconds about once every ${plural(rate.every, "minute")}. That can include reading notes.`;
-    if (!habits.nudgesOn) tips.push({ icon: "i-spark", title: "Nudges are off", text: `${base} Turn them on if you’d like a reminder; Neuro-Focus hasn’t measured whether they help.`, action: { kind: "nudges", label: "Turn nudges on" } });
-    else if (!habits.stepsPlanned) tips.push({ icon: "i-list", title: "Write down your next step", text: `${base} Having the next step written down may make it quicker to restart.`, action: { kind: "step", label: "Add a step" } });
-    else tips.push({ icon: "i-timer", title: "Plan short breaks", text: `${base} Some students find a short break every 15–25 minutes useful; see if it suits you.`, action: habits.timerPreset === "45-10" ? { kind: "preset", value: "25-5", label: "Use 25-minute blocks" } : null });
-  }
-  if (lengths) {
-    const best = LENGTHS[lengths.best.key];
-    if (habits.timerPreset !== best.preset) {
-      tips.push({ icon: "i-timer", title: `You could try ${best.presetLabel}`, text: `Your ${best.phrase} had higher estimates (${lengths.best.avg}%) than ${LENGTHS[lengths.worst.key].phrase} (${lengths.worst.avg}%). A tentative pattern, worth testing.`, action: { kind: "preset", value: best.preset, label: `Use ${best.presetLabel}` } });
-    } else {
-      wins.unshift({ icon: "i-timer", title: "Your timer matches your higher estimates", text: `Your ${best.phrase} had the highest estimates (${lengths.best.avg}%), and that’s how your timer is set.` });
+  // Direction over time (4+ sessions: newer half against older half)
+  if (n >= 4) {
+    const chronological = scored.slice().reverse();
+    const half = Math.floor(chronological.length / 2);
+    const before = averageFocus(chronological.slice(0, half));
+    const after = averageFocus(chronological.slice(half));
+    if (before !== null && after !== null && after - before >= 8) wins.push({ icon: "i-trend", title: "Your recent sessions are going up", text: `About ${after}% on screen recently, up from ${before}% earlier.` });
+    else if (before !== null && after !== null && before - after >= 8) {
+      add(65, { icon: "i-flag", tone: "amber", title: "Your recent sessions have dipped", text: `About ${after}% on screen recently, down from ${before}%. It could be tiredness, the kind of work or the lighting. A quieter spot or shorter blocks might help.`, action: habits.timerPreset !== "15-3" ? { kind: "preset", value: "15-3", label: "Try 15-minute blocks" } : null, basis: sessionsPhrase(n) });
     }
   }
-  if (times) {
-    const worst = TIMES.find((t) => t.key === times.worst.key);
-    tips.push({ icon: "i-sun", title: `Lower estimates ${worst.phrase}`, text: `${times.worst.avg}% ${worst.phrase}. You might try lighter tasks then, like reading over notes, and see whether that suits you.` });
-  }
-  if (activeDays <= 1 && !(daysSinceLast !== null && daysSinceLast >= 4)) {
-    tips.push({ icon: "i-calendar", title: "Spread sessions across the week", text: `You tracked on ${plural(activeDays, "day")} this week. Many students find a few short sessions easier than one long one.`, action: { kind: "start", label: "Start a focus session" } });
-  }
-  if (!tips.length) tips.push({ icon: "i-check", title: "Nothing stands out", text: "Your recent sessions don’t show a clear pattern to change." });
-  if (!wins.length) wins.push({ icon: "i-check", title: `${plural(used.length, "session")} recorded this month`, text: `${mins(evidence.minutes * 60)} of measured tracking.` });
 
+  // Rhythm across the week
+  if (activeDays <= 1 && recent.length >= 2 && daysSinceLast < 3) {
+    add(45, { icon: "i-calendar", title: "Spread your sessions out", text: "You’ve studied on one day this week. A few short sessions on different days are often easier than one long one.", action: { kind: "start", label: "Start a focus session" }, basis: "From this week" });
+  }
+  if (!habits.stepsPlanned) {
+    add(35, { icon: "i-list", title: "Plan your next step", text: "Write down one small, specific step before you start, like “answer questions 1–3”.", action: { kind: "step", label: "Add a step" }, basis: "General tip" });
+  }
+
+  // What's going well
+  if (activeDays >= 3) wins.push({ icon: "i-calendar", title: `You studied on ${activeDays} of the last 7 days`, text: "Keeping a rhythm makes starting easier." });
+  const bestStreak = scored.reduce((top, s) => Math.max(top, s.best_streak_seconds || 0), 0);
+  if (bestStreak >= 600) wins.push({ icon: "i-flame", title: `Longest stretch on screen: ${mins(bestStreak)}`, text: "One continuous stretch, as estimated by the tracker." });
+  if (average !== null && average >= 75) wins.push({ icon: "i-check", title: `About ${average}% of measured time on screen`, text: `${sessionsPhrase(n)} in the last 30 days.` });
+
+  const tips = candidates.sort((a, b) => b.priority - a.priority).map(({ priority, ...tip }) => tip);
+  // Always offer something practical: general tips fill in behind the personal ones.
+  const duplicate = (tip) => tips.some((t) => t.title === tip.title || (tip.action && t.action?.kind === tip.action.kind));
+  generalTips(habits).forEach((tip) => { if (tips.length < 3 && !duplicate(tip)) tips.push(tip); });
   return {
     stage: "personal",
-    basis: `Suggestions from ${plural(evidence.sessions, "session")} on ${plural(evidence.days, "day")} (${evidence.minutes} min measured) in the last 30 days · estimates, not conclusions${evidence.older ? ` · ${plural(evidence.older, "older session")} without tracking-quality information not used` : ""}`,
+    basis: `Based on ${plural(recent.length, "session")} in the last 30 days · estimates from face and eye direction, not conclusions`,
     evidence,
     wins: wins.slice(0, 3),
-    tips: tips.slice(0, 3)
+    tips: tips.slice(0, 4)
   };
 }

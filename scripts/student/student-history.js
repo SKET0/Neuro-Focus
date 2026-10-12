@@ -1,12 +1,13 @@
-// My progress view: the student's saved track record. Summary stats, a focus-time chart,
-// plain-language insights and the session list, all for the chosen range (7 days, 30 days or
+// My progress view: the student's saved track record, kept simple. One summary (time focused,
+// the days you focused, sessions, focus score and day streak), a focus-time chart, the Focus
+// coach (the same one as Home) and the session list, for the chosen range (7 days, 30 days or
 // all time). Live numbers for the session in progress are in Focus session (student-focus.js);
 // a session still being recorded is left out here until it is stopped. Reads the student's
 // saved attention_sessions, and a session's attention_samples when it is opened.
 // Saving happens in student-focus.js, which fires "neurofocus:history-saved" afterwards.
 // Shown in the My progress view; colours follow the student's theme.
 import { themeColor, withAlpha } from "../shared/appearance.js?v=1";
-import { hasFocus, hasQualityInfo, measuredSeconds, focusedSeconds, sum, averageFocus, levelFor, buildInsights, COACH_MINIMUM, EVIDENCE_RULE } from "./focus-analysis.js?v=2";
+import { hasFocus, focusedSeconds, sum, averageFocus, levelFor, buildCoaching } from "./focus-analysis.js?v=3";
 import { sampleRuns, selectWithQuality } from "../shared/tracking-states.js?v=1";
 
 const app = await window.neuroFocusReady;
@@ -62,7 +63,6 @@ if (app) {
     return s >= 3600 ? duration(s) : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
   };
   const time = (date) => new Date(date).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  const shortDate = (date) => new Date(date).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
 
   function dayTitle(date) {
     const key = dayKey(date);
@@ -78,21 +78,15 @@ if (app) {
     const today = startOfDay(new Date());
     if (range === "all") {
       const oldest = sessions.length ? startOfDay(sessions[sessions.length - 1].started_at) : today;
-      return { start: oldest, days: Math.round((today - oldest) / 86400000) + 1, prevStart: null, phrase: "in total", compare: null };
+      return { start: oldest, days: Math.round((today - oldest) / 86400000) + 1, prevStart: null, phrase: "in total", label: "All time", compare: null };
     }
     const days = Number(range);
     const start = addDays(today, -(days - 1));
-    return { start, days, prevStart: addDays(start, -days), phrase: `in the last ${days} days`, compare: days === 7 ? "previous week" : "previous 30 days" };
+    return { start, days, prevStart: addDays(start, -days), phrase: `in the last ${days} days`, label: `Last ${days} days`, compare: days === 7 ? "the week before" : "the 30 days before" };
   }
   const between = (list, from, to) => list.filter((s) => { const t = new Date(s.started_at); return t >= from && (!to || t < to); });
 
-  // ---------- Summary stats ----------
-  function delta(value, unit, label) {
-    const span = el("span", `delta ${value > 0 ? "up" : value < 0 ? "down" : ""}`);
-    span.textContent = value === 0 ? `No change vs ${label}` : `${value > 0 ? "▲" : "▼"} ${unit(Math.abs(value))} vs ${label}`;
-    return span;
-  }
-
+  // ---------- Summary ----------
   function dayStreaks() {
     const days = new Set(sessions.map((s) => dayKey(s.started_at)));
     let cursor = startOfDay(new Date());
@@ -112,29 +106,53 @@ if (app) {
   function renderStats(current, previous, info) {
     const focused = sum(current, focusedSeconds);
     const avg = averageFocus(current);
-    const hasPrev = info.compare && previous.length > 0;
+    $("#psRange").textContent = info.label;
+    $("#hsFocusTime").textContent = focused < 30 ? "0m" : duration(focused);
 
-    $("#hsFocusTime").textContent = current.length ? duration(focused) : "0m";
-    const timeNote = $("#hsFocusTimeNote");
-    if (hasPrev && current.length) timeNote.replaceChildren(delta(Math.round((focused - sum(previous, focusedSeconds)) / 60) * 60, duration, info.compare));
-    else timeNote.textContent = current.length ? `Across ${plural(current.length, "session")}` : `No sessions ${info.phrase}`;
+    // One plain comparison with the period before.
+    const compare = $("#hsCompare");
+    compare.dataset.trend = "";
+    if (!current.length) compare.textContent = sessions.length ? "No sessions yet in this range. A short one counts!" : "Start your first focus session to see your progress here.";
+    else if (!info.compare) compare.textContent = `Across ${plural(current.length, "session")}`;
+    else if (!previous.length) compare.textContent = `Across ${plural(current.length, "session")}. Nice start!`;
+    else {
+      const change = Math.round((focused - sum(previous, focusedSeconds)) / 60) * 60;
+      compare.textContent = change === 0 ? `The same as ${info.compare}` : `${duration(Math.abs(change))} ${change > 0 ? "more" : "less"} than ${info.compare}`;
+      compare.dataset.trend = change > 0 ? "up" : change < 0 ? "down" : "";
+    }
 
+    // The days you focused: a dot per day for 7 or 30 days.
+    const focusDays = new Set(current.map((s) => dayKey(s.started_at)));
+    const dots = $("#psDots");
+    if (range === "all") {
+      dots.replaceChildren();
+      dots.hidden = true;
+      $("#psDaysLabel").textContent = "Days you focused";
+      $("#hsDaysNote").textContent = `${plural(focusDays.size, "day")} in total`;
+    } else {
+      dots.hidden = false;
+      dots.dataset.size = info.days > 7 ? "small" : "";
+      const today = startOfDay(new Date());
+      dots.replaceChildren(...Array.from({ length: info.days }, (_, i) => {
+        const day = addDays(today, i - info.days + 1);
+        const dot = el("span", "ps-dot");
+        dot.dataset.on = String(focusDays.has(day.toDateString()));
+        if (i === info.days - 1) dot.dataset.today = "true";
+        if (info.days <= 7) dot.textContent = day.toLocaleDateString([], { weekday: "narrow" });
+        dot.title = `${day.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" })}${focusDays.has(day.toDateString()) ? " · focused" : ""}`;
+        return dot;
+      }));
+      $("#psDaysLabel").textContent = "Days you focused";
+      $("#hsDaysNote").textContent = `${focusDays.size} of ${info.days} days`;
+    }
+
+    $("#hsSessions").textContent = String(current.length);
     $("#hsAverage").textContent = avg === null ? "—" : `${avg}%`;
-    const avgNote = $("#hsAverageNote");
-    const prevAvg = hasPrev ? averageFocus(previous) : null;
-    if (avg !== null && prevAvg !== null) avgNote.replaceChildren(delta(avg - prevAvg, (n) => `${n} pts`, info.compare));
-    else avgNote.textContent = avg === null ? "Share of measured time on screen" : `${levelFor(avg).label} · share of measured time`;
-
-    const best = current.reduce((top, s) => (!top || s.best_streak_seconds > top.best_streak_seconds ? s : top), null);
-    $("#hsStreak").textContent = best && best.best_streak_seconds ? clock(best.best_streak_seconds) : "—";
-    $("#hsStreakNote").textContent = best && best.best_streak_seconds ? `Focused without a break · ${shortDate(best.started_at)}` : "Your longest focused stretch";
-
+    $("#hsAverageNote").textContent = avg === null ? "After a session" : levelFor(avg).label;
     const streak = dayStreaks();
     $("#hsDays").textContent = plural(streak.current, "day");
-    const activeDays = new Set(current.map((s) => dayKey(s.started_at))).size;
-    $("#hsDaysNote").textContent = streak.current && !streak.studiedToday
-      ? "Do a session today to keep it going"
-      : range === "all" ? `Best run: ${plural(streak.best, "day")}` : `Studied ${activeDays} of the last ${info.days} days`;
+    const keepGoing = streak.current && !streak.studiedToday;
+    $("#hsDays").title = keepGoing ? "Do a session today to keep it going" : `Your best: ${plural(streak.best, "day")}`;
   }
 
   // ---------- Focus time chart ----------
@@ -214,7 +232,7 @@ if (app) {
               title: (items) => chart.$buckets[items[0].dataIndex].title,
               label: (item) => {
                 const b = chart.$buckets[item.dataIndex];
-                return [`${duration(b.minutes * 60)} focused`, `${b.avg}% average focus`, plural(b.count, "session")];
+                return [`${duration(b.minutes * 60)} focused`, plural(b.count, "session")];
               }
             }
           }
@@ -224,45 +242,39 @@ if (app) {
     chart.$buckets = list;
   }
 
-  // ---------- Insights ----------
-  function renderInsights(current, info) {
-    const list = $("#insightList");
-    const { evidence, insights } = buildInsights(current);
-    if (!evidence.enough) {
-      // Not enough measured data for patterns: say exactly what's still needed.
-      const item = el("li", "insight");
-      const icon = el("span", "chip-icon");
-      icon.append(svgUse("i-spark", ""));
-      const body = el("div");
-      const still = [
-        evidence.sessions < COACH_MINIMUM.sessions ? plural(COACH_MINIMUM.sessions - evidence.sessions, "more session") : "",
-        evidence.days < COACH_MINIMUM.days ? plural(COACH_MINIMUM.days - evidence.days, "more day") : "",
-        evidence.minutes < COACH_MINIMUM.minutes ? `${COACH_MINIMUM.minutes - evidence.minutes} more measured minutes` : ""
-      ].filter(Boolean).join(", ");
-      body.append(
-        el("b", "", "Not enough measured data for patterns yet"),
-        el("p", "", `Patterns need ${EVIDENCE_RULE} ${info.phrase}. Still needed: ${still}.${evidence.older ? ` Older sessions without tracking-quality information aren’t used.` : ""}`)
-      );
-      const meter = el("div", "unlock-meter");
-      const fill = el("span");
-      const share = Math.min(evidence.sessions / COACH_MINIMUM.sessions, evidence.days / COACH_MINIMUM.days, evidence.minutes / COACH_MINIMUM.minutes);
-      fill.style.width = `${Math.round(Math.min(1, share) * 100)}%`;
-      meter.append(fill);
-      body.append(meter);
-      item.append(icon, body);
-      list.replaceChildren(item);
-      return;
-    }
-    if (!insights.length) {
-      list.replaceChildren(el("li", "empty-state", "No clear pattern stands out in this range."));
-      return;
-    }
-    list.replaceChildren(...insights.map(({ tone, icon, title, text }) => {
-      const item = el("li", "insight");
-      const chip = el("span", `chip-icon ${tone}`);
-      chip.append(svgUse(icon, ""));
-      const body = el("div");
-      body.append(el("b", "", title), el("p", "", text));
+  // ---------- Focus coach (the same as Home's) ----------
+  // What's going well and the two most useful things to try, from the last 30 days of sessions.
+  // Buttons use Home's controls (student-dashboard.js exposes them as window.neuroFocusCoach).
+  function renderCoach() {
+    const box = $("#pcTips");
+    const coach = window.neuroFocusCoach;
+    const coaching = buildCoaching(sessions, coach?.habits?.() || {});
+    $("#progressCoachSub").textContent = coaching.stage === "personal" ? "Ideas from your recent sessions." : "General tips to get you started.";
+    const win = coaching.wins[0];
+    const winBox = $("#pcWin");
+    winBox.hidden = !win;
+    if (win) winBox.replaceChildren(svgUse("i-check"), el("span", "", `Going well: ${win.title}`));
+    box.replaceChildren(...coaching.tips.slice(0, 2).map((tip) => {
+      const item = el("li", "pc-tip");
+      if (tip.tone) item.dataset.tone = tip.tone;
+      const chip = el("span", `chip-icon ${tip.tone || ""}`);
+      chip.append(svgUse(tip.icon || "i-spark", ""));
+      const body = el("div", "pc-body");
+      body.append(el("b", "", tip.title), el("p", "", tip.text));
+      if (tip.action) {
+        const button = el("button", tip.action.kind === "start" ? "btn-primary pc-action" : "btn-action pc-action", tip.action.label);
+        button.type = "button";
+        if (tip.action.kind === "start") button.dataset.startFocus = ""; // handled by student-ui.js
+        else button.addEventListener("click", () => {
+          // Planning a step happens on Home; the others work from anywhere.
+          if (tip.action.kind === "step") {
+            window.neuroFocusNavigate?.("dashboard");
+            window.setTimeout(() => coach?.run?.(tip.action), 300);
+          } else coach?.run?.(tip.action);
+          window.setTimeout(renderCoach, 400);
+        });
+        body.append(button);
+      }
       item.append(chip, body);
       return item;
     }));
@@ -284,6 +296,7 @@ if (app) {
     return wrap;
   }
 
+  // One line per session: what it was, when, how long, and roughly how much of it was focused.
   function sessionItem(session) {
     const pct = hasFocus(session) ? session.focus_percent : null;
     const item = el("li", "session-item");
@@ -293,22 +306,17 @@ if (app) {
     row.setAttribute("aria-expanded", item.dataset.open);
 
     const main = el("span", "session-main");
-    const title = el("span", "session-title", `${time(session.started_at)} · ${duration(session.tracked_seconds)}`);
-    // Classroom sessions carry their class; everything else is a personal (Solo focus) session.
-    title.append(session.classes?.name ? el("span", "class-tag", `Class · ${session.classes.name}`) : el("span", "class-tag personal-tag", "Personal"));
-    // Never stopped (e.g. the page was closed while tracking): shown, but clearly marked.
+    const name = session.classes?.name || "Solo focus";
+    const title = el("span", "session-title");
+    title.append(el("b", "", name), el("span", "session-time", time(session.started_at)));
     const unfinished = !session.ended_at;
-    if (unfinished) title.append(el("span", "class-tag unfinished-tag", "Unfinished"));
-    const lapses = session.lapses ? `looked away 4s+ ${plural(session.lapses, "time")}` : "no 4s look-aways recorded";
-    if (!hasQualityInfo(session)) title.append(el("span", "class-tag", "Older method"));
-    main.append(title, el("span", "session-meta", hasQualityInfo(session)
-      ? `${duration(session.usable_seconds)} measured · about ${duration(focusedSeconds(session))} on screen · ${lapses}`
-      : `${duration(focusedSeconds(session))} on screen (older method) · ${lapses}`));
+    const meta = `${duration(session.tracked_seconds)} session · about ${duration(focusedSeconds(session))} focused${unfinished ? " · not stopped" : ""}`;
+    main.append(title, el("span", "session-meta", meta));
 
     const verdict = pct === null ? el("span") : el("span", "verdict", levelFor(pct).label);
     if (pct !== null) verdict.dataset.level = levelFor(pct).key;
     row.append(focusRing(pct), main, verdict, svgUse("i-chevron", "chevron"));
-    row.setAttribute("aria-label", `${dayTitle(session.started_at)} at ${time(session.started_at)}, ${duration(session.tracked_seconds)}${unfinished ? ", unfinished" : ""}, ${pct === null ? "no estimate" : `estimated ${pct}% of measured time on screen, ${levelFor(pct).label}`}. Show details.`);
+    row.setAttribute("aria-label", `${name}, ${dayTitle(session.started_at)} at ${time(session.started_at)}, ${duration(session.tracked_seconds)}, about ${duration(focusedSeconds(session))} focused${pct === null ? "" : `, ${pct}%`}. Show details.`);
 
     const detail = el("div", "session-detail");
     detail.hidden = !openSessions.has(session.id);
@@ -339,37 +347,30 @@ if (app) {
     return rows;
   }
 
-  const canHover = window.matchMedia("(hover: hover)").matches;
-  // Timeline colours (tracking-states.js). Unavailable time, breaks and time with no sample are
-  // shown as gaps, never as a score of 0. Old "no face" samples count as unavailable.
+  // The timeline uses three colours only: focused, looking away, and paused (a break, or a moment
+  // the camera couldn't see you). Paused time never counts against you.
   const RUN_INFO = {
-    "on-screen": { cls: "focused", label: "Looking at screen (estimate)" },
-    "looking-away": { cls: "distracted", label: "Looking away (estimate)" },
-    unavailable: { cls: "away", label: "Tracking unavailable" },
-    break: { cls: "on-break", label: "Break (not counted)" },
-    gap: { cls: "no-data", label: "No readings saved" }
+    "on-screen": { cls: "focused", label: "Focused" },
+    "looking-away": { cls: "distracted", label: "Looking away" },
+    unavailable: { cls: "paused", label: "Paused" },
+    break: { cls: "paused", label: "Paused" },
+    gap: { cls: "paused", label: "Paused" }
   };
 
   async function renderDetail(session, detail) {
-    const facts = el("div", "session-facts");
-    const fact = (label, value) => { const span = el("span", "", `${label} `); span.append(el("b", "", value)); return span; };
-    const end = session.ended_at || session.last_seen_at;
-    facts.append(fact("Time", `${time(session.started_at)} – ${time(end)}`));
-    if (hasQualityInfo(session)) {
-      facts.append(fact("Measured", `${duration(session.usable_seconds)} of ${duration(session.tracked_seconds)}`));
-      if (session.unavailable_seconds) facts.append(fact("Unavailable", duration(session.unavailable_seconds)));
-      if (session.break_seconds) facts.append(fact("Break", duration(session.break_seconds)));
-      facts.append(fact("On screen (estimate)", session.focus_percent === null ? "not enough measured" : `${session.focus_percent}% of measured time`));
-    } else {
-      facts.append(fact("On screen (estimate)", `${duration(focusedSeconds(session))} of ${duration(measuredSeconds(session))}`));
-    }
-    facts.append(fact("Longest on-screen stretch", clock(session.best_streak_seconds)));
-    if (!hasQualityInfo(session)) {
-      facts.append(el("span", "unfinished-note older-note", "Recorded before tracking-quality checks: time with no face in view was counted as not on screen, so this estimate may be lower than the newer method would give. The record itself is unchanged."));
-    }
-    if (!session.ended_at) facts.append(el("span", "unfinished-note", `Unfinished: tracking wasn’t stopped, so this shows what was saved up to ${time(session.last_seen_at || session.started_at)}.`));
+    const tiles = el("div", "session-tiles");
+    const tile = (label, value) => {
+      const box = el("div", "session-tile");
+      box.append(el("b", "", value), el("small", "", label));
+      return box;
+    };
+    tiles.append(
+      tile("Session length", duration(session.tracked_seconds)),
+      tile("Focused", `about ${duration(focusedSeconds(session))}`),
+      tile("Longest focus streak", session.best_streak_seconds ? clock(session.best_streak_seconds) : "—")
+    );
     const note = el("p", "strip-note", "Loading timeline…");
-    detail.replaceChildren(facts, note);
+    detail.replaceChildren(tiles, note);
 
     let samples;
     try { samples = await loadSamples(session.id); } catch (error) {
@@ -379,40 +380,51 @@ if (app) {
     }
     if (!samples.length) { note.textContent = "No timeline was saved for this session."; return; }
 
-    const runs = sampleRuns(samples, SAMPLE_SECONDS);
+    // Neighbouring parts of the same colour are joined, so the bar stays simple.
+    const runs = [];
+    sampleRuns(samples, SAMPLE_SECONDS).forEach((run) => {
+      const info = RUN_INFO[run.kind] || RUN_INFO.unavailable;
+      const last = runs.at(-1);
+      if (last && last.info.cls === info.cls) { last.count += run.count; last.end = run.end; }
+      else runs.push({ info, count: run.count, start: run.start, end: run.end });
+    });
     const strip = el("div", "focus-strip");
     runs.forEach((run) => {
-      const info = RUN_INFO[run.kind] || RUN_INFO.unavailable;
-      const part = el("span", info.cls);
+      const part = el("span", run.info.cls);
       part.style.flexGrow = String(run.count);
       const from = new Date(new Date(run.start).getTime() - SAMPLE_SECONDS * 1000);
-      part.title = `${time(from)}–${time(run.end)} · ${info.label} (${duration(run.count * SAMPLE_SECONDS)})`;
+      part.title = `${time(from)}–${time(run.end)} · ${run.info.label}`;
       strip.append(part);
     });
     const slots = sum(runs, (r) => r.count);
-    const share = (kind) => Math.round(sum(runs.filter((r) => r.kind === kind), (r) => r.count) / slots * 100);
+    const share = (cls) => Math.round(sum(runs.filter((r) => r.info.cls === cls), (r) => r.count) / slots * 100);
     strip.setAttribute("role", "img");
-    strip.setAttribute("aria-label", `Session timeline: ${share("on-screen")}% looking at the screen and ${share("looking-away")}% looking away (estimates), ${share("unavailable") + share("gap")}% not measured, ${share("break")}% break.`);
+    strip.setAttribute("aria-label", `Session timeline: ${share("focused")}% focused, ${share("distracted")}% looking away, ${share("paused")}% paused.`);
 
     const axis = el("div", "strip-axis");
     axis.append(el("span", "", time(new Date(new Date(samples[0].recorded_at).getTime() - SAMPLE_SECONDS * 1000))), el("span", "", time(samples[samples.length - 1].recorded_at)));
-
-    const longest = runs.filter((r) => r.kind === "on-screen").sort((a, b) => b.count - a.count)[0];
-    note.textContent = longest && longest.count * SAMPLE_SECONDS >= 30
-      ? `The longest stretch estimated as on screen started at ${time(new Date(new Date(longest.start).getTime() - SAMPLE_SECONDS * 1000))}.${canHover ? " Hover the bar to see each part." : ""}`
-      : canHover ? "Hover the bar to see each part." : "";
-    detail.replaceChildren(facts, strip, axis, note);
+    const legend = el("div", "strip-legend");
+    legend.setAttribute("aria-hidden", "true");
+    [["focused", "Focused"], ["distracted", "Looking away"], ["paused", "Paused"]].forEach(([cls, label]) => {
+      const key = el("span");
+      key.append(el("i", cls), label);
+      legend.append(key);
+    });
+    note.textContent = session.ended_at ? "" : "This session wasn’t stopped, so it shows what was saved.";
+    detail.replaceChildren(tiles, strip, axis, legend, ...(note.textContent ? [note] : []));
   }
 
   function renderList(current, info) {
     const days = $("#historyDays");
     const ongoing = inProgressCount ? `${plural(inProgressCount, "session")} still in progress, added here when stopped` : "";
-    $("#historyCount").textContent = [current.length ? `${plural(current.length, "session")} ${info.phrase}` : "", ongoing].filter(Boolean).join(" · ");
+    $("#historyCount").textContent = current.length
+      ? [`${plural(current.length, "session")} ${info.phrase}. Open one to see how it went.`, ongoing].filter(Boolean).join(" · ")
+      : ongoing;
     if (!current.length) {
       const empty = el("div", "empty-state");
       const link = el("a", "", "Open Solo focus");
       link.href = "#focus";
-      empty.append(`${sessions.length ? `No sessions ${info.phrase}.` : "No saved sessions yet."} Start attention tracking in Focus session and your session shows up here when you stop. `, link);
+      empty.append(`${sessions.length ? `No sessions ${info.phrase}.` : "No sessions yet."} Start a focus session and it shows up here when you stop. `, link);
       days.replaceChildren(empty);
       $("#historyMore").hidden = true;
       return;
@@ -428,7 +440,7 @@ if (app) {
       const all = current.filter((s) => dayKey(s.started_at) === key);
       const section = el("section", "history-day");
       const head = el("div", "day-head");
-      head.append(el("b", "", dayTitle(items[0].started_at)), el("span", "", `${duration(sum(all, focusedSeconds))} focused · ${plural(all.length, "session")}`));
+      head.append(el("b", "", dayTitle(items[0].started_at)), el("span", "", `${plural(all.length, "session")} · about ${duration(sum(all, focusedSeconds))} focused`));
       const list = el("ul", "session-list");
       list.append(...items.map(sessionItem));
       section.append(head, list);
@@ -447,7 +459,7 @@ if (app) {
     const previous = info.prevStart ? between(sessions, info.prevStart, info.start) : [];
     renderStats(current, previous, info);
     renderChart(current, info);
-    renderInsights(current, info);
+    renderCoach();
     renderList(current, info);
   }
 
@@ -466,7 +478,7 @@ if (app) {
         : "Couldn’t load your history. Refresh to try again.";
       status.dataset.state = "error";
       $("#historyCount").textContent = "";
-      $("#insightList").replaceChildren(el("li", "empty-state", "Insights appear once your history loads."));
+      $("#pcTips").replaceChildren(el("li", "empty-state", "Tips appear once your sessions load."));
       return;
     }
     const inProgress = window.neuroFocusSessionInProgress
@@ -496,7 +508,9 @@ if (app) {
   });
   // The chart is drawn while its view may be hidden; size it once the view is shown.
   window.addEventListener("neurofocus:viewchange", (event) => {
-    if (event.detail?.name === "progress") window.requestAnimationFrame(() => chart?.resize());
+    if (event.detail?.name !== "progress") return;
+    window.requestAnimationFrame(() => chart?.resize());
+    renderCoach(); // settings may have changed elsewhere (nudges, timer, steps)
   });
   // A new theme or accent: redraw the chart in the new colours.
   window.addEventListener("neurofocus:appearance-change", () => {

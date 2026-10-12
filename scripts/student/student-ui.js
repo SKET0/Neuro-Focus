@@ -76,10 +76,10 @@
         window.setTimeout(() => view.classList.remove("is-entering"), 900);
       }
     });
-    // The page's own link is current; inside a class, Classes stays highlighted.
+    // The page's own link is current. Inside a class, its entry under "Your classes" is marked
+    // instead (student-sidebar.js), the same as on the teacher dashboard.
     links.forEach((link) => {
       if (link.dataset.viewLink === name) link.setAttribute("aria-current", "page");
-      else if (name === "class" && link.dataset.viewLink === "classes") link.setAttribute("aria-current", "true");
       else link.removeAttribute("aria-current");
     });
     renderCrumbs(name);

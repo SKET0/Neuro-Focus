@@ -1,7 +1,6 @@
 // Teacher live monitor: real-time attention readings streamed by students in the selected class
 // (relayed by teacher-classes.js from Supabase Realtime; numbers only, never video), and the
-// class's saved sessions. Real data only: the simulator with sample students lives in its own
-// Demo page (teacher-demo.js), which shares nothing with this file.
+// class's saved sessions. Real data only.
 // Chart colours follow the teacher's theme and accent (styles/theme.css).
 import { themeColor, withAlpha } from "../shared/appearance.js?v=1";
 import { normalizeReading, describeReading, sampleKind, selectWithQuality, hasQualityInfo, SCORE_BANDS, BAND_LABELS, scoreBand } from "../shared/tracking-states.js?v=1";
