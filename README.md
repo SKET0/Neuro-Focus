@@ -23,15 +23,15 @@ A student-centered classroom prototype built with static HTML/CSS/JavaScript, Su
 
    Then open `http://localhost:8000`. Do not use `file://`; ES modules and camera access require localhost or HTTPS. To run several test accounts side by side, add ports: `python3 tools/serve.py 8000 8001 8002`.
 
-## Live site (https://www.neurofocus.site)
+## Live site (https://neurofocus.site)
 
-The site is hosted on Netlify, which publishes `main` automatically on every push. `netlify.toml` publishes only the website files (`index.html`, the redirect pages, `pages/`, `scripts/`, `styles/`, `assets/`); the report drafts, backend, database, Supabase project files and tests are never public. The domain is registered at Namecheap; its DNS (Advanced DNS) points at Netlify, and `www.neurofocus.site` is the primary address (`neurofocus.site` redirects to it).
+The site is hosted on Netlify, which publishes `main` automatically on every push. `netlify.toml` publishes only the website files (`index.html`, the redirect pages, `pages/`, `scripts/`, `styles/`, `assets/`); the report drafts, backend, database, Supabase project files and tests are never public. The domain is registered at Namecheap; its DNS (Advanced DNS) points at Netlify, and `neurofocus.site` is the primary address (`www.neurofocus.site` redirects to it).
 
 For sign-in and NeuroBuddy to work on the live site:
 
-- **Supabase → Authentication → URL Configuration:** Site URL `https://www.neurofocus.site`; Redirect URLs also include `https://www.neurofocus.site/**` (keep the localhost entries for development).
-- **Google Cloud Console → the OAuth client:** add `https://www.neurofocus.site` to Authorized JavaScript origins.
-- **Supabase → Edge Functions → Secrets:** `APP_ORIGIN` = `https://www.neurofocus.site` (localhost stays allowed).
+- **Supabase → Authentication → URL Configuration:** Site URL `https://neurofocus.site`; Redirect URLs also include `https://neurofocus.site/**` (keep the localhost entries for development).
+- **Google Cloud Console → the OAuth client:** add `https://neurofocus.site` to Authorized JavaScript origins.
+- **Supabase → Edge Functions → Secrets:** `APP_ORIGIN` = `https://neurofocus.site` (localhost stays allowed).
 
 ## Project layout
 

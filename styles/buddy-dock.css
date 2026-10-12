@@ -1,6 +1,6 @@
 /* NeuroBuddy dock (scripts/shared/buddy-dock.js): a small floating NeuroBuddy button in the bottom
-   right corner of the home page and every student page, opening a quick chat. Colours come from the
-   student theme tokens (styles/theme.css), falling back to the home page's own palette. */
+   right corner of every student page, opening a quick chat. Colours come from the student theme
+   tokens (styles/theme.css). */
 .buddy-dock {
   --bd-accent: var(--accent, var(--cyan, #00d9ff));
   --bd-panel: var(--surface, #0f0f12);
@@ -117,14 +117,6 @@
 }
 .bd-starter:hover { color: var(--bd-text); background: var(--bd-hover); border-color: color-mix(in srgb, var(--bd-accent) 35%, var(--bd-border)); }
 .bd-starter svg { width: 16px; height: 16px; color: var(--bd-accent); }
-.bd-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
-.bd-btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; cursor: pointer; font: inherit;
-  font-size: 13px; font-weight: 600; border-radius: 10px; padding: 9px 14px; border: 1px solid var(--bd-border); color: var(--bd-text); background: var(--bd-raised);
-}
-.bd-btn:hover { background: var(--bd-hover); }
-.bd-btn.primary { background: var(--bd-primary); color: var(--bd-primary-text); border-color: transparent; }
-.bd-btn.primary:hover { filter: brightness(1.06); }
 
 /* Composer */
 .buddy-dock-form { display: flex; align-items: flex-end; gap: 8px; padding: 10px; border-top: 1px solid var(--bd-line); background: var(--bd-panel); }

@@ -1,12 +1,9 @@
-// NeuroBuddy dock: a small floating NeuroBuddy button in the bottom right corner of the home page and
-// every student page (styles/buddy-dock.css). It opens a quick chat without leaving the page.
+// NeuroBuddy dock: a small floating NeuroBuddy button in the bottom right corner of every student
+// workspace page (styles/buddy-dock.css). It opens a quick chat without leaving the page.
 // Quick chats are ordinary NeuroBuddy chats (buddy-store.js), so they appear in the full NeuroBuddy
 // page's list, and "Open full chat" continues them there. After saving one it sends
 // "neurofocus:buddy-stored" so the full page (learning-assistant.js) picks up the new copy.
-// Student workspace: hidden on the NeuroBuddy page itself; questions asked inside a class use that
-// class for context. Home page: signed-in students can chat, signed-out visitors are invited to sign
-// in, and teachers don't see it.
-import { getSupabase } from "../services/supabase-client.js";
+// It is hidden on the NeuroBuddy page itself; questions asked inside a class use that class for context.
 import { streamAssistant } from "../services/assistant-api.js?v=2";
 import { renderMarkdown } from "./markdown.js?v=1";
 import { greetingName } from "./avatars.js?v=1";
@@ -20,7 +17,7 @@ const STARTERS = [
   { icon: "help", label: "Quiz me on something", text: "Quiz me with 3 quick questions, one at a time, about " }
 ];
 
-// Drawn here rather than taken from the page's icon sprite, because the home page has its own icons.
+// Drawn here so the dock doesn't depend on the page's icon sprite.
 const stroke = (paths, extra = "") => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ${extra}>${paths}</svg>`;
 const ICONS = {
   face: stroke('<path d="M12 5V3"/><circle cx="12" cy="2.3" r="1.1" fill="currentColor" stroke="none"/><rect x="3.5" y="5" width="17" height="14" rx="7"/><rect x="6.5" y="8.6" width="11" height="6.8" rx="3.4"/><path d="M10 11.3v1.4M14 11.3v1.4" stroke-width="2.2"/>'),
@@ -35,21 +32,12 @@ const ICONS = {
   help: stroke('<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 4.9.7c0 1.7-2.4 2.3-2.4 3.8M12 17h.01"/>')
 };
 
-const onStudentPage = document.body?.dataset.requiredRole === "student";
-
-// Who is using the page, and how "Open full chat" works there. null = don't show the dock.
+// The signed-in student (auth-guard.js), or null when the page isn't a student page.
 async function findContext() {
-  if (onStudentPage) {
-    const app = await window.neuroFocusReady;
-    if (!app) return null;
-    return { supabase: app.supabase, userId: app.user.id, name: app.profile?.display_name || "" };
-  }
-  const supabase = await getSupabase();
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) return { signedOut: true };
-  const { data: profile } = await supabase.from("profiles").select("display_name, role").eq("id", session.user.id).maybeSingle();
-  if (profile?.role !== "student") return null;
-  return { supabase, userId: session.user.id, name: profile.display_name || "" };
+  if (document.body?.dataset.requiredRole !== "student") return null;
+  const app = await window.neuroFocusReady;
+  if (!app) return null;
+  return { supabase: app.supabase, userId: app.user.id, name: app.profile?.display_name || "" };
 }
 
 function el(tag, className, text) {
@@ -75,7 +63,7 @@ function iconButton(name, label, onClick) {
 
 function mount(context) {
   const { userId } = context;
-  const dockKey = userId ? `neuroFocusBuddyDock:${userId}` : "";
+  const dockKey = `neuroFocusBuddyDock:${userId}`;
   const read = (key) => { try { return localStorage.getItem(key); } catch { return null; } };
   const store = (key, value) => { try { if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value); } catch { /* storage unavailable */ } };
 
@@ -116,9 +104,6 @@ function mount(context) {
   dock.append(panel, button);
   document.body.append(dock);
 
-  let form = null;
-  let input = null;
-  let sendButton = null;
   let chat = null;      // the dock's chat; a new one isn't saved until it has a message
   let sending = null;   // AbortController while an answer is coming in
 
@@ -129,8 +114,9 @@ function mount(context) {
     button.setAttribute("aria-expanded", String(open));
     button.setAttribute("aria-label", open ? "Close NeuroBuddy" : "Ask NeuroBuddy");
     if (open) {
-      if (!context.signedOut) { loadChat(); render(); }
-      (input || panel.querySelector(".bd-btn.primary"))?.focus();
+      loadChat();
+      render();
+      input.focus();
     } else if (focusButton) button.focus();
   }
   button.addEventListener("click", () => setOpen(panel.hidden));
@@ -138,28 +124,10 @@ function mount(context) {
 
   const closeButton = iconButton("close", "Close", () => setOpen(false, { focusButton: true }));
 
-  // ---------- Signed out (home page): an invitation ----------
-  if (context.signedOut) {
-    head.append(closeButton);
-    const welcome = el("div", "bd-welcome");
-    const big = el("div", "bd-welcome-face");
-    big.append(iconNode("face"));
-    const actions = el("div", "bd-actions");
-    const signIn = el("a", "bd-btn primary", "Sign in to chat");
-    signIn.href = "pages/login.html";
-    const signUp = el("a", "bd-btn", "Create account");
-    signUp.href = "pages/login.html?mode=signup";
-    actions.append(signIn, signUp);
-    welcome.append(big, el("h3", "", "Hi, I’m NeuroBuddy!"),
-      el("p", "", "I explain tricky topics step by step, summarise your notes and files, make flashcards and quiz you. Sign in with a student account to start."), actions);
-    thread.append(welcome);
-    return;
-  }
-
-  // ---------- Signed in: the quick chat ----------
+  // ---------- The quick chat ----------
   const classes = () => window.neuroFocusClasses || [];
   const className = (id) => classes().find((item) => item.id === id)?.name || "";
-  const contextClass = () => (onStudentPage ? window.neuroFocusRouteClassId || "" : "");
+  const contextClass = () => window.neuroFocusRouteClassId || "";
   const blankChat = () => ({ id: null, title: "New chat", classId: contextClass(), createdAt: "", updatedAt: "", messages: [], documents: [], decks: [] });
 
   // Always start from the stored copy: the chat may have continued on the full NeuroBuddy page.
@@ -195,7 +163,6 @@ function mount(context) {
   // The full NeuroBuddy page, on this chat (it opens the chat saved as current).
   function openFull() {
     if (chat?.id) store(`neuroFocusBuddyCurrent:${userId}`, chat.id);
-    if (!onStudentPage) { window.location.href = "pages/student.html#buddy"; return; }
     setOpen(false);
     if (chat?.id) window.dispatchEvent(new CustomEvent("neurofocus:buddy-open", { detail: { id: chat.id } }));
     window.neuroFocusNavigate?.("buddy");
@@ -203,14 +170,14 @@ function mount(context) {
 
   head.append(iconButton("plus", "New chat", newChat), iconButton("expand", "Open full chat", openFull), closeButton);
 
-  form = el("form", "buddy-dock-form");
+  const form = el("form", "buddy-dock-form");
   form.noValidate = true;
-  input = el("textarea");
+  const input = el("textarea");
   input.rows = 1;
   input.maxLength = 4000;
   input.placeholder = "Ask NeuroBuddy anything…";
   input.setAttribute("aria-label", "Message NeuroBuddy");
-  sendButton = el("button", "bd-send");
+  const sendButton = el("button", "bd-send");
   sendButton.type = "submit";
   form.append(input, sendButton);
   const foot = el("p", "buddy-dock-foot", "Files, flashcards and all your chats are in the full chat.");
@@ -355,8 +322,8 @@ function mount(context) {
     if (problem) thread.append(el("p", "bd-note", problem));
   });
 
-  // On the student workspace: not on the NeuroBuddy page itself (it is already open there).
-  if (onStudentPage) {
+  // Not on the NeuroBuddy page itself (it is already open there).
+  {
     const update = () => {
       const onBuddy = window.neuroFocusView === "buddy";
       if (onBuddy) setOpen(false);
