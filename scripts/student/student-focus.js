@@ -148,7 +148,20 @@ if (app) {
       : done === goals.length ? `All ${goals.length} steps done 🎉` : `${done} of ${goals.length} steps done`;
     $("#goalProgress").style.width = goals.length ? `${(done / goals.length) * 100}%` : "0%";
     $("#goalClearDone").disabled = !done;
+    renderNextStep();
     window.dispatchEvent(new CustomEvent("neurofocus:goals-change", { detail: goalsApi.list() }));
+  }
+
+  // The first step not done yet, in the session panel, so it stays in view during a focus block.
+  function renderNextStep() {
+    const next = goals.find((goal) => !goal.done);
+    const allDone = goals.length > 0 && !next;
+    $("#timerNext").dataset.empty = String(!next);
+    $("#timerNextText").textContent = next?.text || (allDone ? "All steps done. Add another, or take a break." : "Add a small step to keep it in view");
+    $("#timerNextText").title = next?.text || "";
+    $("#timerNextDone").hidden = !next;
+    $("#timerNextAdd").hidden = Boolean(next);
+    $("#timerNextDone").setAttribute("aria-label", next ? `Mark “${next.text}” done` : "Mark this step done");
   }
 
   // Today's plan on the Home view lists, ticks off and adds the same steps.
@@ -188,6 +201,18 @@ if (app) {
     input.value = "";
     saveGoals();
     renderGoals();
+  });
+  $("#timerNextAdd").addEventListener("click", (event) => {
+    event.preventDefault();
+    $("#micro-goals").scrollIntoView({ behavior: "smooth", block: "center" });
+    $("#goalInput").focus({ preventScroll: true });
+  });
+  $("#timerNextDone").addEventListener("click", () => {
+    const next = goals.find((goal) => !goal.done);
+    if (next) goalsApi.setDone(next.id, true);
+    if (goals.length && goals.every((goal) => goal.done)) {
+      showToast({ icon: "🏆", kind: "praise", title: "All steps done!", text: "Great work finishing your plan. Take a moment to celebrate.", autoHideMs: 4000 });
+    }
   });
   $("#goalClearDone").addEventListener("click", () => {
     goals = goals.filter((goal) => !goal.done);
@@ -408,7 +433,6 @@ if (app) {
     chart.options.scales.x.ticks.color = muted;
     chart.options.scales.y.grid.color = themeColor("--surface-hover", "#1c1c20");
     chart.options.scales.x.border.color = themeColor("--border", "#222226");
-    chart.options.plugins.legend.labels.color = themeColor("--text-main", "#f4f4f5");
     chart.update("none");
   }
   if (window.Chart) {
@@ -418,8 +442,8 @@ if (app) {
         labels: timelineLabels,
         datasets: [
           // Seconds with no usable reading are null: drawn as a gap, never as 0.
-          { label: "Estimated attention", data: timelineScores, borderWidth: 2, tension: 0.35, pointRadius: 0, fill: true, spanGaps: false },
-          { label: "70% line", data: [], borderWidth: 1, borderDash: [4, 4], pointRadius: 0, fill: false }
+          { label: "Attention", data: timelineScores, borderWidth: 2, tension: 0.35, pointRadius: 0, fill: true, spanGaps: false },
+          { label: "70%", data: [], borderWidth: 1, borderDash: [4, 4], pointRadius: 0, fill: false }
         ]
       },
       options: {
@@ -430,8 +454,8 @@ if (app) {
           x: { ticks: { maxTicksLimit: 6 }, grid: { display: false }, border: {} }
         },
         plugins: {
-          legend: { labels: { boxWidth: 10, boxHeight: 10, usePointStyle: true } },
-          tooltip: { filter: (item) => item.parsed.y !== null, callbacks: { label: (ctx) => `${ctx.dataset.label}: ${Math.round(ctx.parsed.y)}%` } }
+          legend: { display: false },
+          tooltip: { filter: (item) => item.datasetIndex === 0 && item.parsed.y !== null, callbacks: { label: (ctx) => `${ctx.dataset.label}: ${Math.round(ctx.parsed.y)}%` } }
         }
       }
     });
@@ -522,7 +546,7 @@ if (app) {
     const described = describeReading(reading);
     const active = reading.tracking === "active";
     stats.live.textContent = active ? `${reading.score}%` : "—";
-    stats.liveState.textContent = active ? `${described.label} (estimate)` : described.detail ? `${described.label} · ${described.detail}` : described.label;
+    stats.liveState.textContent = active ? described.label : described.detail ? `${described.label} · ${described.detail}` : described.label;
     const tileState = active ? (reading.engagement === "looking-away" ? "Distracted" : "Focused") : reading.tracking === "break" ? "Break" : "Unavailable";
     stats.liveState.dataset.state = tileState;
     stats.liveTile.dataset.state = tileState;
@@ -600,8 +624,8 @@ if (app) {
       showToast({
         icon: "📈", kind: "timer", title: "Session summary",
         text: snap.focusPercent === null
-          ? `Not enough usable tracking to estimate attention (${clock(snap.usableMs)} measured${extra ? ` · ${extra}` : ""}). Check that your face is in view and well lit.`
-          : `Estimated ${snap.focusPercent}% of measured time looking at the screen · ${clock(snap.usableMs)} measured${extra ? ` · ${extra}` : ""} · looked away 4s+ ${snap.episodes} time${snap.episodes === 1 ? "" : "s"}.`,
+          ? `Not enough tracking to measure your attention (${clock(snap.usableMs)} measured${extra ? ` · ${extra}` : ""}). Check that your face is in view and well lit.`
+          : `${snap.focusPercent}% of the time looking at the screen · ${clock(snap.usableMs)} measured${extra ? ` · ${extra}` : ""} · ${snap.episodes} look-away${snap.episodes === 1 ? "" : "s"}.`,
         autoHideMs: 9000
       });
     }

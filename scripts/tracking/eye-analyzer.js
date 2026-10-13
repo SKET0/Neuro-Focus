@@ -51,9 +51,9 @@ if (video) {
         : "Make sure your face is in view and well lit. Nothing is counted until tracking is back.");
       if (scoreOutput) scoreOutput.textContent = "Unavailable";
     } else {
-      showStatus(reading.engagement === "looking-away" ? "Looking away (estimate)" : "Looking at the screen (estimate)",
-        "Estimated from face and eye direction on this device. Looking away isn’t always a lost focus.");
-      if (scoreOutput) scoreOutput.textContent = `${reading.score}% estimate`;
+      showStatus(reading.engagement === "looking-away" ? "Looking away" : "Looking at the screen",
+        "Worked out on this device from where your face and eyes point.");
+      if (scoreOutput) scoreOutput.textContent = `${reading.score}%`;
     }
   }
 

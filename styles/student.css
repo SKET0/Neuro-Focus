@@ -270,9 +270,21 @@ textarea.field-input { resize: vertical; min-height: 120px; line-height: 1.55; }
 /* ---------- Page headers: Focus session, NeuroBuddy, Class notes, My progress ----------
    Home's welcome area (styles/home.css .home-hero) with each page's own line art. Below it come the
    "at a glance" tiles and cards from Home, so every page looks like the same product. */
-.focus-hero .page-hero-actions { margin-top: 18px; }
 
 /* ---------- Focus session (pages/student.html #view-focus) ---------- */
+/* Header: the title and session state on the left; meeting links and the privacy badge on the right */
+.focus-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px 24px; margin: 2px 0 18px; }
+.focus-head-title { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 16px; min-width: 0; }
+.focus-head .welcome-title { font-size: clamp(24px, 2.6vw, 30px); line-height: 1.1; letter-spacing: -0.03em; }
+.focus-head .eyebrow-pill { margin: 0; }
+.focus-head-side { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 18px; }
+.focus-head .meeting-links { margin: 0; }
+.focus-privacy {
+  display: inline-flex; align-items: center; gap: 7px; padding: 5px 7px 5px 11px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
+  color: var(--success-text); background: color-mix(in srgb, var(--green) 8%, transparent); border: 1px solid color-mix(in srgb, var(--green) 30%, var(--border));
+}
+.focus-privacy .icon { width: 14px; height: 14px; }
+#soloClassNotice { margin: -6px 0 16px; }
 /* Session state pill (student-focus.js) */
 .focus-hero[data-state="idle"] .eyebrow-pill .tag { color: var(--text-soft); background: var(--track); }
 .focus-hero[data-state="timer"] .eyebrow-pill .tag { color: var(--primary-text); background: var(--accent); }
@@ -293,15 +305,74 @@ textarea.field-input { resize: vertical; min-height: 120px; line-height: 1.55; }
 .glance-note[data-state="Unavailable"] { color: var(--text-muted); }
 .glance-note[data-state="Break"] { color: var(--success-text); }
 
-/* Tracker on the left; timer and micro-goals on the right. Both columns end on the same line. */
-.focus-stage { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(320px, 1fr); gap: 20px; align-items: stretch; }
-.focus-side { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
-.focus-side #micro-goals { flex: 1; }
+/* ---- The cockpit: the timer on the left; this session's numbers and the next step on the right ---- */
+.focus-cockpit {
+  display: grid; grid-template-columns: minmax(250px, 300px) minmax(0, 1fr); padding: 0; margin-bottom: 20px; overflow: hidden;
+  background:
+    radial-gradient(520px 260px at 0% 0%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 70%),
+    linear-gradient(180deg, var(--surface), var(--surface-2));
+}
+.focus-hero[data-state="tracking"] ~ .focus-cockpit { border-color: color-mix(in srgb, var(--green) 30%, var(--border)); }
+.focus-hero[data-state="break"] ~ .focus-cockpit { border-color: color-mix(in srgb, var(--green) 30%, var(--border)); }
+.cockpit-label { font-size: 11px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--text-muted); }
+.cockpit-timer { display: flex; flex-direction: column; padding: 20px 22px 22px; border-right: 1px solid var(--border); min-width: 0; }
+.cockpit-timer .timer-body { padding: 12px 0 16px; }
+.cockpit-timer .timer-ring { width: 172px; height: 172px; }
+.cockpit-timer #timerDisplay { font-size: 36px; }
+.cockpit-timer .segmented { margin: 0 0 12px; }
+.cockpit-timer .timer-setting { margin-top: 14px; padding-top: 12px; }
+.cockpit-live { display: flex; flex-direction: column; gap: 14px; padding: 20px 22px 22px; min-width: 0; }
+.cockpit-live-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.cockpit-rounds { font-size: 12.5px; color: var(--text-muted); }
+.cockpit-rounds span { color: var(--text-main); font-weight: 650; font-variant-numeric: tabular-nums; }
+
+/* This session's numbers, as part of the cockpit: Attention large across the top, three below.
+   (In a class's Live focus they are the usual row of tiles.) */
+.focus-cockpit .focus-glance { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.focus-cockpit .glance-tile { padding: 14px 16px; border-radius: 14px; background: color-mix(in srgb, var(--surface-sunken) 70%, transparent); }
+.focus-cockpit .glance-value { font-size: 24px; }
+.focus-cockpit #liveScoreTile {
+  grid-column: 1 / -1; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "label label" "value note" "meter meter";
+  align-items: end; column-gap: 14px; row-gap: 8px; padding: 16px 18px;
+}
+.focus-cockpit #liveScoreTile .glance-label { grid-area: label; }
+.focus-cockpit #liveScoreTile .glance-value { grid-area: value; font-size: 46px; line-height: 1; letter-spacing: -0.04em; }
+.focus-cockpit #liveScoreTile .glance-note { grid-area: note; margin: 0 0 6px; font-size: 14px; font-weight: 600; }
+.focus-cockpit #liveScoreTile .glance-meter { grid-area: meter; height: 8px; }
+
+/* The next step (student-focus.js): Done ticks it off; "Add a step" when there isn't one */
+.timer-next {
+  display: flex; align-items: center; gap: 12px; margin-top: auto; padding: 12px 12px 12px 14px; border-radius: 14px;
+  background: color-mix(in srgb, var(--green) 6%, var(--surface-sunken)); border: 1px solid color-mix(in srgb, var(--green) 28%, var(--border));
+}
+.timer-next .chip-icon { width: 32px; height: 32px; }
+.timer-next-copy { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.timer-next-label { font-size: 10.5px; font-weight: 700; letter-spacing: 0.7px; text-transform: uppercase; color: var(--success-text); }
+.timer-next-text { font-size: 15px; font-weight: 600; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.timer-next[data-empty="true"] { background: var(--surface-sunken); border-style: dashed; border-color: var(--border-hover); }
+.timer-next[data-empty="true"] .chip-icon { color: var(--text-muted); background: transparent; border-color: var(--border-strong); }
+.timer-next[data-empty="true"] .timer-next-text { color: var(--text-muted); font-weight: 500; font-size: 14px; }
+.timer-next .btn-action { flex: none; padding: 8px 14px; font-weight: 600; }
+.timer-next .btn-action[hidden] { display: none; }
+
+/* ---- Below: the camera with its timeline on the left; the steps on the right ---- */
+.focus-stage { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(300px, 1fr); gap: 20px; align-items: stretch; }
+.focus-main { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.focus-main > .stats-slot { flex: 1; display: flex; flex-direction: column; }
+.focus-main .timeline-card { flex: 1; display: flex; flex-direction: column; }
+.focus-main .timeline-card .chart-box { flex: 1 0 200px; height: auto; }
 .tracker-card[data-tracking="true"] { border-color: color-mix(in srgb, var(--green) 35%, var(--border)); }
-/* The camera area grows to fill the card when the right column is taller (e.g. a long list of steps) */
-.tracker-card .video-viewport { flex: 1 0 auto; min-height: 240px; }
-.tracker-settings { padding-top: 16px; }
+.tracker-card .video-viewport { aspect-ratio: 16 / 9; }
 .timeline-card .chart-box { height: 220px; }
+
+/* Camera button and the two tracking switches on one row */
+.tracker-controls { display: flex; align-items: center; gap: 12px 18px; flex-wrap: wrap; }
+.tracker-controls .camera-actions { flex: 1 1 220px; }
+.tracker-toggles { display: flex; align-items: center; gap: 16px; }
+.mini-switch { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--text-soft); cursor: pointer; user-select: none; }
+.mini-switch .switch { gap: 0; }
+.mini-switch:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 8px; }
+.tracker-progress-link { margin-top: 12px; font-size: 12.5px; color: var(--text-muted); }
 
 /* Timer length: segmented buttons that set the hidden #timerPreset list */
 .segmented { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; padding: 3px; margin: -4px 0 14px; background: var(--surface-sunken); border: 1px solid var(--border); border-radius: 11px; }
@@ -688,12 +759,25 @@ textarea.field-input { resize: vertical; min-height: 120px; line-height: 1.55; }
 @media (max-width: 1100px) {
   .stat-grid { grid-template-columns: repeat(2, 1fr); }
   .focus-stage, .buddy-grid, .history-grid, .notes-layout { grid-template-columns: 1fr; }
-  .focus-side { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
+  /* Smaller screens: the camera, the steps, then the timeline, one under another */
+  .focus-main { display: contents; }
+  #solo-tracker { order: 1; }
+  #micro-goals { order: 2; }
+  .focus-main > .stats-slot { order: 3; }
+  .focus-main .timeline-card .chart-box { flex: none; height: 220px; }
   .notes-sidebar { position: static; }
   .note-list { max-height: 260px; }
 }
 @media (max-width: 760px) {
-  .focus-side, .setting-tiles { grid-template-columns: 1fr; }
+  .setting-tiles { grid-template-columns: 1fr; }
+  /* Phones: the cockpit stacks, timer first */
+  .focus-cockpit { grid-template-columns: 1fr; }
+  .cockpit-timer { border-right: 0; border-bottom: 1px solid var(--border); }
+  .focus-cockpit .focus-glance { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .focus-cockpit .focus-glance > .glance-tile:last-child { grid-column: 1 / -1; }
+  .timer-next { flex-wrap: wrap; }
+  .timer-next .timer-next-copy { flex-basis: calc(100% - 50px); }
+  .timer-next .btn-action { flex: 1; }
   .toolbar-tip { display: none; }
   .note-title { font-size: 20px; }
   .note-actions { margin-left: 0; width: 100%; }

@@ -37,7 +37,7 @@
   </script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <link rel="stylesheet" href="../styles/theme.css?v=1">
-  <link rel="stylesheet" href="../styles/student.css?v=33">
+  <link rel="stylesheet" href="../styles/student.css?v=34">
   <link rel="stylesheet" href="../styles/home.css?v=6">
   <link rel="stylesheet" href="../styles/account.css?v=4">
   <link rel="stylesheet" href="../styles/dashboard-layout.css?v=9">
@@ -304,202 +304,195 @@
       </section>
 
       <!-- ================= Focus session ================= -->
-      <!-- Laid out like Home (styles/home.css): a welcome area with the class card, the numbers at a
-           glance, then the tools. No live background here, so nothing moves behind a focus session. -->
+      <!-- A "cockpit": one panel with the timer and this session's live numbers and next step, then the
+           camera and timeline beside the list of steps. No live background, so nothing moves behind a session. -->
       <section class="view focus-view" id="view-focus" data-view="focus" hidden aria-labelledby="focusPageTitle">
-        <section class="home-hero page-hero focus-hero" id="focusHero" data-state="idle" aria-labelledby="focusPageTitle">
-          <div class="home-hero-art" aria-hidden="true">
-            <svg viewBox="0 0 560 320" fill="none">
-              <g stroke="currentColor" stroke-width="1.2">
-                <circle cx="430" cy="150" r="46" stroke-opacity="0.34"/>
-                <circle cx="430" cy="150" r="92" stroke-opacity="0.24"/>
-                <circle cx="430" cy="150" r="138" stroke-opacity="0.16"/>
-                <circle cx="430" cy="150" r="184" stroke-opacity="0.1"/>
-                <path d="M430 6v40M430 254v40M286 150h40M534 150h40" stroke-opacity="0.22"/>
-              </g>
-              <circle cx="430" cy="150" r="5" fill="currentColor" fill-opacity="0.6"/>
-            </svg>
+        <!-- Title and session state (student-focus.js); solo sessions are private -->
+        <div class="focus-head focus-hero" id="focusHero" data-state="idle">
+          <div class="focus-head-title">
+            <h1 class="welcome-title" id="focusPageTitle">Solo focus</h1>
+            <p class="eyebrow-pill"><span class="tag" id="focusStateTag">Ready</span><span id="focusStateText">Camera off</span></p>
           </div>
-          <div class="home-hero-inner">
-            <div class="hero-copy">
-              <!-- Session state (student-focus.js): ready, tracking, timer running or on a break -->
-              <p class="eyebrow-pill"><span class="tag" id="focusStateTag">Ready</span><span id="focusStateText">Camera off</span></p>
-              <h1 class="welcome-title" id="focusPageTitle">Solo focus</h1>
-              <p class="hero-lead">Study on your own with the timer and, if you like, attention tracking. The camera only turns on when you start, and video never leaves this device.</p>
-              <div class="page-hero-actions">
-                <button class="btn-primary" type="button" id="quickStart" data-start-focus><svg class="icon"><use href="#i-play"/></svg><span>Start focus session</span></button>
-              </div>
-              <p class="meeting-links">In a video call?
-                <button class="text-link" type="button" data-open="zoom">Open Zoom</button>
-                <button class="text-link" type="button" data-open="meet">Open Google Meet</button>
-                <span class="info-wrap"><button class="info-btn" type="button" data-info aria-label="More about meeting links" aria-expanded="false" aria-controls="meetingInfo">i</button><span class="info-pop" id="meetingInfo" role="note" hidden>Opens your saved meeting link in a new tab (you’re asked for it the first time; it’s kept on this device). Your camera stays off until you press Start focus session.</span></span>
-              </p>
-            </div>
-
-            <!-- Solo sessions are personal. When a class live session is using the camera, this says so (student-classes.js). -->
-            <section class="class-banner personal-card" id="soloPrivacy" data-state="personal" aria-labelledby="soloPrivacyTitle">
-              <span class="next-icon" aria-hidden="true"><svg><use href="#i-lock"/></svg></span>
-              <div class="class-banner-kicker">Personal session</div>
-              <h2 class="class-banner-title" id="soloPrivacyTitle">Private to you</h2>
-              <p class="class-banner-sub">Saved to My progress as Personal. Never shared with teachers, and it doesn’t affect class attendance.</p>
-              <p class="solo-class-notice" id="soloClassNotice" hidden></p>
-            </section>
+          <div class="focus-head-side">
+            <p class="meeting-links">In a call?
+              <button class="text-link" type="button" data-open="zoom">Zoom</button>
+              <button class="text-link" type="button" data-open="meet">Google Meet</button>
+              <span class="info-wrap"><button class="info-btn" type="button" data-info aria-label="More about meeting links" aria-expanded="false" aria-controls="meetingInfo">i</button><span class="info-pop" id="meetingInfo" role="note" hidden>Opens your saved meeting link in a new tab (you’re asked for it the first time; it’s kept on this device). Your camera stays off until you start.</span></span>
+            </p>
+            <span class="focus-privacy" id="soloPrivacy" data-state="personal">
+              <svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg>Private to you
+              <span class="info-wrap"><button class="info-btn" type="button" data-info aria-label="About privacy in Solo focus" aria-expanded="false" aria-controls="soloPrivacyInfo">i</button><span class="info-pop" id="soloPrivacyInfo" role="note" hidden>Video never leaves this device. Solo sessions are saved to My progress as Personal, never shared with teachers, and don’t affect class attendance.</span></span>
+            </span>
           </div>
-        </section>
-
-        <!-- This session at a glance (student-focus.js). Numbers start fresh each time tracking starts.
-             The tiles, tracker card and timeline move together to a class's Live focus while the
-             student is in that class's live session (student-classes.js). -->
-        <div class="stats-slot" id="soloStatsSlot">
-        <section class="glance focus-glance" id="this-session" aria-label="This session at a glance">
-          <article class="glance-tile home-card live-tile-focus" id="liveScoreTile" style="--d: 1">
-            <span class="glance-label"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg>Attention (estimate)</span>
-            <b class="glance-value" id="statLiveScore">—</b>
-            <span class="glance-meter" aria-hidden="true"><span id="statLiveMeter"></span></span>
-            <small class="glance-note" id="statLiveState">Start tracking to begin</small>
-          </article>
-          <article class="glance-tile home-card" style="--d: 2">
-            <span class="glance-label"><svg class="icon" aria-hidden="true"><use href="#i-target"/></svg>On screen this session</span>
-            <b class="glance-value" id="statSessionFocus">—</b>
-            <span class="glance-meter green" aria-hidden="true"><span id="statFocusMeter"></span></span>
-            <small class="glance-note" id="statTracked">0:00 measured</small>
-          </article>
-          <article class="glance-tile home-card" style="--d: 3">
-            <span class="glance-label"><svg class="icon amber" aria-hidden="true"><use href="#i-flame"/></svg>Focus streak</span>
-            <b class="glance-value" id="statStreak">0:00</b>
-            <small class="glance-note" id="statBestStreak">Best this session: 0:00</small>
-          </article>
-          <article class="glance-tile home-card" style="--d: 4">
-            <span class="glance-label"><svg class="icon red" aria-hidden="true"><use href="#i-flag"/></svg>Looked away 4s+</span>
-            <b class="glance-value" id="statLapses">0</b>
-            <small class="glance-note" id="statNudges">0 nudges shown</small>
-          </article>
-        </section>
         </div>
+        <!-- Shown when a class live session is using the camera (student-classes.js) -->
+        <p class="solo-class-notice" id="soloClassNotice" hidden></p>
+
+        <section class="panel-card home-card focus-cockpit" style="--d: 1" aria-label="Focus session">
+          <!-- Focus timer (student-focus.js): starts each block, and the camera with it if chosen -->
+          <div class="cockpit-timer" id="focus-timer" data-phase="focus">
+            <h2 class="cockpit-label" id="timerTitle">Focus timer</h2>
+            <div class="timer-body">
+              <div class="timer-ring">
+                <svg viewBox="0 0 120 120" aria-hidden="true">
+                  <circle class="ring-track" cx="60" cy="60" r="52"></circle>
+                  <circle id="timerRing" cx="60" cy="60" r="52"></circle>
+                </svg>
+                <div class="timer-center" role="timer" aria-live="off">
+                  <div id="timerDisplay">25:00</div>
+                  <div id="timerPhase">Focus block</div>
+                </div>
+              </div>
+            </div>
+            <!-- The buttons set the hidden list below, which Home's focus coach also reads and sets. -->
+            <div class="segmented" role="radiogroup" aria-label="Focus and break length" id="timerPresetButtons">
+              <button type="button" role="radio" data-timer-preset="10-2">10<small>/2</small></button>
+              <button type="button" role="radio" data-timer-preset="15-3">15<small>/3</small></button>
+              <button type="button" role="radio" data-timer-preset="25-5">25<small>/5</small></button>
+              <button type="button" role="radio" data-timer-preset="45-10">45<small>/10</small></button>
+            </div>
+            <select id="timerPreset" class="field-select" aria-label="Focus and break length" hidden>
+              <option value="25-5">25 / 5 min</option>
+              <option value="15-3">15 / 3 min</option>
+              <option value="10-2">10 / 2 min</option>
+              <option value="45-10">45 / 10 min</option>
+            </select>
+            <div class="timer-actions">
+              <button id="timerToggle" class="btn-primary" type="button">Start focus</button>
+              <button id="timerSkip" class="btn-action" type="button">Skip</button>
+              <button id="timerReset" class="btn-action" type="button">Reset</button>
+            </div>
+            <label class="setting timer-setting"><span><b>Track attention</b><small>The camera turns on with each focus block.</small></span><span class="switch"><input type="checkbox" id="timerWithTracking" checked></span></label>
+          </div>
+
+          <div class="cockpit-live">
+            <div class="cockpit-live-head">
+              <h2 class="cockpit-label">This session</h2>
+              <p class="cockpit-rounds"><span id="timerRounds">0</span> focus blocks done</p>
+            </div>
+            <!-- This session's numbers (student-focus.js). They start fresh each time tracking starts, and
+                 move with the camera to a class's Live focus during its live session (student-classes.js). -->
+            <div class="stats-slot" id="soloStatsSlot">
+            <section class="glance focus-glance" id="this-session" aria-label="This session at a glance">
+              <article class="glance-tile home-card live-tile-focus" id="liveScoreTile">
+                <span class="glance-label"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg>Attention
+                  <span class="info-wrap"><button class="info-btn" type="button" data-info aria-label="How attention is measured" aria-expanded="false" aria-controls="attentionInfo">i</button><span class="info-pop" id="attentionInfo" role="note" hidden>How much of the last few seconds your face and eyes pointed at the screen, worked out on this device. Reading notes or thinking can count as looking away, and lighting or camera angle can change it.</span></span>
+                </span>
+                <b class="glance-value" id="statLiveScore">—</b>
+                <span class="glance-meter" aria-hidden="true"><span id="statLiveMeter"></span></span>
+                <small class="glance-note" id="statLiveState">Start tracking to begin</small>
+              </article>
+              <article class="glance-tile home-card">
+                <span class="glance-label"><svg class="icon" aria-hidden="true"><use href="#i-target"/></svg>On screen</span>
+                <b class="glance-value" id="statSessionFocus">—</b>
+                <span class="glance-meter green" aria-hidden="true"><span id="statFocusMeter"></span></span>
+                <small class="glance-note" id="statTracked">0:00 measured</small>
+              </article>
+              <article class="glance-tile home-card">
+                <span class="glance-label"><svg class="icon amber" aria-hidden="true"><use href="#i-flame"/></svg>Focus streak</span>
+                <b class="glance-value" id="statStreak">0:00</b>
+                <small class="glance-note" id="statBestStreak">Best this session: 0:00</small>
+              </article>
+              <article class="glance-tile home-card" title="Times you looked away for 4 seconds or more">
+                <span class="glance-label"><svg class="icon red" aria-hidden="true"><use href="#i-flag"/></svg>Look-aways</span>
+                <b class="glance-value" id="statLapses">0</b>
+                <small class="glance-note" id="statNudges">0 nudges shown</small>
+              </article>
+            </section>
+            </div>
+            <!-- The first step not done yet (student-focus.js), always in view during a block -->
+            <div class="timer-next" id="timerNext" data-empty="true">
+              <span class="chip-icon green" aria-hidden="true"><svg><use href="#i-check"/></svg></span>
+              <span class="timer-next-copy">
+                <span class="timer-next-label">Next step</span>
+                <span class="timer-next-text" id="timerNextText">Add a small step to keep it in view</span>
+              </span>
+              <button class="btn-action" type="button" id="timerNextDone">Done</button>
+              <a class="btn-action" id="timerNextAdd" href="#micro-goals">Add a step</a>
+            </div>
+          </div>
+        </section>
 
         <div class="focus-stage">
-          <!-- Attention tracker (eye-analyzer.js). The same card moves to a class's Live focus tab while
-               the student is in that class's live session (student-classes.js), and back afterwards. -->
-          <div class="tracker-slot" id="solo-tracker">
-          <div class="tracker-slot-note panel-card" id="soloTrackerNote" hidden>
-            <span class="placeholder-rings" aria-hidden="true"><span class="chip-icon"><svg><use href="#i-school"/></svg></span></span>
-            <b>Your camera is in use by a class session</b>
-            <span id="soloTrackerNoteText">Leave the live session to track a solo session.</span>
-            <a class="btn-action" id="soloTrackerNoteLink" href="#classes">Open class</a>
+          <div class="focus-main">
+            <!-- Attention tracker (eye-analyzer.js). The same card moves to a class's Live focus tab while
+                 the student is in that class's live session (student-classes.js), and back afterwards. -->
+            <div class="tracker-slot" id="solo-tracker">
+            <div class="tracker-slot-note panel-card" id="soloTrackerNote" hidden>
+              <span class="placeholder-rings" aria-hidden="true"><span class="chip-icon"><svg><use href="#i-school"/></svg></span></span>
+              <b>Your camera is in use by a class session</b>
+              <span id="soloTrackerNoteText">Leave the live session to track a solo session.</span>
+              <a class="btn-action" id="soloTrackerNoteLink" href="#classes">Open class</a>
+            </div>
+            <section style="--d: 2" class="panel-card home-card tracker-card" id="focus-session" aria-labelledby="trackerTitle">
+              <div class="panel-head">
+                <div>
+                  <h2 class="panel-title" id="trackerTitle"><span class="chip-icon"><svg><use href="#i-eye"/></svg></span>Attention tracker</h2>
+                  <p class="panel-sub" id="analyzerMessage">Gaze and head orientation are processed on this device.</p>
+                </div>
+              </div>
+
+              <div class="video-viewport">
+                <video id="analyzerVideo" autoplay playsinline muted></video>
+                <div id="cameraPlaceholder" class="video-placeholder">
+                  <span class="placeholder-rings" aria-hidden="true"><span class="chip-icon"><svg><use href="#i-video"/></svg></span></span>
+                  <b>Your camera is off</b>
+                  <span>Start a focus block, or turn the camera on below.</span>
+                </div>
+                <div class="status-chip"><span class="status-dot" aria-hidden="true"></span><span id="gazeStatus">Camera inactive</span></div>
+                <div class="live-kpi-chip"><span aria-hidden="true"></span><strong id="shiftedPercent">—</strong></div>
+                <div class="privacy-chip"><svg><use href="#i-lock"/></svg>Video never leaves this device</div>
+              </div>
+
+              <!-- Camera on/off, and tracking settings (saved per account on this device by student-focus.js) -->
+              <div class="tracker-controls">
+                <div class="camera-actions">
+                  <button id="startAnalyzer" class="btn-camera" type="button">Start attention tracking</button>
+                  <button id="stopAnalyzer" class="btn-stop" type="button" hidden>Stop camera</button>
+                </div>
+                <div class="tracker-toggles" role="group" aria-label="Tracking settings">
+                  <label class="mini-switch" title="A gentle prompt after a few seconds looking away"><span class="switch"><input type="checkbox" id="nudgeToggle" checked></span>Nudges<span class="sr-only">: a gentle prompt after a few seconds looking away</span></label>
+                  <label class="mini-switch" title="A soft sound with nudges and when a block ends"><span class="switch"><input type="checkbox" id="chimeToggle"></span>Chime<span class="sr-only">: a soft sound with nudges and when a block ends</span></label>
+                </div>
+              </div>
+              <p class="tracker-progress-link">When you stop, the session is saved to <a class="text-link" href="#progress">My progress</a>.</p>
+            </section>
+            </div>
+
+            <!-- Focus timeline (student-focus.js) -->
+            <div class="stats-slot" id="soloTimelineSlot">
+            <section style="--d: 3" class="panel-card home-card timeline-card" id="focus-timeline" aria-labelledby="timelineTitle">
+              <div class="panel-head">
+                <div>
+                  <h2 class="panel-title" id="timelineTitle"><span class="chip-icon"><svg><use href="#i-chart"/></svg></span>Focus timeline</h2>
+                  <p class="panel-sub">Your attention over the last 2 minutes. The dashed line is 70%. Gaps are when your face wasn’t in view or you were on a break.</p>
+                </div>
+              </div>
+              <div class="chart-box">
+                <canvas id="focusTimeline" role="img" aria-label="Your attention over the last 2 minutes"></canvas>
+                <div class="chart-empty" id="timelineEmpty">Start attention tracking to see your focus timeline.</div>
+              </div>
+            </section>
+            </div>
           </div>
-          <section style="--d: 5" class="panel-card home-card tracker-card" id="focus-session" aria-labelledby="trackerTitle">
+
+          <!-- Steps (student-focus.js); the first one not done shows in the panel above -->
+          <section style="--d: 4" class="panel-card home-card focus-steps" id="micro-goals" aria-labelledby="goalsTitle">
             <div class="panel-head">
               <div>
-                <h2 class="panel-title" id="trackerTitle"><span class="chip-icon"><svg><use href="#i-eye"/></svg></span>Attention tracker</h2>
-                <p class="panel-sub" id="analyzerMessage">Gaze and head orientation are processed on this device.</p>
+                <h2 class="panel-title" id="goalsTitle"><span class="chip-icon green"><svg><use href="#i-check"/></svg></span>Steps</h2>
+                <p class="panel-sub">Break the work into small, doable steps.</p>
               </div>
+              <button id="goalClearDone" class="btn-action" type="button" disabled>Clear done</button>
             </div>
-
-            <div class="video-viewport">
-              <video id="analyzerVideo" autoplay playsinline muted></video>
-              <div id="cameraPlaceholder" class="video-placeholder">
-                <span class="placeholder-rings" aria-hidden="true"><span class="chip-icon"><svg><use href="#i-video"/></svg></span></span>
-                <b>Your camera is off</b>
-                <span>Start a focus session to begin real-time attention tracking.</span>
-              </div>
-              <div class="status-chip"><span class="status-dot" aria-hidden="true"></span><span id="gazeStatus">Camera inactive</span></div>
-              <div class="live-kpi-chip"><span aria-hidden="true"></span><strong id="shiftedPercent">—</strong></div>
-              <div class="privacy-chip"><svg><use href="#i-lock"/></svg>Video never leaves this device</div>
-            </div>
-
-            <div class="camera-actions">
-              <button id="startAnalyzer" class="btn-camera" type="button">Start attention tracking</button>
-              <button id="stopAnalyzer" class="btn-stop" type="button" hidden>Stop camera</button>
-            </div>
-            <p class="tracker-progress-link">When you stop tracking, this session is saved to <a class="text-link" href="#progress">My progress</a>.</p>
-
-            <!-- Tracking settings (saved per account on this device by student-focus.js) -->
-            <div class="tracker-settings">
-              <div class="setting-tiles" role="group" aria-label="Tracking settings">
-                <label class="setting-tile"><span class="setting-top"><b>Re-engagement nudges</b><span class="switch"><input type="checkbox" id="nudgeToggle" checked></span></span><small>A gentle prompt after a few seconds looking away.</small></label>
-                <label class="setting-tile"><span class="setting-top"><b>Gentle chime</b><span class="switch"><input type="checkbox" id="chimeToggle"></span></span><small>A soft sound with nudges and when a block ends.</small></label>
-              </div>
-            </div>
+            <form id="goalForm" class="inline-form">
+              <input id="goalInput" class="field-input" type="text" maxlength="120" placeholder="Add a small step…" autocomplete="off" aria-label="New step">
+              <button class="btn-primary" type="submit" aria-label="Add step"><svg class="icon"><use href="#i-plus"/></svg></button>
+            </form>
+            <div class="progress" aria-hidden="true"><span id="goalProgress"></span></div>
+            <p class="goal-summary" id="goalSummary" aria-live="polite">No steps yet</p>
+            <ul class="goal-list" id="goalList"></ul>
           </section>
-          </div>
-
-          <div class="focus-side">
-            <!-- Focus timer (student-focus.js) -->
-            <section style="--d: 6" class="panel-card home-card" id="focus-timer" data-phase="focus" aria-labelledby="timerTitle">
-              <div class="panel-head">
-                <div>
-                  <h2 class="panel-title" id="timerTitle"><span class="chip-icon"><svg><use href="#i-timer"/></svg></span>Focus timer</h2>
-                  <p class="panel-sub">Short blocks with built-in breaks.</p>
-                </div>
-              </div>
-              <!-- The buttons set the hidden list below, which Home's focus coach also reads and sets. -->
-              <div class="segmented" role="radiogroup" aria-label="Focus and break length" id="timerPresetButtons">
-                <button type="button" role="radio" data-timer-preset="10-2">10<small>/2</small></button>
-                <button type="button" role="radio" data-timer-preset="15-3">15<small>/3</small></button>
-                <button type="button" role="radio" data-timer-preset="25-5">25<small>/5</small></button>
-                <button type="button" role="radio" data-timer-preset="45-10">45<small>/10</small></button>
-              </div>
-              <select id="timerPreset" class="field-select" aria-label="Focus and break length" hidden>
-                <option value="25-5">25 / 5 min</option>
-                <option value="15-3">15 / 3 min</option>
-                <option value="10-2">10 / 2 min</option>
-                <option value="45-10">45 / 10 min</option>
-              </select>
-              <div class="timer-body">
-                <div class="timer-ring">
-                  <svg viewBox="0 0 120 120" aria-hidden="true">
-                    <circle class="ring-track" cx="60" cy="60" r="52"></circle>
-                    <circle id="timerRing" cx="60" cy="60" r="52"></circle>
-                  </svg>
-                  <div class="timer-center" role="timer" aria-live="off">
-                    <div id="timerDisplay">25:00</div>
-                    <div id="timerPhase">Focus block</div>
-                  </div>
-                </div>
-              </div>
-              <p class="timer-meta"><span id="timerRounds">0</span> focus blocks completed this session</p>
-              <div class="timer-actions">
-                <button id="timerToggle" class="btn-primary" type="button">Start focus</button>
-                <button id="timerSkip" class="btn-action" type="button">Skip</button>
-                <button id="timerReset" class="btn-action" type="button">Reset</button>
-              </div>
-              <label class="setting timer-setting"><span><b>Start tracking with each block</b><small>The camera turns on when a focus block starts.</small></span><span class="switch"><input type="checkbox" id="timerWithTracking" checked></span></label>
-            </section>
-
-            <!-- Micro-goals (student-focus.js) -->
-            <section style="--d: 7" class="panel-card home-card" id="micro-goals" aria-labelledby="goalsTitle">
-              <div class="panel-head">
-                <div>
-                  <h2 class="panel-title" id="goalsTitle"><span class="chip-icon green"><svg><use href="#i-check"/></svg></span>Micro-goals</h2>
-                  <p class="panel-sub">Small, doable steps. Nudges remind you of the next one.</p>
-                </div>
-                <button id="goalClearDone" class="btn-action" type="button" disabled>Clear completed</button>
-              </div>
-              <form id="goalForm" class="inline-form">
-                <input id="goalInput" class="field-input" type="text" maxlength="120" placeholder="Add a small step…" autocomplete="off" aria-label="New micro-goal">
-                <button class="btn-primary" type="submit" aria-label="Add step"><svg class="icon"><use href="#i-plus"/></svg></button>
-              </form>
-              <div class="progress" aria-hidden="true"><span id="goalProgress"></span></div>
-              <p class="goal-summary" id="goalSummary" aria-live="polite">No steps yet</p>
-              <ul class="goal-list" id="goalList"></ul>
-            </section>
-          </div>
-        </div>
-
-        <!-- Focus timeline (student-focus.js) -->
-        <div class="stats-slot" id="soloTimelineSlot">
-        <section style="--d: 8" class="panel-card home-card timeline-card" id="focus-timeline" aria-labelledby="timelineTitle">
-          <div class="panel-head">
-            <div>
-              <h2 class="panel-title" id="timelineTitle"><span class="chip-icon"><svg><use href="#i-chart"/></svg></span>Focus timeline</h2>
-              <p class="panel-sub">Estimated attention over the last 2 minutes. Gaps are times tracking was unavailable or you were on a break.</p>
-            </div>
-          </div>
-          <div class="chart-box">
-            <canvas id="focusTimeline" role="img" aria-label="Your attention score over time"></canvas>
-            <div class="chart-empty" id="timelineEmpty">Start attention tracking to see your focus timeline.</div>
-          </div>
-        </section>
         </div>
       </section>
 
@@ -840,7 +833,7 @@
               <div class="hero-copy">
                 <p class="eyebrow-pill"><span class="tag">Class</span><span id="classPageTeacher">Classroom</span></p>
                 <h1 class="welcome-title" id="classPageTitle">Class</h1>
-                <p class="hero-lead">Classroom sessions with your teacher. Your attention estimate is shared only while you’ve joined a live session.</p>
+                <p class="hero-lead">Classroom sessions with your teacher. Your attention score is shared only while you’ve joined a live session.</p>
               </div>
             </div>
             <div class="page-hero-actions">
@@ -873,12 +866,12 @@
               <div class="tracker-slot-note panel-card" id="classTrackerNote">
                 <span class="placeholder-rings" aria-hidden="true"><span class="chip-icon"><svg><use href="#i-video"/></svg></span></span>
                 <b>Attention tracking starts when you join</b>
-                <span>Join your teacher’s live session to turn it on. Only your attention estimate is shared, never video.</span>
+                <span>Join your teacher’s live session to turn it on. Only your attention score is shared, never video.</span>
               </div>
             </div>
             <section class="panel-card sharing-card" aria-labelledby="sharingTitle">
               <h2 class="panel-title" id="sharingTitle"><span class="chip-icon green"><svg><use href="#i-eye"/></svg></span>Classroom session</h2>
-              <label class="setting-tile"><span class="setting-top"><b>Share with my teacher</b><span class="switch"><input type="checkbox" id="shareToggle" checked></span></span><small>Only your attention estimate, only while you’re in this class’s live session.</small></label>
+              <label class="setting-tile"><span class="setting-top"><b>Share with my teacher</b><span class="switch"><input type="checkbox" id="shareToggle" checked></span></span><small>Only your attention score, only while you’re in this class’s live session.</small></label>
               <p class="share-status" id="shareStatus" aria-live="polite">Checking your class…</p>
               <p class="panel-sub">Classroom sessions are saved to My progress under this class. Solo focus sessions are never shared.</p>
             </section>
@@ -1200,11 +1193,11 @@
   <script src="../scripts/student/student-ui.js?v=9"></script>
   <!-- auth-guard.js must load first: the other modules wait on window.neuroFocusReady -->
   <script type="module" src="../scripts/auth/auth-guard.js?v=5"></script>
-  <script type="module" src="../scripts/tracking/eye-analyzer.js?v=5"></script>
+  <script type="module" src="../scripts/tracking/eye-analyzer.js?v=6"></script>
   <script type="module" src="../scripts/student/learning-assistant.js?v=14"></script>
   <script type="module" src="../scripts/student/student-notes.js?v=7"></script>
-  <script type="module" src="../scripts/student/student-classes.js?v=20"></script>
-  <script type="module" src="../scripts/student/student-focus.js?v=13"></script>
+  <script type="module" src="../scripts/student/student-classes.js?v=21"></script>
+  <script type="module" src="../scripts/student/student-focus.js?v=14"></script>
   <script type="module" src="../scripts/student/student-history.js?v=10"></script>
   <script type="module" src="../scripts/shared/profile.js?v=5"></script>
   <script type="module" src="../scripts/shared/account-security.js?v=1"></script>

@@ -920,7 +920,7 @@ if (app) {
       const kicker = el("span", "classes-live-kicker");
       kicker.append(el("span", "live-dot"), inSession ? "You’re in this live session" : status?.since ? `Live now · since ${clock(status.since)}` : "Live now");
       text.append(kicker, el("b", "", item.name), el("small", "", inSession
-        ? "Only your attention estimate is shared with your teacher, never video."
+        ? "Only your attention score is shared with your teacher, never video."
         : `${teacherNames.get(item.id)?.name || "Your teacher"} started a live session. Joining turns on your attention tracker.`));
       let action;
       if (inSession) {
@@ -992,21 +992,21 @@ if (app) {
       banner.dataset.state = "sharing";
       kicker.append(liveDot(), checkIn.status === "late" ? "You’re in the live session · marked late" : "You’re in the live session");
       sub.textContent = checkIn.status
-        ? "Your attendance is recorded. Your teacher sees your attention estimate, never your video."
-        : "Your teacher sees your attention estimate, never your video.";
+        ? "Your attendance is recorded. Your teacher sees your attention score, never your video."
+        : "Your teacher sees your attention score, never your video.";
       actions.append(bannerButton("Leave session", "btn-action", leaveSession));
     } else if (status?.live && joined) {
       banner.dataset.state = "live";
       kicker.append(liveDot(), "You’ve joined");
       sub.textContent = !shareToggle?.checked
-        ? "Sharing is paused, so your teacher can’t see your attention estimate. Your attendance still counts."
-        : "Your camera is off, so nothing is shared. Your attendance still counts. Turn the camera on to share your attention estimate.";
+        ? "Sharing is paused, so your teacher can’t see your attention score. Your attendance still counts."
+        : "Your camera is off, so nothing is shared. Your attendance still counts. Turn the camera on to share your attention score.";
       if (!tracking && !cameraStarting) actions.append(bannerButton("Turn camera on", "btn-primary", () => window.dispatchEvent(new CustomEvent("neurofocus:start-camera"))));
       actions.append(bannerButton("Leave session", "btn-action", leaveSession));
     } else if (status?.live) {
       banner.dataset.state = "live";
       kicker.append(liveDot(), "Live now");
-      sub.textContent = "Your teacher started a live session. Join to share your attention estimate (never video). Nothing is shared until you join.";
+      sub.textContent = "Your teacher started a live session. Join to share your attention score (never video). Nothing is shared until you join.";
       actions.append(bannerButton("Join session", "btn-join", () => joinSession(item.id)));
     } else if (joined) {
       banner.dataset.state = "";
@@ -1035,13 +1035,13 @@ if (app) {
     else if (navigator.onLine === false) text = "Connection lost · your teacher isn’t receiving updates until you’re back online.";
     else if (!item) text = "Not shared.";
     else if (live && removedFromSession(item.id)) text = "Not shared · your teacher removed you from this live session.";
-    else if (!shareToggle?.checked) text = "Sharing paused · your teacher can’t see your attention estimate.";
+    else if (!shareToggle?.checked) text = "Sharing paused · your teacher can’t see your attention score.";
     else if (!live) text = "Not shared · there’s no live session right now.";
     else if (joined && tracking) {
-      text = `Live · your teacher in ${item.name} sees your attention estimate (never your video).`;
+      text = `Live · your teacher in ${item.name} sees your attention score (never your video).`;
       state = "live";
-    } else if (joined) text = "You’ve joined · turn the camera on to share your attention estimate.";
-    else text = "Not shared yet · join the live session to share your attention estimate.";
+    } else if (joined) text = "You’ve joined · turn the camera on to share your attention score.";
+    else text = "Not shared yet · join the live session to share your attention score.";
     shareStatus.textContent = text;
     shareStatus.dataset.state = state;
   }
