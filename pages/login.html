@@ -247,6 +247,8 @@
     @media (max-width: 960px) {
       main.auth-layout { grid-template-columns: 1fr; gap: 28px; padding: 36px 0 56px; max-width: 520px; }
       .auth-title { font-size: clamp(30px, 7vw, 40px); margin-bottom: 0; }
+      /* Stop the backdrop at the screen edge (16px page margin), or it widens the page on phones */
+      .auth-intro::before { inset: -40px -16px; }
       .auth-lead, .role-list, .auth-checks { display: none; }
       .eyebrow-pill { margin-bottom: 16px; }
     }

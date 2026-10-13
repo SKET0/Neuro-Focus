@@ -27,6 +27,7 @@ function showSetupMessage(message) {
 // signs in as someone else (or signs out), this tab's account has changed underneath it.
 function showAccountChangedNotice() {
   if (document.querySelector("#accountChangedNotice")) return;
+  const local = ["localhost", "127.0.0.1"].includes(window.location.hostname);
   const otherHost = window.location.hostname === "127.0.0.1" ? "localhost" : "127.0.0.1";
   const otherUrl = `${window.location.protocol}//${otherHost}:${window.location.port || "8000"}/pages/login.html`;
   const overlay = document.createElement("div");
@@ -45,14 +46,19 @@ function showAccountChangedNotice() {
   text.textContent = "Another tab signed in to a different account or signed out. A browser can only be signed in to one Neuro-Focus account per address, so all its tabs share it.";
   const tip = document.createElement("p");
   tip.style.cssText = "color:#b4b4bc;margin-top:10px;";
-  tip.append("To test a teacher and a student side by side, sign in to the second account at ");
-  const link = document.createElement("a");
-  link.href = otherUrl;
-  link.target = "_blank";
-  link.rel = "noopener";
-  link.style.color = "#00d9ff";
-  link.textContent = otherUrl.replace("/pages/login.html", "");
-  tip.append(link, " or in a private window.");
+  // The other local address only exists on a development computer (README → Test a teacher and a student).
+  if (local) {
+    tip.append("To test a teacher and a student side by side, sign in to the second account at ");
+    const link = document.createElement("a");
+    link.href = otherUrl;
+    link.target = "_blank";
+    link.rel = "noopener";
+    link.style.color = "#00d9ff";
+    link.textContent = otherUrl.replace("/pages/login.html", "");
+    tip.append(link, " or in a private window.");
+  } else {
+    tip.textContent = "To use two accounts at once, sign in to the second one in a private window or a different browser.";
+  }
   const reload = document.createElement("button");
   reload.type = "button";
   reload.textContent = "Reload this tab";
