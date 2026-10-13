@@ -37,9 +37,10 @@
   </script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <link rel="stylesheet" href="../styles/theme.css?v=1">
-  <link rel="stylesheet" href="../styles/teacher.css?v=10">
+  <link rel="stylesheet" href="../styles/teacher.css?v=12">
   <link rel="stylesheet" href="../styles/dashboard-layout.css?v=9">
   <link rel="stylesheet" href="../styles/home.css?v=6">
+  <link rel="stylesheet" href="../styles/class-cards.css?v=1">
   <link rel="stylesheet" href="../styles/account.css?v=4">
   <link rel="stylesheet" href="../styles/tour.css?v=3">
   <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml">
@@ -267,13 +268,26 @@
       </section>
 
       <!-- ================= Classes (teacher-classes.js): every class, plus pages across classes ================= -->
-      <section class="stack view" id="classListView" hidden aria-labelledby="classListTitle">
+      <section class="stack view classes-view" id="classListView" hidden aria-labelledby="classListTitle">
         <section class="home-hero page-hero" aria-labelledby="classListTitle">
+          <div class="home-hero-art" aria-hidden="true">
+            <svg viewBox="0 0 560 200" fill="none">
+              <g stroke="currentColor" stroke-width="1.2">
+                <path d="M318 84 410 40l92 44-92 44Z" stroke-opacity="0.3"/>
+                <path d="M356 102v34c30 22 78 22 108 0v-34" stroke-opacity="0.22"/>
+                <path d="M502 84v46" stroke-opacity="0.22"/>
+                <path d="M250 150 318 84M502 84l40 56" stroke-opacity="0.14"/>
+              </g>
+              <circle cx="502" cy="134" r="4" fill="currentColor" fill-opacity="0.5"/>
+              <circle cx="250" cy="150" r="3" fill="currentColor" fill-opacity="0.35"/>
+              <circle cx="542" cy="140" r="2.5" fill="currentColor" fill-opacity="0.35"/>
+            </svg>
+          </div>
           <div class="page-hero-inner">
             <div class="hero-copy">
-              <p class="eyebrow-pill"><span class="tag">Teaching</span><span id="sumClassesLine">Your classes</span></p>
+              <p class="eyebrow-pill"><span class="tag">Classes</span><span id="sumClassesLine">Your classes</span></p>
               <h1 class="welcome-title" id="classListTitle">Classes</h1>
-              <p class="hero-lead">Open a class for its posts, assignments, quizzes, live focus, master list and attendance.</p>
+              <p class="hero-lead">Open a class for its live focus, posts, assignments, quizzes, master list and attendance.</p>
             </div>
             <div class="page-hero-actions">
               <button class="btn-primary" type="button" data-nav="new-class"><svg class="icon"><use href="#i-plus"/></svg>New class</button>
@@ -281,9 +295,21 @@
           </div>
         </section>
 
-        <section class="panel-card" id="teacherClassesPanel" aria-label="Your classes">
-          <div class="class-grid" id="classGrid"><p class="empty-state">Loading classes…</p></div>
-        </section>
+        <!-- A live session running now (teacher-classes.js) -->
+        <div class="classes-live" id="tClassesLive" hidden></div>
+
+        <div class="classes-toolbar" id="tClassesToolbar" hidden>
+          <div class="classes-search">
+            <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
+            <input class="field-input" id="tClassesSearch" type="search" placeholder="Search classes" aria-label="Search classes" autocomplete="off">
+          </div>
+          <div class="classes-filter" role="group" aria-label="Show">
+            <button type="button" data-t-class-filter="all" aria-pressed="true">All</button>
+            <button type="button" data-t-class-filter="live" aria-pressed="false">Live now</button>
+          </div>
+        </div>
+
+        <div class="class-card-grid" id="classGrid" role="list" aria-label="Your classes"><p class="empty-state">Loading classes…</p></div>
 
         <section class="panel-card" aria-labelledby="acrossTitle">
           <div class="panel-head">
@@ -702,10 +728,10 @@
         </div>
 
         <div class="class-tabs" role="tablist" aria-label="Class sections">
-          <button role="tab" type="button" id="tabBtn-posts" aria-controls="tab-posts" data-tab="posts" aria-selected="true"><svg class="icon"><use href="#i-megaphone"/></svg>Posts</button>
+          <button role="tab" type="button" id="tabBtn-live" aria-controls="tab-live" data-tab="live" aria-selected="true"><svg class="icon"><use href="#i-live"/></svg>Live focus <span class="nav-live" id="tabLiveDot" hidden><span class="live-dot"></span><span class="sr-only">, live now</span></span></button>
+          <button role="tab" type="button" id="tabBtn-posts" aria-controls="tab-posts" data-tab="posts" aria-selected="false" tabindex="-1"><svg class="icon"><use href="#i-megaphone"/></svg>Posts</button>
           <button role="tab" type="button" id="tabBtn-assignments" aria-controls="tab-assignments" data-tab="assignments" aria-selected="false" tabindex="-1"><svg class="icon"><use href="#i-assignment"/></svg>Assignments</button>
           <button role="tab" type="button" id="tabBtn-quizzes" aria-controls="tab-quizzes" data-tab="quizzes" aria-selected="false" tabindex="-1"><svg class="icon"><use href="#i-quiz"/></svg>Quizzes</button>
-          <button role="tab" type="button" id="tabBtn-live" aria-controls="tab-live" data-tab="live" aria-selected="false" tabindex="-1"><svg class="icon"><use href="#i-live"/></svg>Live focus <span class="nav-live" id="tabLiveDot" hidden><span class="live-dot"></span><span class="sr-only">, live now</span></span></button>
           <span class="tab-divider" aria-hidden="true"></span>
           <button role="tab" type="button" id="tabBtn-students" aria-controls="tab-students" data-tab="students" aria-selected="false" tabindex="-1"><svg class="icon"><use href="#i-users"/></svg>Master list <span class="tab-count" id="tabStudentCount"></span></button>
           <button role="tab" type="button" id="tabBtn-attendance" aria-controls="tab-attendance" data-tab="attendance" aria-selected="false" tabindex="-1"><svg class="icon"><use href="#i-attendance"/></svg>Attendance</button>
@@ -713,99 +739,81 @@
           <button role="tab" type="button" id="tabBtn-settings" aria-controls="tab-settings" data-tab="settings" aria-selected="false" tabindex="-1"><svg class="icon"><use href="#i-settings"/></svg>Settings</button>
         </div>
 
-        <!-- Live focus: the live monitor (teacher-analytics.js) -->
-        <div class="tab-panel" id="tab-live" role="tabpanel" aria-labelledby="tabBtn-live" hidden>
+        <!-- Live focus: the live classroom board (teacher-analytics.js) -->
+        <div class="tab-panel" id="tab-live" role="tabpanel" aria-labelledby="tabBtn-live">
           <section id="overview" class="stack" aria-labelledby="overviewTitle">
             <div class="section-head">
               <div>
-                <h2 id="overviewTitle">Session analytics</h2>
-                <p id="analyticsSource">Real-time attention estimates from students in this class (numbers only, never video).</p>
+                <h2 id="overviewTitle">Live focus</h2>
+                <p id="liveClassName">Start a live session to watch this class.</p>
               </div>
               <div class="mode-row">
                 <span class="sim-badge" id="liveStatusBadge">Not live</span>
               </div>
             </div>
 
-            <div class="stat-grid">
-              <article class="stat-card">
-                <span class="stat-label">Class average attention</span>
-                <span class="chip-icon"><svg><use href="#i-eye"/></svg></span>
+            <!-- The class right now: average, how the class splits, check-ins and time -->
+            <section class="panel-card live-summary-bar" aria-label="The class right now">
+              <div class="lsb-metric lsb-average">
+                <span class="lsb-label">Class attention</span>
                 <strong id="statAverage">—</strong>
                 <small id="statAverageTrend">Start a live session to see scores</small>
-              </article>
-              <article class="stat-card">
-                <span class="stat-label">Learners focused</span>
-                <span class="chip-icon green"><svg><use href="#i-users"/></svg></span>
-                <strong id="statFocused">—</strong>
-                <small id="statFocusedSub">No learners loaded</small>
-              </article>
-              <article class="stat-card">
-                <span class="stat-label">Distraction flags</span>
-                <span class="chip-icon red"><svg><use href="#i-flag"/></svg></span>
+              </div>
+              <div class="lsb-split">
+                <span class="lsb-label">Right now</span>
+                <div class="split-bar" id="liveSplitBar" aria-hidden="true"></div>
+                <ul class="split-legend" id="liveSplitLegend"></ul>
+              </div>
+              <div class="lsb-metric">
+                <span class="lsb-label">Check-ins</span>
                 <strong id="statFlags">0</strong>
-                <small id="statFlagsSub">Distracted for 3+ consecutive readings</small>
-              </article>
-              <article class="stat-card">
-                <span class="stat-label">Session time</span>
-                <span class="chip-icon amber"><svg><use href="#i-timer"/></svg></span>
+                <small id="statFlagsSub">Low attention for a few readings in a row</small>
+              </div>
+              <div class="lsb-metric">
+                <span class="lsb-label">Session time</span>
                 <strong id="statTime">00:00</strong>
                 <small id="statTimeSub">Live session time</small>
-              </article>
-            </div>
+              </div>
+            </section>
+
+            <!-- Every student on the master list, as a card (teacher-analytics.js) -->
+            <section class="panel-card" id="live-students" aria-labelledby="liveBoardTitle">
+              <div class="panel-head live-board-head">
+                <div>
+                  <h3 class="panel-title" id="liveBoardTitle"><span class="chip-icon"><svg><use href="#i-users"/></svg></span>Students</h3>
+                  <p class="panel-sub">Anyone who may need a check-in comes first. Scores come from each student’s own device, never video.</p>
+                </div>
+                <div class="live-filters" id="liveFilters" role="group" aria-label="Show students"></div>
+              </div>
+              <div class="live-board" id="liveBoard" data-source="live"></div>
+              <p class="live-board-none" id="liveBoardNone" hidden>No students match this filter right now.</p>
+              <div class="live-board-empty" id="liveBoardEmpty">
+                <span class="chip-icon"><svg><use href="#i-live"/></svg></span>
+                <b id="liveBoardEmptyTitle">This class isn’t live</b>
+                <ol class="live-steps">
+                  <li><span>Press <strong>Start live session</strong>. Everyone on the master list is invited and attendance starts.</span></li>
+                  <li><span>Students press <strong>Join</strong>, which turns on their attention tracker.</span></li>
+                  <li><span>Each student appears here with their attention, updated every second. <strong>End session</strong> stops sharing.</span></li>
+                </ol>
+              </div>
+            </section>
 
             <div class="analytics-grid">
               <div class="panel-card">
                 <div class="panel-head">
                   <div>
                     <div class="panel-title"><span class="chip-icon"><svg><use href="#i-chart"/></svg></span>Attention curve</div>
-                    <div class="panel-sub">Class average vs. lowest learner over the last 30 readings.</div>
+                    <div class="panel-sub">Class average and the lowest student over the last 30 readings.</div>
                   </div>
                 </div>
                 <div class="chart-box"><canvas id="attentionChart" aria-label="Class attention over time" role="img"></canvas></div>
-              </div>
-
-              <div class="panel-card" id="liveCard">
-                <div class="panel-head">
-                  <div>
-                    <div class="panel-title"><span class="chip-icon green"><svg><use href="#i-live"/></svg></span>Live classroom</div>
-                    <div class="panel-sub" id="liveClassName">Start a live session to watch this class.</div>
-                  </div>
-                </div>
-                <div class="live-summary">
-                  <strong id="liveTrackingCount">0</strong>
-                  <span id="liveTrackingLabel">students sharing live attention</span>
-                </div>
-                <ol class="live-steps">
-                  <li><span>Press <strong>Start live session</strong>. Everyone on the master list is invited automatically and attendance starts.</span></li>
-                  <li><span>They press <strong>Join session</strong>, which starts their attention tracker.</span></li>
-                  <li><span>Scores stream here every second, with no video. <strong>End session</strong> stops sharing.</span></li>
-                </ol>
-                <p class="sim-note">Only numbers computed on the student’s device are shared: score, focus state and session focus. Webcam video never leaves their computer.</p>
-              </div>
-
-            </div>
-
-            <div class="analytics-grid">
-              <div class="panel-card" id="live-students">
-                <div class="panel-head">
-                  <div>
-                    <div class="panel-title"><span class="chip-icon"><svg><use href="#i-users"/></svg></span>Live student attention</div>
-                    <div class="panel-sub">Lowest attention first, so struggling learners stand out.</div>
-                  </div>
-                </div>
-                <div class="table-scroll">
-                  <table class="data-table">
-                    <thead><tr><th>Learner</th><th>Attention</th><th>Status</th></tr></thead>
-                    <tbody id="liveStudentRows"></tbody>
-                  </table>
-                </div>
               </div>
 
               <div class="panel-card">
                 <div class="panel-head">
                   <div>
                     <div class="panel-title"><span class="chip-icon red"><svg><use href="#i-bell"/></svg></span>Check-in alerts</div>
-                    <div class="panel-sub">Raised when measured estimates stay low. An estimate, not proof of distraction.</div>
+                    <div class="panel-sub">When a student’s attention stays low. They may be reading notes, so check in gently.</div>
                   </div>
                 </div>
                 <ul class="alert-feed" id="alertFeed"></ul>
@@ -817,7 +825,7 @@
               <div class="panel-head">
                 <div>
                   <div class="panel-title"><span class="chip-icon"><svg><use href="#i-grid4"/></svg></span>Engagement heatmap</div>
-                  <div class="panel-sub">Each cell is one reading per learner, oldest to newest.</div>
+                  <div class="panel-sub">One cell per reading for each student, oldest to newest.</div>
                 </div>
               </div>
               <div class="heatmap-scroll"><div class="heatmap" id="engagementHeatmap"></div></div>
@@ -832,7 +840,7 @@
         </div>
 
         <!-- Posts (teacher-classroom.js): announcements for everyone in this class -->
-        <div class="tab-panel" id="tab-posts" role="tabpanel" aria-labelledby="tabBtn-posts">
+        <div class="tab-panel" id="tab-posts" role="tabpanel" aria-labelledby="tabBtn-posts" hidden>
           <div class="stack">
             <p class="classroom-setup" id="teacherPostsSetup" hidden></p>
             <form class="panel-card classroom-form" id="postForm">
@@ -1162,13 +1170,13 @@
     </dialog>
   </main>
 
-  <script src="../scripts/shared/app.js?v=4"></script>
+  <script src="../scripts/shared/app.js?v=5"></script>
   <script src="../scripts/shared/dashboard-nav.js?v=3"></script>
   <script src="../scripts/teacher/teacher-ui.js?v=3"></script>
   <script type="module" src="../scripts/auth/auth-guard.js?v=5"></script>
-  <script type="module" src="../scripts/teacher/teacher-classes.js?v=25"></script>
+  <script type="module" src="../scripts/teacher/teacher-classes.js?v=28"></script>
   <script type="module" src="../scripts/teacher/teacher-attendance.js?v=4"></script>
-  <script type="module" src="../scripts/teacher/teacher-analytics.js?v=9"></script>
+  <script type="module" src="../scripts/teacher/teacher-analytics.js?v=10"></script>
   <script type="module" src="../scripts/shared/profile.js?v=5"></script>
   <script type="module" src="../scripts/shared/account-security.js?v=1"></script>
   <script type="module" src="../scripts/teacher/teacher-home.js?v=10"></script>

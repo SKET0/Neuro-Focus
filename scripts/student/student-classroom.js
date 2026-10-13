@@ -1,5 +1,5 @@
-// Student class page: the tabs (Posts, Assignments, Quizzes, Live focus) and the Posts and Assignments
-// panels. Live focus itself is student-classes.js. Students read their teacher's posts and
+// Student class page: the tabs (Overview, Live focus, Posts, Assignments, Quizzes) and the Posts and
+// Assignments panels. Overview is student-class-overview.js; Live focus itself is student-classes.js. Students read their teacher's posts and
 // assignments, upload one file per assignment (replaceable until the deadline) and see their own
 // marks and feedback. They never see classmates' submissions: the database only returns their
 // own (supabase/migrations/20261010000000_class_posts_assignments.sql), and every upload is checked
@@ -15,10 +15,11 @@ const app = await window.neuroFocusReady;
 if (app && document.querySelector("#view-class")) {
   const { supabase } = app;
   const $ = (selector) => document.querySelector(selector);
-  const TABS = ["posts", "assignments", "quizzes", "live"];
-  const PANELS = { live: "#classPanelLive", posts: "#classPanelPosts", assignments: "#classPanelAssignments", quizzes: "#classPanelQuizzes" };
+  const TABS = ["overview", "live", "posts", "assignments", "quizzes"];
+  const PANELS = { overview: "#classPanelOverview", live: "#classPanelLive", posts: "#classPanelPosts", assignments: "#classPanelAssignments", quizzes: "#classPanelQuizzes" };
   let classId = null;
-  let tab = "posts";
+  let tab = "overview";
+  let revealId = null; // an assignment to open and scroll to (from the Overview's "Open")
   let assignments = [];
   let mine = new Map(); // assignment id -> my submission
   const openCards = new Set();
@@ -59,7 +60,7 @@ if (app && document.querySelector("#view-class")) {
     const nextClass = window.neuroFocusRouteClassId || null;
     if (nextClass !== classId) { openCards.clear(); assignments = []; mine = new Map(); }
     classId = nextClass;
-    tab = TABS.includes(window.neuroFocusRouteClassTab) ? window.neuroFocusRouteClassTab : "posts";
+    tab = TABS.includes(window.neuroFocusRouteClassTab) ? window.neuroFocusRouteClassTab : "overview";
     showTab();
     showLiveDot();
   }
@@ -71,6 +72,15 @@ if (app && document.querySelector("#view-class")) {
   window.addEventListener("neurofocus:class-status", showLiveDot);
   $("#classNotesButton").addEventListener("click", () => { if (classId) window.neuroFocusOpenClassNotes?.(classId); });
   window.addEventListener("neurofocus:viewchange", followRoute);
+  // The Overview's "Open" on an assignment: show the Assignments tab with that card open.
+  window.addEventListener("neurofocus:open-assignment", (event) => {
+    const { classId: forClass, id } = event.detail || {};
+    if (!forClass || !id) return;
+    openCards.add(id);
+    revealId = id;
+    if (window.neuroFocusRouteClassId === forClass && window.neuroFocusRouteClassTab === "assignments") { void loadAssignments(); return; }
+    window.location.hash = `class/${forClass}/assignments`;
+  });
   window.addEventListener("focus", () => {
     if (window.neuroFocusView !== "class" || !classId) return;
     if (tab === "assignments" && choosingFile()) return;
@@ -133,10 +143,17 @@ if (app && document.querySelector("#view-class")) {
     const list = $("#studentAssignmentList");
     if (!assignments.length) { list.replaceChildren(el("li", "empty-state", "No assignments yet. When your teacher sets one, it appears here.")); return; }
     list.replaceChildren(...assignments.map(assignmentCard));
+    if (revealId) {
+      const card = list.querySelector(`[data-assignment-id="${revealId}"]`);
+      revealId = null;
+      card?.scrollIntoView({ behavior: "smooth", block: "start" });
+      card?.querySelector(".assignment-toggle")?.focus({ preventScroll: true });
+    }
   }
 
   function assignmentCard(assignment) {
     const item = el("li", "assignment-card");
+    item.dataset.assignmentId = assignment.id;
     const status = statusOf(assignment);
     const due = dueText(assignment.due_at);
     const bodyId = `assignment-body-${assignment.id}`;
@@ -278,6 +295,7 @@ if (app && document.querySelector("#view-class")) {
     if (data?.previous_path) await removeFiles(supabase, [data.previous_path]);
     openCards.add(assignment.id);
     await loadAssignments();
+    window.dispatchEvent(new CustomEvent("neurofocus:assignments-changed", { detail: { classId } }));
     notify({ title: mine.get(assignment.id) && data?.previous_path ? "File replaced" : "Submitted", text: `“${file.name}” is saved for ${assignment.title}. Only you and your teacher can see it.`, kind: "success" });
   }
 

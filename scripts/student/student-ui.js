@@ -7,7 +7,7 @@
     dashboard: "Home", focus: "Solo focus", buddy: "NeuroBuddy", notes: "My notes",
     progress: "My progress", classes: "Classes", class: "Class", profile: "Profile settings"
   };
-  const CLASS_TABS = { posts: "Posts", assignments: "Assignments", quizzes: "Quizzes", live: "Live focus" };
+  const CLASS_TABS = { overview: "Overview", live: "Live focus", posts: "Posts", assignments: "Assignments", quizzes: "Quizzes" };
   const ALIASES = { home: "dashboard" };
   const views = document.querySelectorAll("[data-view]");
   const links = document.querySelectorAll("[data-view-link]");
@@ -17,12 +17,12 @@
   let currentClassId = null;
   let tabChosen = true; // false when the address names a class but not a tab
 
-  // A class opens on Live focus while its live session is on (or the student is in it), else on Posts.
+  // A class opens on its Overview (student-class-overview.js), which shows a live session with a Join
+  // button. A student already in the class's live session goes straight to Live focus.
   function defaultClassTab(classId) {
     const status = window.neuroFocusClassStatus;
     const item = status?.classes?.find((entry) => entry.id === classId);
-    const live = item && ((item.live && !item.removed && !item.blocked) || item.inSession);
-    return live || status?.joinedClassId === classId ? "live" : "posts";
+    return item?.inSession || status?.joinedClassId === classId ? "live" : "overview";
   }
   const className = (classId) => window.neuroFocusClassStatus?.classes?.find((entry) => entry.id === classId)?.name
     || (window.neuroFocusClasses || []).find((entry) => entry.id === classId)?.name || "Class";
@@ -55,8 +55,8 @@
   function showView() {
     const raw = window.location.hash.slice(1);
     // A class's page: #class/<id> or #class/<id>/<tab> (student-classes.js and
-    // student-classroom.js fill it in). Tabs: live (Live focus), posts, assignments, quizzes.
-    const classRoute = /^class\/([0-9a-z-]+)(?:\/(live|posts|assignments|quizzes))?/i.exec(raw);
+    // student-classroom.js fill it in). Tabs: overview, live (Live focus), posts, assignments, quizzes.
+    const classRoute = /^class\/([0-9a-z-]+)(?:\/(overview|live|posts|assignments|quizzes))?/i.exec(raw);
     const hash = classRoute ? "class" : ALIASES[raw] || raw;
     // Links like #focus-timer or #history point at a card inside a view.
     const target = hash && !VIEWS[hash] ? document.getElementById(hash) : null;

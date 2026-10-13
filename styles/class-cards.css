@@ -1,0 +1,130 @@
+/* Classes pages, shared by the student workspace (student-classes.js) and the teacher dashboard
+   (teacher-classes.js): the live-now strip, the search and filter toolbar, and the class cards with
+   a colour band, the class's sections and a main action. Colours come from the theme tokens
+   (styles/theme.css); each card's --class-color is set per class (scripts/student/class-colors.js). */
+.classes-view { display: flex; flex-direction: column; gap: 18px; }
+.classes-live { display: flex; flex-direction: column; gap: 10px; }
+.classes-live-row {
+  position: relative; display: flex; align-items: center; gap: 16px; padding: 16px 18px; border-radius: 16px; overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--red) 40%, var(--border-strong));
+  background: linear-gradient(120deg, color-mix(in srgb, var(--red) 12%, var(--surface)), var(--surface) 60%);
+  animation: live-glow 2.8s ease-in-out infinite;
+}
+.classes-live-row.is-new { animation: classes-rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both, live-glow 2.8s ease-in-out infinite; }
+.classes-live-row[data-in="true"] { border-color: color-mix(in srgb, var(--green) 40%, var(--border-strong)); background: linear-gradient(120deg, color-mix(in srgb, var(--green) 12%, var(--surface)), var(--surface) 60%); animation: none; }
+.classes-live-row[data-in="true"].is-new { animation: classes-rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.classes-live-row::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--class-color); }
+.classes-live-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.classes-live-kicker { display: inline-flex; align-items: center; gap: 8px; font-size: 11.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--danger-text); }
+.classes-live-row[data-in="true"] .classes-live-kicker { color: var(--success-text); }
+.classes-live-text b { font-size: 17px; font-weight: 700; overflow-wrap: anywhere; }
+.classes-live-text small { font-size: 12.5px; color: var(--text-soft); }
+@keyframes live-glow { 50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--red) 10%, transparent); } }
+
+.classes-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.classes-search { position: relative; flex: 1 1 260px; max-width: 420px; }
+.classes-search .icon { position: absolute; left: 12px; top: 50%; width: 15px; height: 15px; margin-top: -7.5px; color: var(--text-muted); pointer-events: none; }
+.classes-search .field-input { padding-left: 34px; }
+.classes-filter { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: var(--surface-sunken); border: 1px solid var(--border); }
+.classes-filter button { border: 0; background: none; color: var(--text-muted); font: inherit; font-size: 13px; font-weight: 550; padding: 6px 12px; border-radius: 9px; cursor: pointer; }
+.classes-filter button[aria-pressed="true"] { background: var(--surface-hover); color: var(--text-main); box-shadow: inset 0 0 0 1px var(--border-strong); }
+
+.class-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.class-card-v2 {
+  --class-color: var(--accent);
+  position: relative; display: flex; flex-direction: column; border-radius: 18px; overflow: hidden; background: var(--surface); border: 1px solid var(--border);
+  transition: transform 0.22s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.22s ease, border-color 0.22s ease;
+}
+.class-card-grid:not([data-settled]) .class-card-v2 { animation: classes-rise 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: calc(var(--i, 0) * 70ms); }
+.class-card-v2:hover, .class-card-v2:focus-within { transform: translateY(-4px); border-color: color-mix(in srgb, var(--class-color) 45%, var(--border)); box-shadow: 0 18px 40px color-mix(in srgb, var(--class-color) 14%, transparent); }
+.class-card-v2[data-live="true"] { border-color: color-mix(in srgb, var(--red) 40%, var(--border)); }
+.class-card-v2[data-in-session="true"] { border-color: color-mix(in srgb, var(--green) 45%, var(--border)); }
+.class-band {
+  position: relative; height: 84px; display: flex; align-items: flex-end; justify-content: space-between; padding: 0 16px 0 16px;
+  background:
+    radial-gradient(120px 80px at 85% 10%, color-mix(in srgb, #fff 18%, transparent), transparent 70%),
+    linear-gradient(135deg, color-mix(in srgb, var(--class-color) 70%, #0b1220), color-mix(in srgb, var(--class-color) 30%, #0b1220));
+  background-size: 140% 140%; background-position: 0% 0%; transition: background-position 0.6s ease;
+}
+.class-card-v2:hover .class-band { background-position: 100% 100%; }
+.class-band::after { content: ""; position: absolute; inset: 0; background-image: radial-gradient(color-mix(in srgb, #fff 14%, transparent) 1px, transparent 1.4px); background-size: 14px 14px; mask-image: linear-gradient(90deg, transparent, #000 60%); opacity: 0.6; pointer-events: none; }
+.class-band-initial {
+  position: relative; z-index: 1; width: 52px; height: 52px; margin-bottom: -22px; border-radius: 15px; display: grid; place-items: center;
+  font-size: 22px; font-weight: 800; color: #fff; background: color-mix(in srgb, var(--class-color) 85%, #000); border: 3px solid var(--surface);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--class-color) 35%, transparent);
+}
+.class-badge { position: relative; z-index: 1; align-self: flex-start; margin-top: 12px; display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 700; color: #fff; background: rgba(9, 9, 11, 0.45); backdrop-filter: blur(6px); }
+.class-badge[data-state="live"] { background: color-mix(in srgb, var(--red) 80%, #000); }
+.class-badge[data-state="in"] { background: color-mix(in srgb, var(--green) 70%, #000); }
+.class-badge .live-dot { background: #fff; }
+.class-body { display: flex; flex-direction: column; gap: 8px; padding: 30px 16px 12px; }
+.class-name { font-size: 17px; font-weight: 700; letter-spacing: -0.2px; line-height: 1.25; overflow-wrap: anywhere; }
+.class-open-link { color: inherit; text-decoration: none; }
+.class-open-link::after { content: ""; position: absolute; inset: 0; z-index: 0; } /* the whole card opens the class */
+.class-open-link:focus-visible { outline: none; }
+.class-card-v2:has(.class-open-link:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.class-teacher-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-soft); }
+.class-teacher-row .nf-avatar { --size: 24px; }
+.class-teacher-unknown { color: var(--text-muted); }
+.class-since { margin-left: auto; font-size: 11.5px; color: var(--danger-text); }
+.class-attendance { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-muted); }
+.class-attendance b { font-size: 12.5px; color: var(--text-main); font-variant-numeric: tabular-nums; }
+.class-meter { flex: 1; height: 6px; border-radius: 999px; background: var(--surface-sunken); overflow: hidden; }
+.class-meter span { display: block; height: 100%; width: var(--rate); border-radius: inherit; background: linear-gradient(90deg, var(--class-color), color-mix(in srgb, var(--class-color) 50%, var(--green))); }
+.class-card-grid:not([data-settled]) .class-meter span { animation: meter-fill 1s cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: calc(250ms + var(--i, 0) * 70ms); }
+@keyframes meter-fill { from { width: 0; } }
+.class-shortcuts { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 0 12px 12px; }
+.class-shortcut {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 9px 4px; border-radius: 11px; text-decoration: none; font-size: 11.5px; font-weight: 600; color: var(--text-soft);
+  background: var(--surface-sunken); border: 1px solid var(--border); transition: color 0.15s ease, border-color 0.15s ease, transform 0.15s ease, background 0.15s ease;
+}
+.class-shortcut .icon { width: 17px; height: 17px; color: var(--class-color); transition: transform 0.2s ease; }
+.class-shortcut:hover { color: var(--text-main); border-color: color-mix(in srgb, var(--class-color) 45%, var(--border)); background: color-mix(in srgb, var(--class-color) 8%, var(--surface-sunken)); }
+.class-shortcut:hover .icon { transform: translateY(-2px); }
+.class-shortcut:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.class-shortcut[data-live="true"] { color: var(--danger-text); border-color: color-mix(in srgb, var(--red) 40%, var(--border)); }
+.class-shortcut[data-live="true"] .icon { color: var(--danger-text); }
+.class-foot { position: relative; z-index: 1; display: flex; align-items: center; gap: 8px; padding: 12px; margin-top: auto; border-top: 1px solid var(--border); }
+.class-main { flex: 1; justify-content: center; padding: 9px 12px; font-size: 13px; text-decoration: none; }
+.class-main .icon { width: 15px; height: 15px; }
+.class-menu { position: relative; }
+.class-menu-button { width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--border-strong); background: var(--surface-raised); color: var(--text-soft); font-size: 18px; line-height: 1; cursor: pointer; }
+.class-menu-button:hover, .class-menu-button[aria-expanded="true"] { color: var(--text-main); border-color: var(--border-hover); }
+.class-menu-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.class-menu-list { position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 20; min-width: 230px; padding: 6px; border-radius: 12px; background: var(--surface-raised); border: 1px solid var(--border-strong); box-shadow: 0 16px 40px var(--shadow-color); animation: classes-pop 0.16s ease both; }
+.class-menu-item { width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border: 0; border-radius: 8px; background: none; color: var(--text-soft); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.class-menu-item .icon { width: 15px; height: 15px; flex: none; }
+.class-menu-item:hover, .class-menu-item:focus-visible { background: var(--surface-hover); color: var(--text-main); outline: none; }
+.class-menu-item.danger { color: var(--danger-text); }
+.classes-empty { grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 30px 16px 40px; text-align: center; }
+.classes-empty .buddy-mascot { width: 130px; }
+.classes-empty h2 { font-size: 20px; font-weight: 700; }
+.classes-empty p { max-width: 440px; font-size: 13.5px; color: var(--text-muted); line-height: 1.55; }
+@keyframes classes-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes classes-pop { from { opacity: 0; transform: translateY(6px) scale(0.98); } }
+@media (max-width: 640px) {
+  .classes-live-row { flex-direction: column; align-items: stretch; }
+  .classes-live-row .btn-join, .classes-live-row .btn-action { justify-content: center; }
+  .class-card-grid { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .classes-live-row, .class-card-grid .class-card-v2, .class-meter span, .class-menu-list { animation: none !important; }
+  .class-card-v2, .class-band, .class-shortcut, .class-shortcut .icon { transition: none; }
+  .class-card-v2:hover, .class-card-v2:focus-within { transform: none; }
+}
+
+
+/* Teacher cards open the class with a button rather than a link (teacher-classes.js routes itself) */
+button.class-open-link { padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+button.class-shortcut { font-family: inherit; cursor: pointer; }
+.class-code {
+  position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 8px; cursor: pointer;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; font-weight: 600; letter-spacing: 0.04em;
+  color: var(--text-soft); background: var(--surface-sunken); border: 1px solid var(--border-strong);
+}
+.class-code:hover { color: var(--text-main); border-color: var(--border-hover); }
+.class-code:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.class-code .icon { width: 13px; height: 13px; }
+.class-facts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: 12.5px; color: var(--text-muted); }
+.class-facts .is-online { color: var(--success-text); font-weight: 600; }
+.class-facts .is-closed { color: var(--warning-text); }

@@ -132,16 +132,17 @@ document.querySelectorAll("[data-export-report]").forEach((button) => {
         .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
         .join("\r\n");
     } else {
-      // Teacher snapshot of the live table. Simulator data is clearly marked as a demo.
-      const demo = document.querySelector("#liveStudentRows")?.dataset.source === "sim";
-      const rows = [...document.querySelectorAll("[data-roster-row]")].map((row) => [
-        row.cells[0].textContent.replace(/^[A-Z]{2}\s*/, "").replace(/\s+/g, " ").trim(),
-        row.cells[1].textContent.replace(/\s+/g, " ").trim(),
-        row.cells[2].textContent.replace(/\s+/g, " ").trim(),
+      // Teacher snapshot of the live student board (teacher-analytics.js): each card carries its
+      // student's name, score and status. Simulator data is clearly marked as a demo.
+      const demo = document.querySelector("#liveBoard")?.dataset.source === "sim";
+      const rows = [...document.querySelectorAll("#liveBoard [data-roster-row]")].map((card) => [
+        card.dataset.name || "",
+        card.dataset.score || "",
+        card.dataset.status || "",
         demo ? "Simulated (demo, not a real student)" : "Live classroom"
       ]);
       if (!rows.length) {
-        window.alert("Nothing to export yet. Open a class with students first.");
+        window.alert("Nothing to export yet. Start a live session in a class with students first.");
         return;
       }
       csv = [["Learner", "Attention Score", "Engagement Status", "Data source"], ...rows]

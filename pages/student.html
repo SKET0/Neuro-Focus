@@ -37,7 +37,8 @@
   </script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <link rel="stylesheet" href="../styles/theme.css?v=1">
-  <link rel="stylesheet" href="../styles/student.css?v=34">
+  <link rel="stylesheet" href="../styles/student.css?v=36">
+  <link rel="stylesheet" href="../styles/class-cards.css?v=1">
   <link rel="stylesheet" href="../styles/home.css?v=6">
   <link rel="stylesheet" href="../styles/account.css?v=4">
   <link rel="stylesheet" href="../styles/dashboard-layout.css?v=9">
@@ -833,7 +834,7 @@
               <div class="hero-copy">
                 <p class="eyebrow-pill"><span class="tag">Class</span><span id="classPageTeacher">Classroom</span></p>
                 <h1 class="welcome-title" id="classPageTitle">Class</h1>
-                <p class="hero-lead">Classroom sessions with your teacher. Your attention score is shared only while you’ve joined a live session.</p>
+                <p class="hero-lead">Everything for this class in one place: live sessions, posts, assignments and quizzes.</p>
               </div>
             </div>
             <div class="page-hero-actions">
@@ -844,10 +845,96 @@
         </section>
 
         <div class="class-hub-tabs" role="tablist" aria-label="Class sections">
-          <button type="button" role="tab" id="classTabPosts" data-class-tab="posts" aria-selected="true" aria-controls="classPanelPosts"><svg class="icon"><use href="#i-megaphone"/></svg>Posts</button>
-          <button type="button" role="tab" id="classTabAssignments" data-class-tab="assignments" aria-selected="false" aria-controls="classPanelAssignments" tabindex="-1"><svg class="icon"><use href="#i-assignment"/></svg>Assignments</button>
-          <button type="button" role="tab" id="classTabQuizzes" data-class-tab="quizzes" aria-selected="false" aria-controls="classPanelQuizzes" tabindex="-1"><svg class="icon"><use href="#i-quiz"/></svg>Quizzes</button>
+          <button type="button" role="tab" id="classTabOverview" data-class-tab="overview" aria-selected="true" aria-controls="classPanelOverview"><svg class="icon"><use href="#i-grid"/></svg>Overview</button>
           <button type="button" role="tab" id="classTabLive" data-class-tab="live" aria-selected="false" aria-controls="classPanelLive" tabindex="-1"><svg class="icon"><use href="#i-video"/></svg>Live focus<span class="tab-live" id="classTabLiveDot" hidden><span class="live-dot"></span><span class="sr-only">, live now</span></span></button>
+          <button type="button" role="tab" id="classTabPosts" data-class-tab="posts" aria-selected="false" aria-controls="classPanelPosts" tabindex="-1"><svg class="icon"><use href="#i-megaphone"/></svg>Posts</button>
+          <button type="button" role="tab" id="classTabAssignments" data-class-tab="assignments" aria-selected="false" aria-controls="classPanelAssignments" tabindex="-1"><svg class="icon"><use href="#i-assignment"/></svg>Assignments<span class="tab-count" id="classTabAssignmentsCount" hidden></span></button>
+          <button type="button" role="tab" id="classTabQuizzes" data-class-tab="quizzes" aria-selected="false" aria-controls="classPanelQuizzes" tabindex="-1"><svg class="icon"><use href="#i-quiz"/></svg>Quizzes<span class="tab-live" id="classTabQuizzesDot" hidden><span class="live-dot"></span><span class="sr-only">, a quiz is open</span></span></button>
+        </div>
+
+        <!-- Overview (student-class-overview.js): where a class opens. The live session, what's still to
+             hand in, the latest posts, open quizzes, the student's own numbers here, and NeuroBuddy. -->
+        <div class="class-hub-panel" id="classPanelOverview" role="tabpanel" aria-labelledby="classTabOverview">
+          <section class="ov-live" id="ovLive" data-state="idle" aria-live="polite" aria-labelledby="ovLiveTitle">
+            <span class="next-icon" id="ovLiveIcon" aria-hidden="true"><svg><use href="#i-video"/></svg></span>
+            <div class="ov-live-text">
+              <h2 id="ovLiveTitle">No live session right now</h2>
+              <p id="ovLiveSub">When your teacher starts one, you’ll get a notification here.</p>
+            </div>
+            <div class="ov-live-actions" id="ovLiveActions"></div>
+          </section>
+
+          <section class="glance class-glance" aria-label="This class at a glance">
+            <article class="glance-tile home-card">
+              <span class="glance-label"><svg class="icon" aria-hidden="true"><use href="#i-assignment"/></svg>To do</span>
+              <b class="glance-value" id="ovDue">—</b>
+              <small class="glance-note" id="ovDueNote">Loading…</small>
+            </article>
+            <article class="glance-tile home-card">
+              <span class="glance-label"><svg class="icon" aria-hidden="true"><use href="#i-calendar"/></svg>Attendance</span>
+              <b class="glance-value" id="ovAttendance">—</b>
+              <small class="glance-note" id="ovAttendanceNote"></small>
+            </article>
+            <article class="glance-tile home-card">
+              <span class="glance-label"><svg class="icon" aria-hidden="true"><use href="#i-target"/></svg>Focus in class</span>
+              <b class="glance-value" id="ovFocus">—</b>
+              <small class="glance-note" id="ovFocusNote"></small>
+            </article>
+          </section>
+
+          <div class="ov-grid">
+            <section class="panel-card ov-next" aria-labelledby="ovNextTitle">
+              <div class="panel-head">
+                <div>
+                  <h2 class="panel-title" id="ovNextTitle"><span class="chip-icon"><svg><use href="#i-assignment"/></svg></span>Up next</h2>
+                  <p class="panel-sub">Assignments to hand in, soonest first.</p>
+                </div>
+                <a class="btn-action" data-ov-tab="assignments" href="#classes">All assignments</a>
+              </div>
+              <ul class="ov-list" id="ovNextList"><li class="empty-state">Loading…</li></ul>
+            </section>
+
+            <section class="panel-card ov-posts" aria-labelledby="ovPostsTitle">
+              <div class="panel-head">
+                <div>
+                  <h2 class="panel-title" id="ovPostsTitle"><span class="chip-icon"><svg><use href="#i-megaphone"/></svg></span>Latest posts</h2>
+                  <p class="panel-sub">Announcements from your teacher.</p>
+                </div>
+                <a class="btn-action" data-ov-tab="posts" href="#classes">All posts</a>
+              </div>
+              <ul class="ov-list" id="ovPostList"><li class="empty-state">Loading…</li></ul>
+            </section>
+
+            <section class="panel-card ov-quizzes" aria-labelledby="ovQuizTitle">
+              <div class="panel-head">
+                <div>
+                  <h2 class="panel-title" id="ovQuizTitle"><span class="chip-icon"><svg><use href="#i-quiz"/></svg></span>Quizzes</h2>
+                  <p class="panel-sub">Open quizzes first. Join when your teacher opens one.</p>
+                </div>
+                <a class="btn-action" data-ov-tab="quizzes" href="#classes">All quizzes</a>
+              </div>
+              <ul class="ov-list" id="ovQuizList"><li class="empty-state">Loading…</li></ul>
+            </section>
+
+            <section class="panel-card ov-study" aria-labelledby="ovStudyTitle">
+              <div class="panel-head">
+                <div>
+                  <h2 class="panel-title" id="ovStudyTitle"><span class="chip-icon green"><svg><use href="#i-buddy"/></svg></span>Study this class</h2>
+                  <p class="panel-sub">NeuroBuddy answers with this class in mind.</p>
+                </div>
+              </div>
+              <form class="inline-form" id="ovBuddyForm">
+                <input class="field-input" id="ovBuddyInput" type="text" maxlength="500" placeholder="Ask NeuroBuddy about this class…" autocomplete="off" aria-label="Ask NeuroBuddy about this class">
+                <button class="btn-primary" type="submit" aria-label="Ask NeuroBuddy"><svg class="icon"><use href="#i-send"/></svg></button>
+              </form>
+              <div class="ov-chips">
+                <button class="chip-button" type="button" data-ov-ask="Explain the main idea of our latest topic simply, with one everyday example: ">Explain a topic</button>
+                <button class="chip-button" type="button" data-ov-ask="Quiz me with 3 quick questions, one at a time, about ">Quiz me</button>
+                <button class="chip-button" type="button" data-ov-ask="I'm stuck getting started on my assignment. Break it into tiny first steps: ">Help me start an assignment</button>
+              </div>
+              <button class="btn-action ov-notes" type="button" id="ovNotesButton"><svg class="icon"><use href="#i-note"/></svg>My notes for this class<span id="ovNotesCount"></span></button>
+            </section>
+          </div>
         </div>
 
         <div class="class-hub-panel" id="classPanelLive" role="tabpanel" aria-labelledby="classTabLive" hidden>
@@ -880,7 +967,7 @@
         </div>
 
         <!-- Posts (student-classroom.js): announcements from the teacher -->
-        <div class="class-hub-panel" id="classPanelPosts" role="tabpanel" aria-labelledby="classTabPosts">
+        <div class="class-hub-panel" id="classPanelPosts" role="tabpanel" aria-labelledby="classTabPosts" hidden>
           <p class="classroom-setup" id="studentPostsSetup" hidden></p>
           <section class="panel-card" aria-labelledby="studentPostsTitle">
             <div class="panel-head">
@@ -1188,21 +1275,22 @@
     </div>
   </div>
 
-  <script src="../scripts/shared/app.js?v=4"></script>
+  <script src="../scripts/shared/app.js?v=5"></script>
   <script src="../scripts/shared/dashboard-nav.js?v=3"></script>
-  <script src="../scripts/student/student-ui.js?v=9"></script>
+  <script src="../scripts/student/student-ui.js?v=10"></script>
   <!-- auth-guard.js must load first: the other modules wait on window.neuroFocusReady -->
   <script type="module" src="../scripts/auth/auth-guard.js?v=5"></script>
   <script type="module" src="../scripts/tracking/eye-analyzer.js?v=6"></script>
   <script type="module" src="../scripts/student/learning-assistant.js?v=14"></script>
   <script type="module" src="../scripts/student/student-notes.js?v=7"></script>
-  <script type="module" src="../scripts/student/student-classes.js?v=21"></script>
-  <script type="module" src="../scripts/student/student-focus.js?v=14"></script>
+  <script type="module" src="../scripts/student/student-classes.js?v=23"></script>
+  <script type="module" src="../scripts/student/student-focus.js?v=15"></script>
   <script type="module" src="../scripts/student/student-history.js?v=10"></script>
   <script type="module" src="../scripts/shared/profile.js?v=5"></script>
   <script type="module" src="../scripts/shared/account-security.js?v=1"></script>
   <script type="module" src="../scripts/student/student-dashboard.js?v=15"></script>
-  <script type="module" src="../scripts/student/student-classroom.js?v=4"></script>
+  <script type="module" src="../scripts/student/student-classroom.js?v=5"></script>
+  <script type="module" src="../scripts/student/student-class-overview.js?v=1"></script>
   <script type="module" src="../scripts/student/student-quizzes.js?v=2"></script>
   <script src="../scripts/shared/info-popover.js?v=1"></script>
   <script type="module" src="../scripts/shared/home-background.js?v=1"></script>

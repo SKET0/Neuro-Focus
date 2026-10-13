@@ -48,6 +48,7 @@ if (app) {
   let teacherNamesFor = "";
   let teacherNamesAt = 0;
   let checkIn = { sessionId: null, timer: null, status: "" };
+  const checkInStatus = new Map(); // session id -> "present" | "late", kept after leaving (for the summary)
   const CHECK_IN_MS = 30000;
   const shareToggle = $("#shareToggle");
   const shareStatus = $("#shareStatus");
@@ -266,12 +267,15 @@ if (app) {
   // turn the camera off and save it to My progress) and tell the student. A saved session is
   // checked first: a teacher dashboard opening on another device can briefly look "not live"
   // before it finds the open session, and that must not end anyone's focus session.
-  async function endFocusWithSession(item, key) {
+  // verified: the database already showed this session as ended (checkSessionEnded).
+  async function endFocusWithSession(item, key, { verified = false } = {}) {
     if (joinedSessionId === key) joinedSessionId = null;
-    const mine = () => tracking && focusInSession?.classId === item.id && focusInSession.key === key;
+    // A focus session joined before the session's id reached this page is kept as "local": once
+    // the database shows the class's session has ended, that one ends too.
+    const mine = () => tracking && focusInSession?.classId === item.id && (focusInSession.key === key || focusInSession.key === "local" || key === "local");
     const joined = joinedClassId === item.id;
     if (!mine() && !joined) return;
-    if (key !== "local") {
+    if (verified) { /* checked by the caller */ } else if (key !== "local") {
       const { data, error } = await supabase.from("class_sessions").select("ended_at").eq("id", key).maybeSingle();
       if (!error && data && !data.ended_at) return; // still open: the dashboard is just reconnecting
     } else {
@@ -280,24 +284,64 @@ if (app) {
       const status = teacher.get(item.id);
       if (status?.live && sessionKey(status) === key) return;
     }
+    // The focus session ends first, while this page still knows it belonged to this live session
+    // and the attendance mark: leaving the session (below) re-renders, which forgets both. Ending it
+    // first also means the summary covers the class session, not a moment of personal tracking.
+    if (mine()) {
+      focusInSession = null;
+      liveNotices.get(item.id)?.();
+      liveNotices.delete(item.id);
+      // student-focus.js stops the camera, saves the session and shows its summary (session-summary.js).
+      window.dispatchEvent(new CustomEvent("neurofocus:end-focus-session", {
+        detail: {
+          classId: item.id,
+          className: item.name,
+          teacherName: teacherNames.get(item.id)?.name || "",
+          color: classColor(item.id),
+          attendance: attendanceFor(key)
+        }
+      }));
+    }
     if (joinedClassId === item.id) {
       joinedClassId = null;
       updateSharing();
       render();
     }
-    if (!mine()) return;
-    focusInSession = null;
-    liveNotices.get(item.id)?.();
-    liveNotices.delete(item.id);
-    window.dispatchEvent(new CustomEvent("neurofocus:end-focus-session", { detail: { classId: item.id } }));
-    notify({
-      title: `The live session in ${item.name} has ended`,
-      text: "Your teacher ended the session, so your focus session has ended too and your camera is off. It’s saved in My progress.",
-      kind: "info",
-      timeoutMs: 15000,
-      actions: [{ label: "See my progress", onClick: () => window.neuroFocusNavigate?.("progress") }]
-    });
   }
+
+  // The attendance mark for a session the student was in ("present" / "late"), or null if unknown.
+  function attendanceFor(key) {
+    const status = (key && checkInStatus.get(key)) || checkIn.status;
+    return status === "late" || status === "present" ? status : null;
+  }
+
+  // The end of a live session normally arrives through the teacher's presence (onTeacherStatus),
+  // but a flaky Realtime connection can delay or drop that. So while a student is in a live
+  // session, the database is asked every 10 seconds whether it has ended. (Students can't receive
+  // Realtime broadcasts at all, by design, so the database is the dependable signal.)
+  async function checkSessionEnded(classId, key) {
+    const item = classes.find((entry) => entry.id === classId);
+    if (!item) return;
+    let ended = false;
+    let endedKey = key;
+    if (key && key !== "local") {
+      const { data, error } = await supabase.from("class_sessions").select("ended_at").eq("id", key).maybeSingle();
+      ended = !error && Boolean(data?.ended_at);
+    } else {
+      // The session's id never reached this page: ask whether the class still has an open session.
+      const { data, error } = await supabase.from("class_sessions").select("id").eq("class_id", classId).is("ended_at", null).limit(1);
+      if (error) return; // before the attendance database update there is nothing to check
+      ended = data.length === 0;
+      endedKey = "local";
+    }
+    if (ended) void endFocusWithSession(item, endedKey, { verified: true });
+  }
+  window.setInterval(() => {
+    const classId = focusInSession?.classId || joinedClassId;
+    const key = focusInSession?.key || joinedSessionId || "local";
+    // Runs in a background tab too (browsers slow it to about once a minute there).
+    if (classId && (tracking || joinedClassId)) void checkSessionEnded(classId, key);
+  }, 10000);
 
   function onTeacherStatus(classId, status) {
     const item = classes.find((entry) => entry.id === classId);
@@ -567,6 +611,7 @@ if (app) {
         render();
         return;
       }
+      if (data?.status) checkInStatus.set(sessionId, data.status);
       if (data?.status && data.status !== checkIn.status) {
         checkIn.status = data.status;
         renderBanner();
@@ -696,7 +741,7 @@ if (app) {
   let cardsKey = "";
   let classFilter = "all";
   let liveShown = new Set(); // classes already in the live strip (only new ones animate in)
-  const TAB_LINKS = [["posts", "i-megaphone", "Posts"], ["assignments", "i-assignment", "Assignments"], ["quizzes", "i-quiz", "Quizzes"], ["live", "i-video", "Live focus"]];
+  const TAB_LINKS = [["live", "i-video", "Live focus"], ["posts", "i-megaphone", "Posts"], ["assignments", "i-assignment", "Assignments"], ["quizzes", "i-quiz", "Quizzes"]];
   const el = (tag, className, text) => {
     const node = document.createElement(tag);
     if (className) node.className = className;

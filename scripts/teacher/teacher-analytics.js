@@ -3,7 +3,8 @@
 // class's saved sessions. Real data only.
 // Chart colours follow the teacher's theme and accent (styles/theme.css).
 import { themeColor, withAlpha } from "../shared/appearance.js?v=1";
-import { normalizeReading, describeReading, sampleKind, selectWithQuality, hasQualityInfo, SCORE_BANDS, BAND_LABELS, scoreBand } from "../shared/tracking-states.js?v=1";
+import { normalizeReading, describeReading, sampleKind, selectWithQuality, hasQualityInfo, SCORE_BANDS } from "../shared/tracking-states.js?v=1";
+import { paintAvatar } from "../shared/avatars.js?v=1";
 
 const HISTORY = 30;      // points kept on the attention curve
 const HEAT_COLUMNS = 20; // readings shown in the heatmap
@@ -21,18 +22,20 @@ const els = {
   status: $("#liveStatusBadge"),
   avg: $("#statAverage"),
   avgTrend: $("#statAverageTrend"),
-  focused: $("#statFocused"),
-  focusedSub: $("#statFocusedSub"),
   flags: $("#statFlags"),
   flagsSub: $("#statFlagsSub"),
   time: $("#statTime"),
   timeSub: $("#statTimeSub"),
-  table: $("#liveStudentRows"),
+  splitBar: $("#liveSplitBar"),
+  splitLegend: $("#liveSplitLegend"),
+  board: $("#liveBoard"),
+  filters: $("#liveFilters"),
+  boardEmpty: $("#liveBoardEmpty"),
+  boardEmptyTitle: $("#liveBoardEmptyTitle"),
+  boardNone: $("#liveBoardNone"),
   heatmap: $("#engagementHeatmap"),
   alerts: $("#alertFeed"),
-  liveClassName: $("#liveClassName"),
-  liveCount: $("#liveTrackingCount"),
-  liveLabel: $("#liveTrackingLabel")
+  liveClassName: $("#liveClassName")
 };
 
 let students = [];       // rendered rows: { name, score (null = not tracking), flagged, heat[] }
@@ -52,10 +55,43 @@ let liveStartedAt = 0;
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const stateFor = (score) => (score >= FOCUSED ? "Focused" : score >= DRIFTING ? "Drifting" : "Distracted");
-const bandLabel = (score) => BAND_LABELS[scoreBand(score)];
-// What the teacher sees for a student who isn't giving a score right now.
-const STATUS_TEXT = { off: "Not tracking", stale: "No recent data", unavailable: "Tracking unavailable", break: "On a break" };
-const initials = (name) => name.split(/\s+/).filter((part) => /\p{L}/u.test(part)).map((part) => part[0]).join("").slice(0, 2).toUpperCase().padEnd(2, "X");
+
+// ---------- The student board ----------
+// Each student's card has one of these states. Measured: focused / mixed / away (by score band).
+// Not measured right now: unmeasured (no face, no recent data), break, joined (in the session with
+// the camera off). Not in the session: absent (invited, not joined) or offline (no live session).
+const BOARD = {
+  focused: { label: "Focused", group: "focused", order: 3 },
+  mixed: { label: "Mixed", group: "mixed", order: 2 },
+  away: { label: "Looking away", group: "attention", order: 1 },
+  unmeasured: { label: "Can’t measure", group: "unmeasured", order: 4 },
+  break: { label: "On a break", group: "unmeasured", order: 5 },
+  joined: { label: "Joined · camera off", group: "unmeasured", order: 6 },
+  absent: { label: "Not joined yet", group: "absent", order: 7 },
+  offline: { label: "Not in a session", group: "absent", order: 8 }
+};
+const FILTERS = [
+  { key: "all", label: "All" },
+  { key: "attention", label: "Needs attention" },
+  { key: "mixed", label: "Mixed" },
+  { key: "focused", label: "Focused" },
+  { key: "unmeasured", label: "Not measured" },
+  { key: "absent", label: "Not joined" }
+];
+// The split bar: how the students in the live session divide right now. Students who haven't
+// joined aren't part of it (the board and its "Not joined" filter still list them).
+const SPLIT = [
+  { key: "focused", label: "focused" },
+  { key: "mixed", label: "mixed" },
+  { key: "attention", label: "looking away" },
+  { key: "unmeasured", label: "can’t measure" }
+];
+let boardFilter = "all";
+const tiles = new Map(); // studentId -> card element
+let tileOrder = "";
+let attendanceRows = { classId: "", current: new Map() }; // teacher-attendance.js: who joined, who was late
+
+const STATUS_TEXT = { stale: "No recent data", unavailable: "Can’t measure", break: "On a break" };
 const clockLabel = (ms) => {
   const seconds = Math.floor(ms / 1000);
   return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
@@ -101,9 +137,9 @@ function liveStep() {
   const ids = new Set(roster.map((member) => member.id));
   [...liveStudents.keys()].forEach((id) => { if (!ids.has(id)) liveStudents.delete(id); });
 
-  students = roster.map(({ id, name }) => {
+  students = roster.map(({ id, name, avatarPreset = null, avatarUrl = null }) => {
     const student = liveStudents.get(id) || { name, score: null, status: "off", flagged: false, heat: [], distractedTicks: 0 };
-    student.name = name;
+    Object.assign(student, { id, name, avatarPreset, avatarUrl });
     const entry = liveReadings.get(id);
     const tracking = entry?.reading.tracking || "off";
     // Sharing, but nothing arrived for a while: the connection dropped (or the page froze).
@@ -129,6 +165,11 @@ function resetLive() {
   liveStudents.clear();
   liveStartedAt = 0;
 }
+
+window.addEventListener("neurofocus:attendance", (event) => {
+  const detail = event.detail || {};
+  if (detail.classId) attendanceRows = { classId: detail.classId, current: detail.current || new Map() };
+});
 
 window.addEventListener("neurofocus:live-attention", (event) => {
   const reading = event.detail || {};
@@ -359,7 +400,7 @@ function addAlert(name, score, duration, timeText) {
   const title = document.createElement("strong");
   title.textContent = `${name} may need a check-in`;
   const detail = document.createElement("small");
-  detail.textContent = `Estimated attention ${Math.round(score)}% for ${duration} · may be looking at notes`;
+  detail.textContent = `Attention ${Math.round(score)}% for ${duration} · may be reading notes`;
   body.append(title, detail);
   const time = document.createElement("time");
   time.textContent = timeText;
@@ -373,10 +414,9 @@ function render() {
   const active = students.filter((student) => student.score !== null);
   const latest = [...classHistory].reverse().find((value) => value !== null);
   const recent = classHistory.slice(-6).filter((value) => value !== null);
-  const focusedCount = active.filter((student) => student.score >= FOCUSED).length;
 
-  els.avg.textContent = latest === undefined || !active.length ? "—" : `${Math.round(latest)}%`;
-  if (active.length && recent.length > 1) {
+  els.avg.textContent = latest === undefined || !active.length || !sessionLive ? "—" : `${Math.round(latest)}%`;
+  if (sessionLive && active.length && recent.length > 1) {
     const delta = recent.at(-1) - recent[0];
     const span = `${recent.length - 1}s`;
     els.avgTrend.textContent = `${delta >= 0 ? "↗" : "↘"} ${Math.abs(delta).toFixed(1)} pts vs. ${span} ago`;
@@ -385,27 +425,22 @@ function render() {
     els.avgTrend.textContent = sessionLive ? "Waiting for students to join" : "Start a live session to see scores";
     els.avgTrend.dataset.trend = "";
   }
-  els.focused.textContent = active.length ? `${focusedCount}/${active.length}` : "—";
-  const unmeasured = students.filter((student) => ["unavailable", "stale", "break"].includes(student.status)).length;
-  els.focusedSub.textContent = `${active.length} of ${students.length} measured now${unmeasured ? ` · ${unmeasured} not measurable` : ""}`;
   els.flags.textContent = String(flagCount);
-  els.flagsSub.textContent = `Estimated below ${DRIFTING}% for ${FLAG_AFTER_READINGS}+ measured readings in a row`;
-  els.time.textContent = elapsedLabel();
-  els.timeSub.textContent = "Live session time";
+  els.flagsSub.textContent = `Below ${DRIFTING}% for ${FLAG_AFTER_READINGS}+ readings in a row`;
+  els.time.textContent = sessionLive ? elapsedLabel() : "—";
+  els.timeSub.textContent = sessionLive ? "Live session time" : "No session running";
 
   const className = selectedClassName();
   const since = sessionSince ? new Date(sessionSince).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "";
   els.liveClassName.textContent = blockedClasses.has(liveClassId)
     ? "Live updates are blocked: run the Phase 2 database updates (see README), then refresh."
     : !className ? "Open a class to watch it live."
-      : sessionLive ? `Live session in ${className}${since ? ` since ${since}` : ""}.`
+      : sessionLive ? `Live session in ${className}${since ? ` since ${since}` : ""} · ${active.length} of ${students.length} sharing attention.`
         : `${className} isn’t live. Press Start live session to begin.`;
-  els.liveCount.textContent = String(active.length);
-  els.liveLabel.textContent = `of ${students.length} student${students.length === 1 ? "" : "s"} sharing live attention`;
   els.status.textContent = !sessionLive ? "Not live" : active.length ? `Live · ${active.length} sharing` : "Live · waiting for students";
   els.status.dataset.state = sessionLive ? "live" : "";
 
-  renderTable();
+  renderBoard();
   renderHeatmap();
   if (chart) {
     chart.data.labels = labels;
@@ -415,60 +450,160 @@ function render() {
   }
 }
 
-function renderTable() {
-  els.table.replaceChildren();
-  els.table.dataset.source = "live";
-  if (!students.length) {
-    const row = document.createElement("tr");
-    const cell = document.createElement("td");
-    cell.colSpan = 3;
-    cell.className = "empty-state";
-    cell.textContent = "No students in this class yet. Share its join code from the Master list tab.";
-    row.append(cell);
-    els.table.append(row);
+// One student's state on the board, and the line under their name.
+function boardState(student) {
+  if (student.score !== null) {
+    const band = stateFor(student.score);
+    const key = band === "Focused" ? "focused" : band === "Drifting" ? "mixed" : "away";
+    // A flag means low readings several times in a row: they need attention even if just recovering.
+    const group = student.flagged ? "attention" : BOARD[key].group;
+    const text = student.flagged ? `${BOARD[key].label} · check in?` : BOARD[key].label;
+    return { key, group, text, order: student.flagged ? 0 : BOARD[key].order };
+  }
+  const row = attendanceRows.classId === liveClassId ? attendanceRows.current.get(student.id) : null;
+  if (student.status === "unavailable" || student.status === "stale") {
+    const reason = student.status === "stale" ? STATUS_TEXT.stale : describeReading({ tracking: "unavailable", reason: student.reason }).detail || STATUS_TEXT.unavailable;
+    return { key: "unmeasured", group: "unmeasured", text: reason, order: BOARD.unmeasured.order };
+  }
+  if (student.status === "break") return { key: "break", group: "unmeasured", text: BOARD.break.label, order: BOARD.break.order };
+  if (!sessionLive) return { key: "offline", group: "absent", text: BOARD.offline.label, order: BOARD.offline.order };
+  if (row?.joined_at) return { key: "joined", group: "unmeasured", text: BOARD.joined.label, order: BOARD.joined.order };
+  return { key: "absent", group: "absent", text: BOARD.absent.label, order: BOARD.absent.order };
+}
+
+function renderBoard() {
+  const states = new Map(students.map((student) => [student.id, boardState(student)]));
+  renderSplit(states);
+  renderFilters(states);
+
+  // Not live: the steps to start, instead of a board of empty cards.
+  const showBoard = sessionLive && students.length > 0;
+  els.board.hidden = !showBoard;
+  els.boardEmpty.hidden = showBoard;
+  els.boardEmptyTitle.textContent = !students.length
+    ? "No students in this class yet. Share its join code from the Master list tab."
+    : `${selectedClassName() || "This class"} isn’t live`;
+  if (!showBoard) { els.boardNone.hidden = true; return; }
+
+  // Cards are kept and updated in place (no flicker); they're only re-ordered when the order changes.
+  // Order: needs attention first, then mixed, focused, not measured, not joined; by name within each.
+  const ids = new Set(students.map((student) => student.id));
+  [...tiles.keys()].forEach((id) => { if (!ids.has(id)) { tiles.get(id).remove(); tiles.delete(id); } });
+  const sorted = [...students].sort((a, b) => states.get(a.id).order - states.get(b.id).order || a.name.localeCompare(b.name));
+  sorted.forEach((student) => updateTile(student, states.get(student.id)));
+  const order = sorted.map((student) => student.id).join(",");
+  if (order !== tileOrder) {
+    tileOrder = order;
+    els.board.append(...sorted.map((student) => tiles.get(student.id)));
+  }
+  let shown = 0;
+  sorted.forEach((student) => {
+    const visible = boardFilter === "all" || states.get(student.id).group === boardFilter;
+    tiles.get(student.id).hidden = !visible;
+    if (visible) shown += 1;
+  });
+  els.boardNone.hidden = shown > 0;
+}
+
+function updateTile(student, state) {
+  let tile = tiles.get(student.id);
+  if (!tile) {
+    tile = document.createElement("article");
+    tile.className = "live-tile";
+    tile.dataset.rosterRow = "";
+    tile.innerHTML = '<div class="lt-top"><span class="mini-avatar lt-avatar"></span><div class="lt-who"><b class="lt-name"></b><small class="lt-status"></small></div><strong class="lt-score"></strong></div><div class="lt-spark" aria-hidden="true"></div>';
+    const spark = tile.querySelector(".lt-spark");
+    for (let i = 0; i < HEAT_COLUMNS; i += 1) spark.append(document.createElement("span"));
+    tiles.set(student.id, tile);
+  }
+  const tracking = student.score !== null;
+  const score = tracking ? `${Math.round(student.score)}%` : "—";
+  const late = attendanceRows.classId === liveClassId && attendanceRows.current.get(student.id)?.status === "late";
+  tile.dataset.state = state.key;
+  tile.dataset.group = state.group;
+  tile.toggleAttribute("data-flagged", Boolean(student.flagged));
+  // Read by the Export CSV button (scripts/shared/app.js).
+  tile.dataset.name = student.name;
+  tile.dataset.score = score;
+  tile.dataset.status = state.text;
+  tile.querySelector(".lt-name").textContent = student.name;
+  tile.querySelector(".lt-status").textContent = late && sessionLive ? `${state.text} · late` : state.text;
+  tile.querySelector(".lt-score").textContent = score;
+  tile.setAttribute("aria-label", `${student.name}: ${tracking ? `attention ${score}, ` : ""}${state.text}`);
+  const avatar = tile.querySelector(".lt-avatar");
+  const look = `${student.avatarPreset || ""}|${student.avatarUrl || ""}|${student.name}`;
+  if (avatar.dataset.look !== look) {
+    avatar.dataset.look = look;
+    paintAvatar(avatar, { name: student.name, preset: student.avatarPreset, url: student.avatarUrl });
+  }
+  // The last 20 readings as small bars (empty = not measured).
+  const bars = tile.querySelector(".lt-spark").children;
+  const offset = HEAT_COLUMNS - student.heat.length;
+  for (let i = 0; i < HEAT_COLUMNS; i += 1) {
+    const value = i >= offset ? student.heat[i - offset] : null;
+    const bar = bars[i];
+    if (value === null || value === undefined) {
+      bar.removeAttribute("data-state");
+      bar.style.height = "";
+    } else {
+      bar.dataset.state = stateFor(value);
+      bar.style.height = `${Math.max(12, Math.round(value))}%`;
+    }
+  }
+}
+
+function renderSplit(states) {
+  if (!sessionLive) {
+    els.splitBar.replaceChildren();
+    els.splitLegend.replaceChildren(Object.assign(document.createElement("li"), { className: "split-idle", textContent: "Start a live session to see how the class splits." }));
     return;
   }
-  // Tracking students first, lowest attention at the top; then students not tracking.
-  const sorted = [...students].sort((a, b) => (a.score ?? 101) - (b.score ?? 101));
-  sorted.forEach((student) => {
-    const row = document.createElement("tr");
-    row.dataset.rosterRow = "";
-    const tracking = student.score !== null;
-    const status = student.status || "off";
-    const state = tracking ? stateFor(student.score) : status === "unavailable" || status === "stale" ? "Unavailable" : status === "break" ? "Break" : "Offline";
+  const counts = Object.fromEntries(SPLIT.map(({ key }) => [key, 0]));
+  states.forEach((state) => { if (counts[state.group] !== undefined) counts[state.group] += 1; });
+  const inSession = SPLIT.reduce((sum, { key }) => sum + counts[key], 0);
+  if (!inSession) {
+    els.splitBar.replaceChildren();
+    els.splitLegend.replaceChildren(Object.assign(document.createElement("li"), { className: "split-idle", textContent: "Waiting for students to join the session." }));
+    return;
+  }
+  const total = inSession;
+  els.splitBar.replaceChildren(...SPLIT.filter(({ key }) => counts[key]).map(({ key }) => {
+    const part = document.createElement("span");
+    part.dataset.group = key;
+    part.style.flexGrow = String(counts[key]);
+    part.style.flexBasis = `${(counts[key] / total) * 100}%`;
+    return part;
+  }));
+  els.splitLegend.replaceChildren(...SPLIT.map(({ key, label }) => {
+    const item = document.createElement("li");
+    item.dataset.group = key;
+    const value = document.createElement("b");
+    value.textContent = String(counts[key]);
+    item.append(value, ` ${label}`);
+    return item;
+  }), Object.assign(document.createElement("li"), { className: "split-total", textContent: `of ${inSession} in the session` }));
+}
 
-    const nameCell = document.createElement("td");
-    const avatar = document.createElement("span");
-    avatar.className = "mini-avatar";
-    avatar.textContent = initials(student.name);
-    const name = document.createElement("span");
-    name.textContent = student.name;
-    nameCell.append(avatar, " ", name);
-
-    const scoreCell = document.createElement("td");
-    const value = document.createElement("span");
-    value.className = "score-value";
-    value.textContent = tracking ? `${Math.round(student.score)}%` : "—";
-    if (tracking) value.title = "Estimate from face and eye direction";
-    const bar = document.createElement("span");
-    bar.className = "score-bar";
-    const fill = document.createElement("span");
-    fill.style.width = tracking ? `${Math.round(student.score)}%` : "0%";
-    fill.dataset.state = state;
-    bar.append(fill);
-    scoreCell.append(value, bar);
-
-    const stateCell = document.createElement("td");
-    const pill = document.createElement("span");
-    pill.className = "state-pill";
-    pill.dataset.state = state;
-    pill.textContent = !tracking
-      ? (status === "unavailable" && student.reason ? `${STATUS_TEXT.unavailable} · ${describeReading({ tracking: "unavailable", reason: student.reason }).detail}` : STATUS_TEXT[status] || STATUS_TEXT.off)
-      : student.flagged ? `${bandLabel(student.score)} · Check in?` : bandLabel(student.score);
-    stateCell.append(pill);
-
-    row.append(nameCell, scoreCell, stateCell);
-    els.table.append(row);
+function renderFilters(states) {
+  const counts = { all: students.length };
+  states.forEach((state) => { counts[state.group] = (counts[state.group] || 0) + 1; });
+  if (!els.filters.children.length) {
+    FILTERS.forEach(({ key, label }) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "filter-chip";
+      button.dataset.filter = key;
+      button.append(label, Object.assign(document.createElement("span"), { className: "filter-count" }));
+      button.addEventListener("click", () => { boardFilter = key; render(); });
+      els.filters.append(button);
+    });
+  }
+  els.filters.hidden = !sessionLive || !students.length;
+  [...els.filters.children].forEach((button) => {
+    const key = button.dataset.filter;
+    button.setAttribute("aria-pressed", String(key === boardFilter));
+    button.querySelector(".filter-count").textContent = String(counts[key] || 0);
+    button.dataset.alert = key === "attention" && counts.attention ? "true" : "";
   });
 }
 
@@ -487,7 +622,7 @@ function renderHeatmap() {
       if (score !== null && score !== undefined) {
         cell.dataset.state = stateFor(score);
         cell.style.setProperty("--level", (0.25 + (score / 100) * 0.75).toFixed(2));
-        cell.title = `${student.name}: ${Math.round(score)}% (estimate)`;
+        cell.title = `${student.name}: ${Math.round(score)}%`;
       }
       els.heatmap.append(cell);
     }
@@ -512,7 +647,7 @@ function setupChart() {
           pointRadius: 0, fill: true
         },
         {
-          label: "Lowest learner", data: lowHistory, borderWidth: 1.5, borderDash: [4, 4],
+          label: "Lowest student", data: lowHistory, borderWidth: 1.5, borderDash: [4, 4],
           tension: 0.35, pointRadius: 0, fill: false
         }
       ]
@@ -555,6 +690,10 @@ function clearData() {
   tick = 0;
   flagCount = 0;
   students = [];
+  tiles.forEach((tile) => tile.remove());
+  tiles.clear();
+  tileOrder = "";
+  boardFilter = "all";
   classHistory.length = 0;
   lowHistory.length = 0;
   labels.length = 0;

@@ -3,6 +3,7 @@
 // "neurofocus:attention-update" events published by eye-analyzer.js. The timer state and
 // micro-goals are also shared with the Home view (student-dashboard.js).
 import { themeColor, withAlpha } from "../shared/appearance.js?v=1";
+import { showSessionSummary } from "./session-summary.js?v=1";
 import {
   createSessionAccumulator, createSampleWindow, normalizeReading, describeReading, LEGACY_SAMPLE_STATES, missingQualityColumns
 } from "../shared/tracking-states.js?v=1";
@@ -387,12 +388,15 @@ if (app) {
   }
   restoreTimer();
 
-  // The teacher ended the live session this focus session was part of (student-classes.js): the
-  // timer stops and the camera turns off. Turning it off saves the session to My progress.
   // The teacher ended the live session this camera session was part of (student-classes.js): the
-  // camera turns off, which saves the session. The solo timer is separate and keeps its state.
-  window.addEventListener("neurofocus:end-focus-session", () => {
+  // camera turns off, which saves the session, and its summary opens (session-summary.js). The
+  // solo timer is separate and keeps its state.
+  let summaryFor = null; // the class whose ended session gets a summary once the camera stops
+  window.addEventListener("neurofocus:end-focus-session", (event) => {
+    summaryFor = event.detail || {};
     window.dispatchEvent(new CustomEvent("neurofocus:stop-camera"));
+    // If the camera had already stopped, there's no session left to summarise.
+    window.setTimeout(() => { if (!trackingOn) summaryFor = null; }, 3000);
   });
 
   // ---------- Live attention stats, nudges and timeline ----------
@@ -616,7 +620,7 @@ if (app) {
     stats.streak.textContent = "0:00";
     trackingOn = false;
     renderSessionState();
-    if (snap.totalMs >= 10000) {
+    if (snap.totalMs >= 10000 && !summaryFor) {
       const extra = [
         snap.unavailableMs >= 1000 ? `${clock(snap.unavailableMs)} unavailable` : "",
         snap.breakMs >= 1000 ? `${clock(snap.breakMs)} break` : ""
@@ -682,7 +686,7 @@ if (app) {
   // The database refuses class-linked history outside an open live session.
   function startPart() {
     const p = {
-      sessionId: null, creating: null, pending: [], window: createSampleWindow(), off: false, timer: null, ended: false,
+      sessionId: null, creating: null, pending: [], history: [], window: createSampleWindow(), off: false, timer: null, ended: false,
       base: session.snapshot(Date.now()), scoreSum: 0, scoreCount: 0, bestStreakMs: 0, startedAt: Date.now(), final: null,
       classId: window.neuroFocusSharingClassId || null
     };
@@ -715,12 +719,16 @@ if (app) {
   }
 
   // Ends a part: its last sample and final numbers are fixed now, then the final save is queued.
+  // The last part shared with each class, for the summary when its teacher ends the session: the
+  // end can reach this page after sharing has already stopped (a short personal part started then).
+  const lastClassPart = new Map();
   function endPart(p) {
     if (!p || p.ended) return saveQueue;
     p.ended = true;
     window.clearInterval(p.timer);
     closeSampleWindow(p);
     p.final = partSummary(p, Date.now());
+    if (p.classId) lastClassPart.set(p.classId, p);
     if (part === p) part = null;
     return enqueue(() => saveProgress(p)).then(() => {
       // student-history.js reloads My progress.
@@ -731,6 +739,9 @@ if (app) {
   function closeSampleWindow(p) {
     const row = p.window.close();
     if (!row) return;
+    // Every sample of this part, for the end-of-session summary's chart (kept on this page only).
+    p.history.push({ at: row.recorded_at, score: row.score });
+    if (p.history.length > 1440) p.history.shift();
     p.pending.push(row);
     if (p.pending.length > MAX_PENDING) p.pending.splice(0, p.pending.length - MAX_PENDING);
   }
@@ -838,7 +849,34 @@ if (app) {
   });
   window.addEventListener("neurofocus:attention-update", (event) => recordSample(Date.now(), event.detail));
   // The camera stopped: the part's final numbers are fixed right away (synchronously), then saved.
-  window.addEventListener("neurofocus:tracking-stopped", () => { endPart(part); });
+  // When the teacher ended the session, its summary opens.
+  window.addEventListener("neurofocus:tracking-stopped", () => {
+    const ended = part;
+    endPart(part);
+    const request = summaryFor;
+    summaryFor = null;
+    if (!request) return;
+    // The part shared with that class (it may have ended a moment earlier, when sharing stopped).
+    const recent = lastClassPart.get(request.classId);
+    const classPart = ended?.classId === request.classId ? ended
+      : recent && Date.now() - new Date(recent.final.endedAt).getTime() < 120000 ? recent : null;
+    if (!classPart?.final) return;
+    lastClassPart.delete(request.classId);
+    const numbers = classPart.final;
+    showSessionSummary({
+      ...request,
+      startedAt: classPart.startedAt,
+      endedAt: numbers.endedAt,
+      totalMs: numbers.totalMs,
+      usableMs: numbers.usableMs,
+      unavailableMs: numbers.unavailableMs,
+      focusPercent: numbers.focusPercent,
+      averageScore: numbers.averageScore,
+      bestStreakMs: numbers.bestStreakMs,
+      episodes: numbers.episodes,
+      samples: classPart.history
+    });
+  });
   // Back online: save what was kept meanwhile.
   window.addEventListener("online", () => { if (part) enqueue(() => saveProgress(part)); });
   window.addEventListener("offline", () => { if (part) setHistoryStatus(OFFLINE_TEXT, true); });
