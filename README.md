@@ -33,6 +33,10 @@ For sign-in and NeuroBuddy to work on the live site:
 - **Google Cloud Console:** nothing to add for the domain. Google only ever returns people to Supabase (`https://awklqioisiiyaqixnnbl.supabase.co/auth/v1/callback`, already an Authorized redirect URI), and Supabase sends them on to the site. For anyone (not just listed test users) to sign in with Google, the app's **Google Auth Platform → Audience → Publishing status** must be **In production**.
 - **Supabase → Edge Functions → Secrets:** `APP_ORIGIN` = `https://neurofocus.site` (localhost stays allowed).
 
+**Email.** Sign-up confirmations, password resets and email changes are sent by **Brevo** (free plan, 300 a day) as `Neuro-Focus <no-reply@neurofocus.site>`, set in **Supabase → Authentication → Emails → SMTP Settings**: host `smtp-relay.brevo.com`, port `587`, username = the **Login** on Brevo's **Settings → SMTP & API → SMTP** tab (ends in `@smtp-brevo.com`, not the account email), password = an **SMTP key** (starts `xsmtpsib-`; an `xkeysib-` API key fails with `535 Authentication failed`). The domain is authenticated in Brevo with a Brevo-code TXT record at `@`, DKIM CNAMEs `brevo1._domainkey` and `brevo2._domainkey`, and a DMARC TXT record at `_dmarc` (Namecheap → Advanced DNS). Brevo needs no MX record, so it doesn't interfere with incoming mail: `contact@neurofocus.site` (the address on the privacy policy) is forwarded by Namecheap's free email forwarding (**Domain → Redirect Email**). If an email doesn't arrive, **Supabase → Logs → Auth** shows the SMTP error and **Brevo → Transactional → Logs** shows delivery.
+
+**Email design.** The branded emails are in `supabase/templates/` and are pasted into **Supabase → Authentication → Emails → Templates** (Supabase keeps its own copy, so edit the file, then paste it again): **Confirm signup** (`confirm-signup.html`, subject `Confirm your Neuro-Focus account`), **Reset Password** (`reset-password.html`, `Reset your Neuro-Focus password`) and **Change Email Address** (`change-email.html`, `Confirm your new email for Neuro-Focus`). The app doesn't send the Invite, Magic Link or Reauthentication emails, so those keep Supabase's defaults.
+
 ## Project layout
 
 ```
@@ -62,7 +66,7 @@ tests/                     Database access-rule tests
 
 The login page has **Continue with Google**, **Forgot password?** and a confirm-password box on sign-up.
 
-**Password reset** works once the Redirect URLs above are set. Supabase emails a link that opens `pages/login.html?mode=reset`, where the person chooses a new password. Supabase's built-in email sender only sends a few emails per hour, so before real use add your own sender in **Authentication → Emails → SMTP Settings**.
+**Password reset** works once the Redirect URLs above are set. Supabase emails a link that opens `pages/login.html?mode=reset`, where the person chooses a new password. Supabase's built-in email sender only sends a few emails per hour; the live site uses Brevo instead (see **Live site** above).
 
 **Continue with Google** needs a one-time setup (until then the button explains that it isn't turned on):
 
