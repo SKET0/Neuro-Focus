@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#09090b">
+  <meta name="description" content="How Neuro-Focus handles your camera, your account and your learning data.">
+  <title>Privacy Policy | Neuro-Focus</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+  <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="../assets/images/favicon-64.png" type="image/png" sizes="64x64">
+  <link rel="apple-touch-icon" href="../assets/images/apple-touch-icon.png">
+  <style>
+    /* The home page's palette and type (index.html), for a long read */
+    :root {
+      --cyan: #00d9ff;
+      --green: #22c55e;
+      --bg: #09090b;
+      --surface: #0f0f12;
+      --line: #1f1f24;
+      --line-strong: #2c2c33;
+      --text-main: #f5f5f6;
+      --text-soft: #b6b6bd;
+      --text-muted: #85858e;
+      --text-faint: #5c5c66;
+      --sans: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: var(--sans); background: var(--bg); color: var(--text-soft); line-height: 1.7; -webkit-font-smoothing: antialiased; }
+    a { color: var(--cyan); text-underline-offset: 3px; }
+    :focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; border-radius: 6px; }
+    .container { width: min(760px, 100% - 48px); margin: 0 auto; }
+
+    .topbar { position: sticky; top: 0; z-index: 10; background: rgba(9, 9, 11, 0.85); backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
+    .topbar-inner { height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text-main); font-weight: 600; font-size: 15.5px; letter-spacing: -0.2px; }
+    .brand-mark {
+      width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; flex: none; color: #fff;
+      background: radial-gradient(circle at 30% 22%, #202024, #050506 72%); border: 1px solid rgba(255, 255, 255, 0.16);
+    }
+    .brand-mark svg { width: 20px; height: 20px; overflow: visible; }
+    .back { font-size: 13.5px; font-weight: 500; color: var(--text-soft); text-decoration: none; white-space: nowrap; }
+    .back:hover { color: var(--text-main); }
+
+    header.page-head { padding: 64px 0 32px; }
+    .kicker { font-family: var(--mono); font-size: 11.5px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: var(--cyan); margin-bottom: 14px; }
+    h1 { font-size: clamp(32px, 5vw, 44px); font-weight: 600; letter-spacing: -0.035em; line-height: 1.1; color: var(--text-main); margin-bottom: 14px; }
+    .updated { font-size: 14px; color: var(--text-muted); }
+
+    .summary { border: 1px solid rgba(34, 197, 94, 0.28); background: linear-gradient(180deg, rgba(34, 197, 94, 0.06), var(--surface)); border-radius: 16px; padding: 22px 24px; margin-bottom: 40px; }
+    .summary h2 { margin-top: 0; font-size: 15px; }
+    .summary ul { margin-top: 10px; }
+
+    main section { padding-bottom: 8px; }
+    h2 { font-size: 21px; font-weight: 600; letter-spacing: -0.02em; color: var(--text-main); margin: 40px 0 12px; scroll-margin-top: 80px; }
+    h3 { font-size: 15.5px; font-weight: 600; color: var(--text-main); margin: 22px 0 6px; }
+    p, ul { font-size: 15.5px; margin-bottom: 12px; }
+    ul { padding-left: 20px; }
+    li { margin-bottom: 6px; }
+    strong { color: var(--text-main); font-weight: 600; }
+
+    .table-wrap { overflow-x: auto; margin: 6px 0 16px; border: 1px solid var(--line); border-radius: 12px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 520px; }
+    th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { font-family: var(--mono); font-size: 11px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); background: var(--surface); }
+    tr:last-child td { border-bottom: 0; }
+
+    footer { border-top: 1px solid var(--line); margin-top: 64px; padding: 28px 0 40px; font-size: 13px; color: var(--text-faint); }
+    footer .container { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    footer a { color: var(--text-soft); text-decoration: none; }
+    footer a:hover { color: var(--text-main); }
+
+    @media (max-width: 600px) {
+      .container { width: calc(100% - 32px); }
+      header.page-head { padding-top: 44px; }
+      p, ul { font-size: 15px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="container topbar-inner">
+      <a class="brand" href="../index.html" aria-label="Neuro-Focus home">
+        <span class="brand-mark"><svg viewBox="632 191 736 736" fill="none" stroke="currentColor" stroke-width="44" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M790 565 C700 572 655 525 655 465 C655 345 790 245 955 245 C1170 245 1345 390 1345 548 C1345 640 1278 700 1188 722"/><path d="M802 552 C780 455 865 380 990 380 C1140 380 1246 465 1246 572 C1246 630 1214 668 1186 710 C1166 740 1166 770 1168 795"/><path d="M790 565 C850 562 890 540 935 518 C985 495 1025 485 1070 485 C1132 485 1162 515 1162 555 C1162 612 1102 682 1012 682 C932 682 855 640 818 578"/><path d="M1022 688 C1062 712 1100 721 1140 721 C1160 721 1176 718 1188 714"/><circle cx="1175" cy="835" r="38"/></svg></span>
+        <span>Neuro-Focus</span>
+      </a>
+      <a class="back" href="../index.html">← Back to home</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <header class="page-head">
+      <p class="kicker">Privacy policy</p>
+      <h1>How Neuro-Focus handles your data</h1>
+      <p class="updated">Last updated 13 October 2026</p>
+    </header>
+
+    <main>
+      <div class="summary">
+        <h2>The short version</h2>
+        <ul>
+          <li><strong>Your camera video never leaves your device.</strong> It is analysed in your browser and is never recorded, uploaded or stored.</li>
+          <li>We store your account, your classes and learning work, and numerical focus estimates, so the app can show your progress.</li>
+          <li>Teachers see focus numbers only from live sessions in their class that you choose to join. Classmates never see your data.</li>
+          <li>NeuroBuddy questions are sent to an AI service to be answered. Don’t share personal details with it.</li>
+          <li>No advertising, no tracking or analytics scripts, and we never sell your data.</li>
+        </ul>
+      </div>
+
+      <section id="who">
+        <h2>Who we are</h2>
+        <p>Neuro-Focus (<a href="https://neurofocus.site">neurofocus.site</a>) is a Final Year Project (FYP-F25-12) built by Muhammad Bilal Khalid and Namaika Sabir at the Department of Software Engineering, The University of Lahore. It is a study-support and classroom tool, not a medical or diagnostic service. We are responsible for the data described here. You can reach us at <a href="mailto:contact@neurofocus.site">contact@neurofocus.site</a>.</p>
+      </section>
+
+      <section id="camera">
+        <h2>Your camera</h2>
+        <p>The camera only turns on when you start a focus session or join a live class session, and your browser asks your permission first. While it is on, your browser finds points on your face (such as eye and head position) and turns them into an estimated engagement score, a few times a second.</p>
+        <ul>
+          <li>This all happens on your own device. <strong>Video and images are never sent to us or anyone else, and never saved.</strong></li>
+          <li>The score is an estimate of whether you seem to be looking at the screen. It does not measure understanding, and it is not a diagnosis of anything.</li>
+          <li>You can stop the camera or take a break at any time.</li>
+        </ul>
+      </section>
+
+      <section id="collect">
+        <h2>What we store</h2>
+        <h3>Your account</h3>
+        <ul>
+          <li>Your email address and password (stored securely by our sign-in provider, never visible to us in plain text). If you continue with Google, we receive your name and email address from Google.</li>
+          <li>Your display name and whether you are a student or a teacher.</li>
+          <li>Optional profile settings: a chosen avatar or a profile picture you upload, and your theme and colour choices.</li>
+        </ul>
+        <h3>Classes and learning</h3>
+        <ul>
+          <li>The classes you create or join, and attendance for live sessions (when you were invited, joined and how long you attended).</li>
+          <li>Class posts, assignments, files you submit, marks and feedback.</li>
+          <li>Quiz questions, your answers and your results.</li>
+          <li>Notes you write in the app.</li>
+        </ul>
+        <h3>Focus estimates</h3>
+        <ul>
+          <li>For each focus session: when it started and ended, time tracked, average score, focus percentage, number of focus lapses and your longest focused streak.</li>
+          <li>Individual readings during the session: a time, a score and a state (for example “looking at screen”, “looking away”, “break” or “unavailable”). Time when tracking can’t get a reading is recorded as unavailable, not as zero.</li>
+        </ul>
+        <h3>NeuroBuddy usage</h3>
+        <ul>
+          <li>A daily count of NeuroBuddy requests per student, used to apply a fair-use limit. The content of your chats is not stored on our servers (see below).</li>
+        </ul>
+      </section>
+
+      <section id="buddy">
+        <h2>NeuroBuddy and the AI service</h2>
+        <p>NeuroBuddy answers questions using a third-party AI service (Google’s Gemini API by default). When you ask something, we send that service your message, the recent messages in that chat, the name of the class you picked for context, and the text of any files or pictures you added to the chat. We do not send your name or email address.</p>
+        <p>The AI service processes this content to produce an answer and handles it under its own terms, which may allow it to keep or review content. Please <strong>don’t share personal or sensitive information</strong> with NeuroBuddy. Answers can be wrong, so check important information.</p>
+        <p>When you use “Organize rough notes” or make a quiz or flashcards, the text you provide is sent to the AI service in the same way.</p>
+      </section>
+
+      <section id="device">
+        <h2>Stored only on your device</h2>
+        <p>Some things are kept in your browser’s local storage on the device you use, and are not uploaded to us:</p>
+        <ul>
+          <li>Your NeuroBuddy chats, including the text of files you added to them, and flashcard decks.</li>
+          <li>Your focus timer, today’s plan, your preferences and meeting links you save.</li>
+          <li>A short log of recent focus readings that you can export yourself.</li>
+          <li>Your sign-in session, so you stay signed in.</li>
+        </ul>
+        <p>Anyone with access to your device and browser profile could see these. Clearing your browser’s site data for neurofocus.site removes them. We don’t use advertising or tracking cookies.</p>
+      </section>
+
+      <section id="sharing">
+        <h2>Who can see what</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Information</th><th>You</th><th>Your teacher</th><th>Classmates</th></tr></thead>
+            <tbody>
+              <tr><td>Name and profile picture</td><td>Yes</td><td>For students in their classes</td><td>No</td></tr>
+              <tr><td>Focus history from solo sessions</td><td>Yes</td><td>No</td><td>No</td></tr>
+              <tr><td>Focus numbers from a live class session</td><td>Yes</td><td>Only from their own live sessions you joined</td><td>No</td></tr>
+              <tr><td>Attendance</td><td>Your own</td><td>For their classes</td><td>No</td></tr>
+              <tr><td>Assignment files, marks and quiz results</td><td>Your own</td><td>For their classes</td><td>No</td></tr>
+              <tr><td>Your notes</td><td>Yes</td><td>No</td><td>No</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>These rules are enforced by the database itself, not just by the app’s pages. As the project’s developers and administrators, we can technically access stored data to run and fix the service; we only do so when needed. We don’t sell, rent or share your data with advertisers.</p>
+      </section>
+
+      <section id="services">
+        <h2>Services we use</h2>
+        <ul>
+          <li><strong>Supabase</strong>: sign-in, database, file storage and the server function that talks to the AI service.</li>
+          <li><strong>The AI service</strong> behind NeuroBuddy (Google’s Gemini API by default), as described above.</li>
+          <li><strong>Google</strong>: only if you choose “Continue with Google” to sign in.</li>
+          <li><strong>Netlify</strong>: hosts the website.</li>
+          <li><strong>Content delivery networks</strong> (Google Fonts, jsDelivr, unpkg, cdnjs and Google Cloud Storage) supply fonts, icons, code libraries and the face-landmark model to your browser.</li>
+        </ul>
+        <p>These providers receive technical information such as your IP address and browser type when your browser connects to them, and may keep short-term logs for security and reliability under their own privacy policies.</p>
+      </section>
+
+      <section id="retention">
+        <h2>How long we keep it, and deleting it</h2>
+        <p>We keep your account and learning data while your account exists, so you and your teachers can see past sessions and work. A teacher can remove you from a class, and you can leave a class.</p>
+        <p>To delete your account and the data stored with it, or to get a copy of your data, email <a href="mailto:contact@neurofocus.site">contact@neurofocus.site</a> from the address you sign in with. We’ll respond within 30 days. Data kept on your own device can be removed by clearing your browser’s site data.</p>
+      </section>
+
+      <section id="choices">
+        <h2>Your choices</h2>
+        <ul>
+          <li>The camera is optional. You can use notes, classes, quizzes and NeuroBuddy without it.</li>
+          <li>Focus numbers are shared with a teacher only while you are in their live session, and you can leave at any time.</li>
+          <li>You can change your name, picture, email and password in Profile settings.</li>
+          <li>You can ask us to access, correct or delete your data at any time.</li>
+        </ul>
+      </section>
+
+      <section id="security">
+        <h2>Security</h2>
+        <p>The site is served over HTTPS. Database access rules limit each person to the data described above, and uploaded files are stored privately. No system is perfectly secure, so please use a strong password and sign out on shared computers.</p>
+      </section>
+
+      <section id="students">
+        <h2>Students and schools</h2>
+        <p>Neuro-Focus is meant for students using it through their school or university. If you are under 18, please use it with your parent’s or school’s permission. Schools using Neuro-Focus with their students are responsible for any consent their own rules require.</p>
+      </section>
+
+      <section id="changes">
+        <h2>Changes to this policy</h2>
+        <p>If we change how we handle data, we’ll update this page and the date at the top.</p>
+      </section>
+
+      <section id="contact">
+        <h2>Contact</h2>
+        <p>Questions or requests about your data: <a href="mailto:contact@neurofocus.site">contact@neurofocus.site</a>.</p>
+      </section>
+    </main>
+  </div>
+
+  <footer>
+    <div class="container">
+      <span>© 2026 Neuro-Focus · FYP-F25-12, The University of Lahore</span>
+      <a href="../index.html">neurofocus.site</a>
+    </div>
+  </footer>
+</body>
+</html>

@@ -30,7 +30,7 @@ The site is hosted on Netlify, which publishes `main` automatically on every pus
 For sign-in and NeuroBuddy to work on the live site:
 
 - **Supabase → Authentication → URL Configuration:** Site URL `https://neurofocus.site`; Redirect URLs also include `https://neurofocus.site/**` (keep the localhost entries for development).
-- **Google Cloud Console → the OAuth client:** add `https://neurofocus.site` to Authorized JavaScript origins.
+- **Google Cloud Console:** nothing to add for the domain. Google only ever returns people to Supabase (`https://awklqioisiiyaqixnnbl.supabase.co/auth/v1/callback`, already an Authorized redirect URI), and Supabase sends them on to the site. For anyone (not just listed test users) to sign in with Google, the app's **Google Auth Platform → Audience → Publishing status** must be **In production**.
 - **Supabase → Edge Functions → Secrets:** `APP_ORIGIN` = `https://neurofocus.site` (localhost stays allowed).
 
 ## Project layout
