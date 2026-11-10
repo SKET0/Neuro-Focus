@@ -6,10 +6,10 @@
 // and focus shared during live sessions (attention_sessions). Attendance only counts finished
 // sessions: rate = (present + late) / (present + late + absent); excused doesn't count, and a
 // student who never joined ("invited") counts as absent, the same as the class Attendance tab.
-import { paintAvatar, avatarUrls } from "../shared/avatars.js?v=1";
-import { themeColor, withAlpha } from "../shared/appearance.js?v=1";
-import { averageFocus, levelFor } from "../student/focus-analysis.js?v=3";
-import { selectWithQuality } from "../shared/tracking-states.js?v=1";
+import { paintAvatar, avatarUrls } from "../shared/avatars.js";
+import { themeColor, withAlpha } from "../shared/appearance.js";
+import { averageFocus, levelFor } from "../student/focus-analysis.js";
+import { selectWithQuality } from "../shared/tracking-states.js";
 
 const app = await window.neuroFocusReady;
 

@@ -3,7 +3,7 @@
 // cards above it, so no sharp movement passes behind text. It reacts gently to the mouse.
 // It runs only while the element marked [data-live-background] is showing and the tab is
 // visible, at most 30 frames a second, and shows a still picture for reduced motion.
-import { themeColor } from "./appearance.js?v=1";
+import { themeColor } from "./appearance.js";
 
 const app = await window.neuroFocusReady;
 const main = document.querySelector("main");

@@ -21,11 +21,6 @@ export const ENGAGEMENT = { ON_SCREEN: "on-screen", LOOKING_AWAY: "looking-away"
 
 // Score bands, the same on the student and teacher screens.
 export const SCORE_BANDS = { HIGH: 70, MIDDLE: 45 };
-export function scoreBand(score) {
-  if (score === null || score === undefined) return null;
-  return score >= SCORE_BANDS.HIGH ? "high" : score >= SCORE_BANDS.MIDDLE ? "middle" : "low";
-}
-export const BAND_LABELS = { high: "Mostly on screen", middle: "Mixed", low: "Mostly looking away" };
 
 export const REASONS = {
   "no-face": "No face in view",

@@ -4,10 +4,10 @@
 // page's list, and "Open full chat" continues them there. After saving one it sends
 // "neurofocus:buddy-stored" so the full page (learning-assistant.js) picks up the new copy.
 // It is hidden on the NeuroBuddy page itself; questions asked inside a class use that class for context.
-import { streamAssistant } from "../services/assistant-api.js?v=2";
-import { renderMarkdown } from "./markdown.js?v=1";
-import { greetingName } from "./avatars.js?v=1";
-import { loadChats, saveChats, newId, titleFrom, LIMITS } from "../student/buddy-store.js?v=1";
+import { streamAssistant } from "../services/assistant-api.js";
+import { renderMarkdown } from "./markdown.js";
+import { greetingName } from "./avatars.js";
+import { loadChats, saveChats, newId, titleFrom, LIMITS } from "../student/buddy-store.js";
 
 const HISTORY_SENT = 10;
 const DOCUMENT_CHARS_SENT = 60000;

@@ -4,11 +4,11 @@
 // gives optional marks and feedback. Everything is checked again by the database
 // (supabase/migrations/20261010000000_class_posts_assignments.sql): only this class's teacher
 // writes posts and assignments, files stay private, and marking goes through mark_submission().
-import { confirmAction, notify } from "../shared/class-live.js?v=9";
+import { confirmAction, notify } from "../shared/class-live.js";
 import {
   checkFile, fileType, fileSize, attachmentPath, uploadFile, removeFiles, downloadFile, dueText, whenText, el,
   classroomSqlMissing, SETUP_TEXT, errorText, ACCEPT, FILE_RULES_TEXT, infoButton
-} from "../shared/classroom.js?v=2";
+} from "../shared/classroom.js";
 
 const app = await window.neuroFocusReady;
 

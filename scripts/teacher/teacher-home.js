@@ -9,10 +9,10 @@
 // (attention_sessions), the master lists (class_members), assignments and submissions, quizzes and
 // posts. Nothing is estimated or invented. Class names, online students and the live session come
 // from teacher-classes.js; the class pages are opened through its actions.
-import { paintAvatar, avatarUrls, greetingName } from "../shared/avatars.js?v=1";
-import { averageFocus, sum, levelFor, compareGroups, TIMES, timeOfDay, measuredSeconds } from "../student/focus-analysis.js?v=3";
-import { selectWithQuality } from "../shared/tracking-states.js?v=1";
-import { classHue } from "../shared/class-colors.js?v=1";
+import { paintAvatar, avatarUrls, greetingName } from "../shared/avatars.js";
+import { averageFocus, sum, levelFor, compareGroups, TIMES, timeOfDay, measuredSeconds } from "../student/focus-analysis.js";
+import { selectWithQuality } from "../shared/tracking-states.js";
+import { classHue } from "../shared/class-colors.js";
 
 const app = await window.neuroFocusReady;
 const view = document.querySelector("#classesView");

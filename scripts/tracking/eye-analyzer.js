@@ -3,8 +3,8 @@
 // estimated score and engagement. Frames that can't be measured (no face, more than one face,
 // face partly out of view, too far away, eyes not visible) give "Tracking unavailable" with no
 // score, never a score of 0. During the focus timer's break readings are marked as a break.
-import { assessFrame, createReadingFilter } from "./gaze-reading.js?v=1";
-import { REASONS } from "../shared/tracking-states.js?v=1";
+import { assessFrame, createReadingFilter } from "./gaze-reading.js";
+import { REASONS } from "../shared/tracking-states.js";
 
 const video = document.querySelector("#analyzerVideo");
 if (video) {

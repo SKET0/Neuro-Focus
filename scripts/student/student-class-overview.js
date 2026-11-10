@@ -3,9 +3,9 @@
 // class, and a quick way to ask NeuroBuddy about it. It also puts small counts on the class tabs.
 // Everything shown is the student's own or the class's (the database only returns those); the
 // tabs themselves (student-classroom.js) still hold the full lists.
-import { dueText, whenText, el, classroomSqlMissing, quizSqlMissing } from "../shared/classroom.js?v=2";
-import { selectWithQuality } from "../shared/tracking-states.js?v=1";
-import { averageFocus, hasFocus } from "./focus-analysis.js?v=3";
+import { dueText, whenText, el, classroomSqlMissing, quizSqlMissing } from "../shared/classroom.js";
+import { selectWithQuality } from "../shared/tracking-states.js";
+import { averageFocus, hasFocus } from "./focus-analysis.js";
 
 const app = await window.neuroFocusReady;
 

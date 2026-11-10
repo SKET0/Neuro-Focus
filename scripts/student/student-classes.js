@@ -3,11 +3,11 @@
 // attention numbers (never video) stream to that teacher over the private class channel.
 import {
   openClassChannel, teacherStatus, confirmAction, notify, showMessage, missingDatabaseUpdates, showSetupBanner, isMissingSql
-} from "../shared/class-live.js?v=9";
-import { paintAvatar, avatarUrls } from "../shared/avatars.js?v=1";
-import { classColor } from "./class-colors.js?v=1";
-import { createMascot } from "./buddy-mascot.js?v=3";
-import { normalizeReading, legacyState } from "../shared/tracking-states.js?v=1";
+} from "../shared/class-live.js";
+import { paintAvatar, avatarUrls } from "../shared/avatars.js";
+import { classColor } from "./class-colors.js";
+import { createMascot } from "./buddy-mascot.js";
+import { normalizeReading, legacyState } from "../shared/tracking-states.js";
 
 const app = await window.neuroFocusReady;
 

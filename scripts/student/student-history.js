@@ -6,9 +6,9 @@
 // saved attention_sessions, and a session's attention_samples when it is opened.
 // Saving happens in student-focus.js, which fires "neurofocus:history-saved" afterwards.
 // Shown in the My progress view; colours follow the student's theme.
-import { themeColor, withAlpha } from "../shared/appearance.js?v=1";
-import { hasFocus, focusedSeconds, sum, averageFocus, levelFor, buildCoaching } from "./focus-analysis.js?v=3";
-import { sampleRuns, selectWithQuality } from "../shared/tracking-states.js?v=1";
+import { themeColor, withAlpha } from "../shared/appearance.js";
+import { hasFocus, focusedSeconds, sum, averageFocus, levelFor, buildCoaching } from "./focus-analysis.js";
+import { sampleRuns, selectWithQuality } from "../shared/tracking-states.js";
 
 const app = await window.neuroFocusReady;
 

@@ -82,7 +82,6 @@ export function evidenceFor(list) {
   };
 }
 
-export const EVIDENCE_RULE = `${COACH_MINIMUM.sessions} sessions on ${COACH_MINIMUM.days} different days, with ${COACH_MINIMUM.minutes} minutes of measured tracking`;
 
 // Compares groups (time of day, session length) and returns the highest and lowest, only when
 // both have enough measured data and differ clearly. Returns null otherwise.

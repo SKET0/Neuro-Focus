@@ -4,9 +4,9 @@
 // bucket (supabase/migrations/20261007000000_student_profiles.sql), so they follow the person to
 // any device. Also keeps every avatar and name on the page up to date and runs the header's
 // account menu. Each page provides window.neuroFocusNavigate and "neurofocus:viewchange" events.
-import { AVATAR_PRESETS, avatarPreset, paintAvatar, avatarUrl, forgetAvatarUrl } from "./avatars.js?v=1";
-import { applyAppearance, cacheAppearance, normalizeAppearance } from "./appearance.js?v=1";
-import { notify } from "./class-live.js?v=9";
+import { AVATAR_PRESETS, avatarPreset, paintAvatar, avatarUrl, forgetAvatarUrl } from "./avatars.js";
+import { applyAppearance, cacheAppearance, normalizeAppearance } from "./appearance.js";
+import { notify } from "./class-live.js";
 
 const app = await window.neuroFocusReady;
 

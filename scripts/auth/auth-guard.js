@@ -1,5 +1,5 @@
 import { getSupabase } from "../services/supabase-client.js";
-import { applyAppearance, cacheAppearance, clearAppearanceCache } from "../shared/appearance.js?v=1";
+import { applyAppearance, cacheAppearance, clearAppearanceCache } from "../shared/appearance.js";
 
 const requiredRole = document.body.dataset.requiredRole;
 

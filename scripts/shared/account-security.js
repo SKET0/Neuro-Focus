@@ -4,7 +4,7 @@
 // effect once the person opens the confirmation link Supabase emails (login.html shows the result).
 // Accounts that only sign in with Google have no password: they get an emailed link to set one,
 // which opens the existing "Choose a new password" step on login.html.
-import { notify } from "./class-live.js?v=9";
+import { notify } from "./class-live.js";
 
 const app = await window.neuroFocusReady;
 

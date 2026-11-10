@@ -5,8 +5,8 @@
 // remembered (card.misses) so they come first next time. Cards come from the learning-assistant
 // function's "flashcards" task; an
 // older deployed function only has "quiz" (from given text, up to 10 cards), which is used instead.
-import { streamAssistant } from "../services/assistant-api.js?v=2";
-import { markdownToPlain } from "../shared/markdown.js?v=1";
+import { streamAssistant } from "../services/assistant-api.js";
+import { markdownToPlain } from "../shared/markdown.js";
 
 const COUNTS = [5, 10, 15, 20];
 const SOURCE_CHARS = 60000;

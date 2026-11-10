@@ -4,7 +4,7 @@
 // class members only, one answer per question while it's open, 1 point per correct answer, and
 // the correct answer is only sent once the question has closed. Quiz points never use attention
 // scores. If the connection drops, the page keeps retrying and picks up where the quiz is now.
-import { el, errorText, infoButton, quizSqlMissing, QUIZ_SETUP_TEXT, CHOICE_LETTERS, secondsLeft } from "../shared/classroom.js?v=2";
+import { el, errorText, infoButton, quizSqlMissing, QUIZ_SETUP_TEXT, CHOICE_LETTERS, secondsLeft } from "../shared/classroom.js";
 
 const app = await window.neuroFocusReady;
 

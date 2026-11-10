@@ -2,11 +2,11 @@
 // timer, gentle re-engagement nudges, and micro-goals. Reads the
 // "neurofocus:attention-update" events published by eye-analyzer.js. The timer state and
 // micro-goals are also shared with the Home view (student-dashboard.js).
-import { themeColor, withAlpha } from "../shared/appearance.js?v=1";
-import { showSessionSummary } from "./session-summary.js?v=1";
+import { themeColor, withAlpha } from "../shared/appearance.js";
+import { showSessionSummary } from "./session-summary.js";
 import {
   createSessionAccumulator, createSampleWindow, normalizeReading, describeReading, LEGACY_SAMPLE_STATES, missingQualityColumns
-} from "../shared/tracking-states.js?v=1";
+} from "../shared/tracking-states.js";
 
 const app = await window.neuroFocusReady;
 

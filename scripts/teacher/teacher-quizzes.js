@@ -4,8 +4,8 @@
 // only this class's teacher writes and runs quizzes, answers are scored there (1 point per correct
 // answer, no speed bonus), and students only see a question's answer once it has closed.
 // Quiz points have nothing to do with attention tracking.
-import { confirmAction, notify } from "../shared/class-live.js?v=9";
-import { el, errorText, infoButton, quizSqlMissing, QUIZ_SETUP_TEXT, CHOICE_LETTERS, secondsLeft, whenText } from "../shared/classroom.js?v=2";
+import { confirmAction, notify } from "../shared/class-live.js";
+import { el, errorText, infoButton, quizSqlMissing, QUIZ_SETUP_TEXT, CHOICE_LETTERS, secondsLeft, whenText } from "../shared/classroom.js";
 
 const app = await window.neuroFocusReady;
 

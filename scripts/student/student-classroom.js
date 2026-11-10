@@ -4,11 +4,11 @@
 // marks and feedback. They never see classmates' submissions: the database only returns their
 // own (supabase/migrations/20261010000000_class_posts_assignments.sql), and every upload is checked
 // again there (class member, before the deadline, own folder, allowed type and size).
-import { notify } from "../shared/class-live.js?v=9";
+import { notify } from "../shared/class-live.js";
 import {
   checkFile, fileType, fileSize, submissionPath, uploadFile, removeFiles, downloadFile, dueText, whenText, el,
   classroomSqlMissing, SETUP_TEXT, errorText, ACCEPT, FILE_RULES_TEXT, infoButton
-} from "../shared/classroom.js?v=2";
+} from "../shared/classroom.js";
 
 const app = await window.neuroFocusReady;
 

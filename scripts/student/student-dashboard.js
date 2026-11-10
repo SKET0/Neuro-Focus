@@ -10,12 +10,12 @@
 // "neurofocus:class-status"), the timer and steps (student-focus.js) and the profile
 // (student-profile.js). Notes and the latest saved session are read here.
 
-import { buildCoaching, averageFocus, focusedSeconds, sum, levelFor } from "./focus-analysis.js?v=3";
-import { paintAvatar, greetingName } from "../shared/avatars.js?v=1";
-import { selectWithQuality } from "../shared/tracking-states.js?v=1";
-import { notify } from "../shared/class-live.js?v=9";
-import { latestChat } from "./buddy-store.js?v=1";
-import { classColor } from "./class-colors.js?v=1";
+import { buildCoaching, averageFocus, focusedSeconds, sum, levelFor } from "./focus-analysis.js";
+import { paintAvatar, greetingName } from "../shared/avatars.js";
+import { selectWithQuality } from "../shared/tracking-states.js";
+import { notify } from "../shared/class-live.js";
+import { latestChat } from "./buddy-store.js";
+import { classColor } from "./class-colors.js";
 
 const app = await window.neuroFocusReady;
 

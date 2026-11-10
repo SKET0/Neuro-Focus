@@ -16,7 +16,6 @@ export const normalizeAppearance = ({ theme, accent } = {}) => ({
   accent: ACCENTS.includes(accent) ? accent : "default"
 });
 
-export const currentAppearance = () => normalizeAppearance(document.documentElement.dataset);
 
 let switchTimer;
 // animate: cross-fade colours (skipped when the student prefers reduced motion).

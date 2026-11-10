@@ -2,9 +2,9 @@
 // (relayed by teacher-classes.js from Supabase Realtime; numbers only, never video), and the
 // class's saved sessions. Real data only.
 // Chart colours follow the teacher's theme and accent (styles/theme.css).
-import { themeColor, withAlpha } from "../shared/appearance.js?v=1";
-import { normalizeReading, describeReading, sampleKind, selectWithQuality, hasQualityInfo, SCORE_BANDS } from "../shared/tracking-states.js?v=1";
-import { paintAvatar } from "../shared/avatars.js?v=1";
+import { themeColor, withAlpha } from "../shared/appearance.js";
+import { normalizeReading, describeReading, sampleKind, selectWithQuality, hasQualityInfo, SCORE_BANDS } from "../shared/tracking-states.js";
+import { paintAvatar } from "../shared/avatars.js";
 
 const HISTORY = 30;      // points kept on the attention curve
 const HEAT_COLUMNS = 20; // readings shown in the heatmap

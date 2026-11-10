@@ -1,7 +1,7 @@
 // Student sidebar: the "Your classes" list, built like the teacher dashboard's (teacher-classes.js):
 // one colour per class, a live dot while the teacher's live session is on, and the open class
 // marked. Class names and live sessions come from student-classes.js ("neurofocus:class-status").
-import { classHue } from "../shared/class-colors.js?v=1";
+import { classHue } from "../shared/class-colors.js";
 
 const app = await window.neuroFocusReady;
 const box = document.querySelector("#sidebarClasses");

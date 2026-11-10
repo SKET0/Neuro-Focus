@@ -2,7 +2,7 @@
 // in (student-focus.js opens it once the camera has stopped and the session is saved). It shows
 // the class, how long it ran, the share of measured time on screen with a ring, the attention
 // over the whole session, and the other numbers. Styles: styles/student.css (.summary-dialog).
-import { levelFor } from "./focus-analysis.js?v=3";
+import { levelFor } from "./focus-analysis.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 

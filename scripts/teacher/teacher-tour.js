@@ -2,8 +2,8 @@
 // first time the teacher reaches Home (a new account lands there straight after sign-up). The
 // "Take the tour" card at the bottom of the sidebar replays it at any time. The student dashboard
 // has the same kind of tour (student-tour.js).
-import { setupDashboardTour, sidebarDrawer, settle } from "../shared/tour.js?v=3";
-import { greetingName } from "../shared/avatars.js?v=1";
+import { setupDashboardTour, sidebarDrawer, settle } from "../shared/tour.js";
+import { greetingName } from "../shared/avatars.js";
 
 const app = await window.neuroFocusReady;
 

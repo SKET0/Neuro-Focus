@@ -3,14 +3,14 @@
 // buddy-files.js and kept with the chat) and flashcard decks (buddy-flashcards.js). The explanation
 // style is a menu in the message box. Chats are saved on this device per account (buddy-store.js).
 // Answers stream in as they are written and render simple formatting (markdown.js).
-import { streamAssistant } from "../services/assistant-api.js?v=2";
-import { renderMarkdown } from "../shared/markdown.js?v=1";
-import { confirmAction, notify } from "../shared/class-live.js?v=9";
-import { loadChats, saveChats, newId, titleFrom, LIMITS } from "./buddy-store.js?v=1";
-import { readFile, kindOf, ACCEPT, FILE_TYPES_TEXT } from "./buddy-files.js?v=1";
-import { createFlashcards } from "./buddy-flashcards.js?v=4";
-import { createMascot, followPointer } from "./buddy-mascot.js?v=3";
-import { greetingName } from "../shared/avatars.js?v=1";
+import { streamAssistant } from "../services/assistant-api.js";
+import { renderMarkdown } from "../shared/markdown.js";
+import { confirmAction, notify } from "../shared/class-live.js";
+import { loadChats, saveChats, newId, titleFrom, LIMITS } from "./buddy-store.js";
+import { readFile, kindOf, ACCEPT, FILE_TYPES_TEXT } from "./buddy-files.js";
+import { createFlashcards } from "./buddy-flashcards.js";
+import { createMascot, followPointer } from "./buddy-mascot.js";
+import { greetingName } from "../shared/avatars.js";
 
 const app = await window.neuroFocusReady;
 
