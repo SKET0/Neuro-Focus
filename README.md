@@ -55,6 +55,7 @@ scripts/
   shared/                  Used by more than one page: live channels, Markdown, dashboard nav, 3D background
 assets/images/             Images
 assets/models/             3D models
+ml/                        Attention model training (train_lstm.py); recordings go in ml/data/ (not committed)
 backend/                   Optional Python prediction service (not used by the web app yet)
 tools/                     Local dev server
 database/                  Reference MySQL schema
@@ -252,6 +253,25 @@ Until it is run, the Quizzes tabs say the update is needed; everything else keep
 `pages/model-data.html` (not linked from the site; live at `https://neurofocus.site/pages/model-data.html`) collects labelled data for training the attention model. A participant enters a code (not their name), agrees to the use of the data, and follows about 6 minutes of guided tasks, each done twice in a random order: **read the text** and **follow the dot** (labelled focused), and **use your phone**, **look away** and **act tired** (labelled distracted). A beep marks the start and end of each task.
 
 The page uses the same face tracker as the app (`scripts/tracking/face-model.js`, `gaze-reading.js`) at the same rate (about 8 readings a second). Each reading saves the numbers in `FEATURE_NAMES` (horizontal and vertical eye direction, eye openness, signed head turn, face size, and head yaw, pitch and roll from MediaPipe's transformation matrix), whether the face could be measured and why not, and the app's current rule-based score for comparison. **No video or pictures are kept and nothing is uploaded**: the participant downloads a CSV file and sends it to the team.
+
+## Training the attention model
+
+`ml/train_lstm.py` trains a small LSTM on the recorder's CSV files and tests it against the app's current rules.
+
+1. Put everyone's CSV files in `ml/data/`. This folder isn't committed, so recordings stay private.
+2. One-time setup (Python 3.9 or newer; a normal CPU is enough):
+
+   ```sh
+   python3 -m venv ml/.venv
+   ml/.venv/bin/python -m pip install -r ml/requirements.txt
+   ```
+3. Test, and save the model for the website:
+
+   ```sh
+   ml/.venv/bin/python ml/train_lstm.py ml/data --export
+   ```
+
+How it works: each task is cut into windows of 16 readings (about 2 seconds). Unusable readings are gaps, never inputs, the same as in the app. Each task's first second is skipped. Testing is **leave one person out**: everyone is tested by a model trained only on the other people, so the results show how it does with someone new. The current rules are scored on the same windows. The results go to `ml/results/report.md` (tables ready for the report) and `results.json`. With `--export`, a final model trained on everyone is saved to `assets/models/attention-lstm.json`, including a few check windows with PyTorch's answers so the website's own LSTM code can be tested against them.
 
 ## The full class workflow
 

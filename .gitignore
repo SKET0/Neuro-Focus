@@ -3,3 +3,7 @@ supabase/.temp/
 .env
 .env.*
 node_modules/
+
+# Attention model: local Python environment and participants' recordings (kept private)
+ml/.venv/
+ml/data/
