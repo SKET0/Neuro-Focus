@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#09090b">
+  <meta name="robots" content="noindex">
+  <title>Model data recorder | Neuro-Focus</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+  <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml">
+  <style>
+    :root {
+      --cyan: #00d9ff;
+      --green: #22c55e;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --bg: #09090b;
+      --surface: #0f0f12;
+      --surface-2: #16161a;
+      --line: #1f1f24;
+      --line-strong: #2c2c33;
+      --text-main: #f5f5f6;
+      --text-soft: #b6b6bd;
+      --text-muted: #85858e;
+      --sans: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: var(--sans); background: var(--bg); color: var(--text-soft); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+    :focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; border-radius: 6px; }
+    [hidden] { display: none !important; }
+    .container { width: min(760px, 100% - 48px); margin: 0 auto; padding: 56px 0 64px; }
+    .kicker { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--cyan); margin-bottom: 12px; }
+    h1 { font-size: clamp(28px, 5vw, 40px); font-weight: 600; letter-spacing: -0.03em; line-height: 1.15; color: var(--text-main); margin-bottom: 14px; }
+    h2 { font-size: 18px; font-weight: 600; color: var(--text-main); margin: 32px 0 10px; }
+    p, li { font-size: 15.5px; }
+    p { margin-bottom: 12px; }
+    ul { padding-left: 20px; margin-bottom: 12px; }
+    li { margin-bottom: 4px; }
+    strong { color: var(--text-main); font-weight: 600; }
+    .card { border: 1px solid var(--line); background: var(--surface); border-radius: 16px; padding: 22px 24px; margin-top: 24px; }
+    .note { border-color: rgba(34, 197, 94, 0.28); background: linear-gradient(180deg, rgba(34, 197, 94, 0.06), var(--surface)); }
+
+    .fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    label.field { display: grid; gap: 6px; font-size: 14px; color: var(--text-main); font-weight: 500; }
+    label.field small { color: var(--text-muted); font-weight: 400; }
+    input[type="text"], select {
+      width: 100%; font: inherit; font-size: 15px; color: var(--text-main); background: var(--surface-2);
+      border: 1px solid var(--line-strong); border-radius: 10px; padding: 10px 12px;
+    }
+    .consent { display: flex; gap: 10px; align-items: flex-start; margin-top: 18px; font-size: 14.5px; }
+    .consent input { margin-top: 4px; width: 17px; height: 17px; accent-color: var(--cyan); flex: none; }
+
+    .preview { display: grid; grid-template-columns: 220px 1fr; gap: 20px; align-items: center; }
+    .preview-video { width: 220px; aspect-ratio: 4 / 3; border-radius: 12px; background: #000; border: 1px solid var(--line-strong); overflow: hidden; }
+    video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); display: block; }
+    .status { display: flex; align-items: center; gap: 8px; font-size: 15px; color: var(--text-main); }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--text-muted); flex: none; }
+    .dot.ok { background: var(--green); box-shadow: 0 0 10px var(--green); }
+    .dot.bad { background: var(--amber); }
+    .status-detail { font-size: 13.5px; color: var(--text-muted); margin-top: 6px; }
+
+    .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px; }
+    button {
+      font: inherit; font-size: 15px; font-weight: 600; border-radius: 10px; padding: 11px 18px; cursor: pointer;
+      border: 1px solid var(--line-strong); background: var(--surface-2); color: var(--text-main);
+    }
+    button.primary { background: var(--cyan); border-color: var(--cyan); color: #04131a; }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .error { color: var(--amber); font-size: 14px; margin-top: 10px; }
+
+    /* Recording: fills the whole window */
+    .stage { position: fixed; inset: 0; z-index: 20; background: var(--bg); display: grid; grid-template-rows: auto 1fr; }
+    .stage-bar { display: flex; align-items: center; gap: 16px; padding: 12px 20px; border-bottom: 1px solid var(--line); background: var(--surface); }
+    .stage-bar .mini { width: 80px; aspect-ratio: 4 / 3; border-radius: 8px; overflow: hidden; background: #000; flex: none; }
+    .progress { flex: 1; display: grid; gap: 6px; min-width: 0; }
+    .progress-label { font-size: 13.5px; color: var(--text-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bar { height: 6px; border-radius: 99px; background: var(--line-strong); overflow: hidden; }
+    .bar span { display: block; height: 100%; width: 0; background: var(--cyan); transition: width 0.25s linear; }
+    .stage-body { position: relative; overflow: hidden; }
+
+    .prep, .instruction { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; padding: 24px; gap: 14px; }
+    .prep h2, .instruction h2 { font-size: clamp(26px, 4vw, 38px); margin: 0; letter-spacing: -0.02em; }
+    .prep p, .instruction p { font-size: 18px; max-width: 560px; margin: 0 auto; }
+    .count { font-family: var(--mono); font-size: 56px; color: var(--cyan); }
+    .timer { font-family: var(--mono); font-size: 15px; color: var(--text-muted); }
+
+    .reading { position: absolute; inset: 0; overflow-y: auto; padding: 40px 24px; }
+    .reading article { max-width: 680px; margin: 0 auto; }
+    .reading p { font-size: 20px; line-height: 1.75; color: var(--text-main); margin-bottom: 18px; }
+
+    .target { position: absolute; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 24px var(--cyan); }
+
+    table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 8px; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+    th { font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+
+    @media (max-width: 640px) {
+      .container { width: calc(100% - 32px); padding-top: 40px; }
+      .fields, .preview { grid-template-columns: 1fr; }
+      .preview-video { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container" id="setup">
+    <p class="kicker">Neuro-Focus · model data</p>
+    <h1>Help train the Neuro-Focus attention model</h1>
+    <p>This takes about <strong>6 minutes</strong>. The screen will ask you to do a few short things: read some text, follow a dot, use your phone, look away and act tired. Each one lasts 30–40 seconds and each comes up twice.</p>
+
+    <div class="card note">
+      <p><strong>No video is recorded.</strong> Your camera picture is analysed on this computer and thrown away straight away. Only numbers are kept, such as where your eyes point and the angle of your head, a few times a second.</p>
+      <p style="margin-bottom:0">The numbers are saved to a file on this computer when you finish. Nothing is uploaded. If you agree, send the file to the Neuro-Focus team. Don't type your name anywhere on this page: use the code you were given.</p>
+    </div>
+
+    <h2>Before you start</h2>
+    <ul>
+      <li>Sit the way you normally would when studying, in your normal lighting.</li>
+      <li>Keep your phone nearby. You'll be asked to use it.</li>
+      <li>Make sure only your face is in view of the camera.</li>
+      <li>Turn your sound on. A beep tells you when to look back at the screen.</li>
+    </ul>
+
+    <form class="card" id="setupForm" novalidate>
+      <div class="fields">
+        <label class="field">Participant code <small>For example P03. Not your name.</small>
+          <input type="text" id="participant" maxlength="12" autocomplete="off" spellcheck="false" placeholder="P01" required>
+        </label>
+        <label class="field">Glasses
+          <select id="glasses"><option value="none">No glasses</option><option value="glasses">Wearing glasses</option></select>
+        </label>
+        <label class="field">Camera
+          <select id="camera"><option value="built-in">Laptop's built-in camera</option><option value="external">External webcam</option></select>
+        </label>
+        <label class="field">Lighting
+          <select id="lighting"><option value="normal">Normal</option><option value="bright">Bright</option><option value="dim">Dim</option></select>
+        </label>
+      </div>
+      <label class="consent"><input type="checkbox" id="consent"> <span>I agree that the numbers recorded on this page may be used to train and test the Neuro-Focus attention model and be described, without my name, in the project report.</span></label>
+      <p class="error" id="formError" hidden></p>
+    </form>
+
+    <div class="card">
+      <div class="preview">
+        <div class="preview-video" id="videoHome"><video id="video" playsinline muted></video></div>
+        <div>
+          <div class="status"><span class="dot" id="faceDot"></span><span id="faceStatus">Camera off</span></div>
+          <p class="status-detail" id="faceDetail">Turn the camera on to check that your face is in view.</p>
+          <div class="actions">
+            <button type="button" id="cameraButton">Turn camera on</button>
+            <button type="button" class="primary" id="beginButton" disabled>Begin recording</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stage" id="stage" hidden>
+    <div class="stage-bar">
+      <div class="mini" id="miniVideo"></div>
+      <div class="progress">
+        <div class="progress-label" id="progressLabel">Getting ready</div>
+        <div class="bar"><span id="progressBar"></span></div>
+      </div>
+      <span class="dot" id="stageDot" title="Face found"></span>
+      <button type="button" id="stopButton">Stop</button>
+    </div>
+    <div class="stage-body" id="stageBody"></div>
+  </div>
+
+  <div class="container" id="done" hidden>
+    <p class="kicker">Neuro-Focus · model data</p>
+    <h1 id="doneTitle">Thank you, that's everything</h1>
+    <p id="doneText">Download your file and send it to the Neuro-Focus team. It contains only the numbers described at the start.</p>
+    <div class="actions">
+      <button type="button" class="primary" id="downloadButton">Download data file</button>
+      <button type="button" id="againButton">Record again</button>
+    </div>
+    <div class="card">
+      <h2 style="margin-top:0">What was recorded</h2>
+      <table>
+        <thead><tr><th>Task</th><th>Readings</th><th>Face measurable</th></tr></thead>
+        <tbody id="summaryRows"></tbody>
+      </table>
+      <p class="status-detail" id="summaryNote"></p>
+    </div>
+  </div>
+
+  <script type="module" src="../scripts/tracking/data-recorder.js"></script>
+</body>
+</html>

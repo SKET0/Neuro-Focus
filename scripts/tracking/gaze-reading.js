@@ -20,6 +20,10 @@ export const LIMITS = {
   headTurn: 0.25       // nose position between the outer eye corners (0.5 = facing the camera)
 };
 
+// The numbers saved for each usable frame, in this order (the recorder's CSV columns and the
+// model's inputs). Head angles come from MediaPipe's face transformation matrix.
+export const FEATURE_NAMES = ["gaze_x", "gaze_y", "eye_open", "head_turn", "face_size", "head_yaw", "head_pitch", "head_roll"];
+
 const KEY_POINTS = [LANDMARKS.leftOuter, LANDMARKS.leftInner, LANDMARKS.rightInner, LANDMARKS.rightOuter, LANDMARKS.noseTip, ...LANDMARKS.leftIris, ...LANDMARKS.rightIris];
 
 function irisPosition(face, outer, inner, iris) {
@@ -29,10 +33,33 @@ function irisPosition(face, outer, inner, iris) {
   return width ? (centre - left) / width : 0.5;
 }
 
-// One camera frame: { usable: false, reason } or { usable: true, gaze, headTurn }.
+// Iris height between the upper and lower lid: 0 = at the upper lid, 1 = at the lower lid.
+function irisHeight(face, upper, lower, iris) {
+  const top = face[upper].y;
+  const height = face[lower].y - top;
+  const centre = iris.reduce((total, index) => total + face[index].y, 0) / iris.length;
+  return height ? (centre - top) / height : 0.5;
+}
+
+// Head angles in degrees from a 4×4 column-major transformation matrix.
+//   yaw: turning left/right, pitch: nodding up/down, roll: tilting toward a shoulder.
+export function headAngles(matrix) {
+  const m = matrix?.data || matrix;
+  if (!m || m.length < 16) return null;
+  const at = (row, col) => m[col * 4 + row];
+  const degrees = 180 / Math.PI;
+  return {
+    yaw: Math.asin(Math.max(-1, Math.min(1, -at(2, 0)))) * degrees,
+    pitch: Math.atan2(at(2, 1), at(2, 2)) * degrees,
+    roll: Math.atan2(at(1, 0), at(0, 0)) * degrees
+  };
+}
+
+// One camera frame: { usable: false, reason } or { usable: true, gaze, headTurn, features }.
 //   gaze:     average iris position inside both eyes, 0.5 = looking straight ahead
 //   headTurn: how far the head is turned, 0 = facing the camera, 0.5 = fully sideways
-export function assessFrame(faces) {
+//   features: the FEATURE_NAMES numbers (head angles are null without a matrix)
+export function assessFrame(faces, matrices = []) {
   if (!faces || !faces.length) return { usable: false, reason: "no-face" };
   if (faces.length > 1) return { usable: false, reason: "multiple-faces" };
   const face = faces[0];
@@ -54,7 +81,19 @@ export function assessFrame(faces) {
   const from = Math.min(face[LANDMARKS.leftOuter].x, face[LANDMARKS.rightOuter].x);
   const span = Math.abs(face[LANDMARKS.rightOuter].x - face[LANDMARKS.leftOuter].x);
   const nose = span ? (face[LANDMARKS.noseTip].x - from) / span : 0.5;
-  return { usable: true, gaze, headTurn: Math.abs(nose - 0.5) };
+  const angles = headAngles(matrices[0]);
+  const features = {
+    gaze_x: gaze,
+    gaze_y: (irisHeight(face, LANDMARKS.leftUpper, LANDMARKS.leftLower, LANDMARKS.leftIris)
+      + irisHeight(face, LANDMARKS.rightUpper, LANDMARKS.rightLower, LANDMARKS.rightIris)) / 2,
+    eye_open: (leftOpen + rightOpen) / 2,
+    head_turn: nose - 0.5, // signed: which way the head is turned
+    face_size: eyeWidth,   // bigger = closer to the camera
+    head_yaw: angles ? angles.yaw : null,
+    head_pitch: angles ? angles.pitch : null,
+    head_roll: angles ? angles.roll : null
+  };
+  return { usable: true, gaze, headTurn: Math.abs(nose - 0.5), features };
 }
 
 // Frames in, readings out. Returns null while a short glitch is being skipped.

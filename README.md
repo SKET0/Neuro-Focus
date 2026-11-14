@@ -247,6 +247,12 @@ Run `supabase/migrations/20261011000000_class_quizzes.sql` once in **Supabase Da
 
 Until it is run, the Quizzes tabs say the update is needed; everything else keeps working.
 
+## Attention model data recorder
+
+`pages/model-data.html` (not linked from the site; live at `https://neurofocus.site/pages/model-data.html`) collects labelled data for training the attention model. A participant enters a code (not their name), agrees to the use of the data, and follows about 6 minutes of guided tasks, each done twice in a random order: **read the text** and **follow the dot** (labelled focused), and **use your phone**, **look away** and **act tired** (labelled distracted). A beep marks the start and end of each task.
+
+The page uses the same face tracker as the app (`scripts/tracking/face-model.js`, `gaze-reading.js`) at the same rate (about 8 readings a second). Each reading saves the numbers in `FEATURE_NAMES` (horizontal and vertical eye direction, eye openness, signed head turn, face size, and head yaw, pitch and roll from MediaPipe's transformation matrix), whether the face could be measured and why not, and the app's current rule-based score for comparison. **No video or pictures are kept and nothing is uploaded**: the participant downloads a CSV file and sends it to the team.
+
 ## The full class workflow
 
 1. **Teacher creates a class** (`create_class`) and shares the join code.

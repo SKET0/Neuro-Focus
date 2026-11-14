@@ -5,7 +5,7 @@ import {
   normalizeReading, legacyState, describeReading, createSessionAccumulator, createSampleWindow, sampleKind, sampleRuns,
   hasQualityInfo, missingQualityColumns
 } from "../scripts/shared/tracking-states.js";
-import { assessFrame, createReadingFilter } from "../scripts/tracking/gaze-reading.js";
+import { assessFrame, createReadingFilter, headAngles, FEATURE_NAMES } from "../scripts/tracking/gaze-reading.js";
 import { averageFocus, focusedSeconds, buildCoaching, buildInsights, evidenceFor, compareGroups, timeOfDay, COACH_MINIMUM } from "../scripts/student/focus-analysis.js";
 
 let failures = 0;
@@ -167,6 +167,38 @@ ok("a clear face looking ahead is usable", assessFrame([face()]).usable === true
   ok("head strongly turned → looking away", reading.engagement === "looking-away");
   for (let i = 0; i < 6; i += 1, t += 120) reading = filter.next(assessFrame([face(), face({ shiftX: 0.1 })]), t) || reading;
   ok("a second face appearing makes tracking unavailable", reading.tracking === "unavailable" && reading.reason === "multiple-faces");
+}
+
+section("Model readings (features)");
+{
+  // A 4×4 column-major matrix that turns the head by `yaw` degrees and nods it by `pitch` degrees.
+  const matrix = ({ yaw = 0, pitch = 0 } = {}) => {
+    const y = (yaw * Math.PI) / 180, p = (pitch * Math.PI) / 180;
+    const R = [ // R = Ry(yaw) · Rx(pitch), rows
+      [Math.cos(y), Math.sin(y) * Math.sin(p), Math.sin(y) * Math.cos(p)],
+      [0, Math.cos(p), -Math.sin(p)],
+      [-Math.sin(y), Math.cos(y) * Math.sin(p), Math.cos(y) * Math.cos(p)]
+    ];
+    const data = new Array(16).fill(0);
+    for (let r = 0; r < 3; r += 1) for (let c = 0; c < 3; c += 1) data[c * 4 + r] = R[r][c];
+    data[15] = 1;
+    return { data };
+  };
+  const near = (a, b, tolerance = 0.5) => Math.abs(a - b) <= tolerance;
+  const straight = headAngles(matrix());
+  ok("a head facing the camera has angles near 0", near(straight.yaw, 0) && near(straight.pitch, 0) && near(straight.roll, 0));
+  ok("turning the head 30° gives a yaw of 30°", near(headAngles(matrix({ yaw: 30 })).yaw, 30));
+  ok("nodding down 20° gives a pitch of 20°", near(headAngles(matrix({ pitch: 20 })).pitch, 20));
+  ok("no matrix gives no angles", headAngles(undefined) === null && headAngles({ data: [1, 2] }) === null);
+
+  const usable = assessFrame([face()], [matrix({ yaw: 10 })]);
+  ok("every feature is present on a usable frame", FEATURE_NAMES.every((name) => typeof usable.features[name] === "number"), FEATURE_NAMES.join(", "));
+  ok("irises in the middle of the eye → gaze_x and gaze_y near 0.5", near(usable.features.gaze_x, 0.5, 0.01) && near(usable.features.gaze_y, 0.5, 0.01));
+  ok("eye_open matches the lid gap", near(usable.features.eye_open, 0.3, 0.01));
+  ok("head_turn is signed (which way the head turns)", assessFrame([face({ headTurn: -0.2 })]).features.head_turn < 0 && assessFrame([face({ headTurn: 0.2 })]).features.head_turn > 0);
+  ok("head angles come from the matrix", near(usable.features.head_yaw, 10));
+  ok("without a matrix the head angles are missing, not 0", assessFrame([face()]).features.head_yaw === null);
+  ok("an unusable frame has no features", assessFrame([]).features === undefined);
 }
 
 // ---------- Saved samples ----------

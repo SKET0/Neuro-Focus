@@ -4,6 +4,7 @@
 // face partly out of view, too far away, eyes not visible) give "Tracking unavailable" with no
 // score, never a score of 0. During the focus timer's break readings are marked as a break.
 import { assessFrame, createReadingFilter } from "./gaze-reading.js";
+import { loadFaceLandmarker } from "./face-model.js";
 import { REASONS } from "../shared/tracking-states.js";
 
 const video = document.querySelector("#analyzerVideo");
@@ -15,9 +16,6 @@ if (video) {
   const scoreOutput = document.querySelector("#shiftedPercent");
   const placeholder = document.querySelector("#cameraPlaceholder");
 
-  const visionVersion = "0.10.14";
-  const visionBase = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${visionVersion}`;
-  const modelUrl = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
   const defaultStartLabel = "Start attention tracking";
   const defaultMessage = "Gaze and head orientation are processed on this device.";
 
@@ -72,7 +70,7 @@ if (video) {
     busy = true;
     try {
       const result = landmarker.detectForVideo(video, performance.now());
-      const reading = filter.next(assessFrame(result.faceLandmarks || []), now);
+      const reading = filter.next(assessFrame(result.faceLandmarks || [], result.facialTransformationMatrixes || []), now);
       if (!reading) return; // a short glitch such as a blink: the last reading still stands
       showReading(reading);
       publish(reading);
@@ -85,16 +83,7 @@ if (video) {
   }
 
   async function loadAnalyzer() {
-    if (landmarker) return;
-    const { FaceLandmarker, FilesetResolver } = await import(`${visionBase}/vision_bundle.mjs`);
-    const vision = await FilesetResolver.forVisionTasks(`${visionBase}/wasm`);
-    landmarker = await FaceLandmarker.createFromOptions(vision, {
-      baseOptions: { modelAssetPath: modelUrl, delegate: "CPU" },
-      runningMode: "VIDEO",
-      numFaces: 2, // two are looked for only to notice when more than one face is in view
-      outputFaceBlendshapes: false,
-      outputFacialTransformationMatrixes: false
-    });
+    landmarker ??= await loadFaceLandmarker();
   }
 
   function cameraProblem(error) {
