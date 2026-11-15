@@ -118,7 +118,7 @@ if (app) {
     const isNew = classStatus.loaded && !classStatus.error && !(classStatus.classes || []).length;
     $("#heroLead").textContent = isNew
       ? "Welcome! Join your first class, or try a short focus session on your own."
-      : "Here’s what’s next. Go at your own pace.";
+      : "";
   }
 
   // ---------- The one main action ----------
@@ -157,7 +157,7 @@ if (app) {
         setIcon("i-eye");
         kicker.append(liveDot(), "You’re in a live session");
         title.textContent = next.item.name;
-        sub.textContent = "Your teacher sees your attention score, never your video. Keep Live focus open while class is on.";
+        sub.textContent = "Your teacher sees your score, never your video.";
         buttons.append(
           button("Back to Live focus", "btn-primary", () => { window.location.hash = `class/${next.item.id}/live`; }, "i-video"),
           button("Leave session", "btn-action", () => actions().leaveSession?.())
@@ -172,13 +172,13 @@ if (app) {
         setIcon("i-eye");
         kicker.textContent = "Focus session in progress";
         title.textContent = "You’re tracking your focus";
-        sub.textContent = "Your camera is on for attention tracking. Video never leaves this device.";
+        sub.textContent = "Video never leaves this device.";
         buttons.append(button("Open Solo focus", "btn-primary", () => window.neuroFocusNavigate?.("focus"), "i-timer"));
       } else if (next.kind === "join-first") {
         setIcon("i-school");
         kicker.textContent = "Get started";
         title.textContent = "Join your first class";
-        sub.textContent = "Ask your teacher for a join code. You’ll see your class’s posts, assignments, quizzes and live sessions. Solo focus, notes and NeuroBuddy work on your own too.";
+        sub.textContent = "Ask your teacher for a join code.";
         buttons.append(button("Join a class", "btn-primary", () => actions().openJoinDialog?.(), "i-plus"));
       } else if (next.kind === "continue") {
         setIcon("i-note");
@@ -190,7 +190,7 @@ if (app) {
         setIcon("i-timer");
         kicker.textContent = "Ready when you are";
         title.textContent = "Start a focus session";
-        sub.textContent = "Work in a short focus block with a break after. Your camera turns on only when you press start, and video never leaves this device.";
+        sub.textContent = "A short focus block with a break after. Video never leaves this device.";
         const start = button("Start a focus session", "btn-primary", null, "i-play");
         start.dataset.startFocus = ""; // handled by student-ui.js
         buttons.append(start);

@@ -373,7 +373,7 @@ If one tab's account changes because another tab on the same address signed in o
 - **Teachers:** Home, Classes, All students and Attendance report, then **Your classes** (every class with who's online and a live dot; **+** creates one). A running session also gets a **Live now** shortcut, and Home's badge counts submissions waiting to be marked. New teachers get a short guided tour the first time they open Home; **Take the tour** at the bottom of the sidebar replays it. Whether it has been seen is saved on the account (auth user metadata), so it doesn't come back on another device.
 - **Inside a class:** Posts, Assignments, Quizzes, Live focus (teachers then have Students, Sessions and Settings). Arrow keys move between tabs. Teachers' Classes page shows each class as a card with its attendance, focus and work to mark.
 - The header breadcrumb shows where you are (Home / Classes / Biology / Posts) and every part of it is a link; on phones it shows the last two parts. Old links (`#home`, `#class/<id>`, `#students`, `#attendance-report`, `#buddy`, …) still work.
-- Opening a page never turns the camera on. Only **Start focus session**, **Join live session** and **Turn camera on** do; the Zoom and Google Meet links on Solo focus only open the meeting.
+- Opening a page never turns the camera on. Only **Start focus session**, **Join live session** and **Turn camera on** do. Online class links (Zoom or Google Meet) are set per class by the teacher.
 
 ## How classes and learning tools work
 

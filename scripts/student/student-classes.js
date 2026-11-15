@@ -799,7 +799,6 @@ if (app) {
   let cardsKey = "";
   let classFilter = "all";
   let liveShown = new Set(); // classes already in the live strip (only new ones animate in)
-  const TAB_LINKS = [["live", "i-video", "Live focus"], ["posts", "i-megaphone", "Posts"], ["assignments", "i-assignment", "Assignments"], ["quizzes", "i-quiz", "Quizzes"]];
   const el = (tag, className, text) => {
     const node = document.createElement(tag);
     if (className) node.className = className;
@@ -849,7 +848,7 @@ if (app) {
       join.dataset.focusKey = "join-first";
       join.addEventListener("click", openJoinDialog);
       empty.append(mascot, el("h2", "", "No classes yet"),
-        el("p", "", "Ask your teacher for a join code. Once you join, their posts, assignments, quizzes and live sessions show up here."), join);
+        el("p", "", "Ask your teacher for a join code."), join);
       grid.replaceChildren(empty);
       grid.dataset.settled = "true";
       return;
@@ -870,91 +869,64 @@ if (app) {
     window.setTimeout(() => { grid.dataset.settled = "true"; }, 900);
   }
 
+  // One class: name, teacher, live status and attendance, with one main action and the ⋯ menu.
   function classCard(item, index) {
     const status = teacher.get(item.id);
     const live = isLive(item);
     const inSession = item.id === joinedClassId;
     const info = teacherNames.get(item.id);
     const stats = myAttendance.get(item.id);
-    const card = el("article", "class-card-v2");
+    const card = el("article", "tclass-card");
     card.setAttribute("role", "listitem");
     card.style.setProperty("--class-color", classColor(item.id));
     card.style.setProperty("--i", String(index));
-    card.dataset.live = String(live);
-    card.dataset.inSession = String(inSession);
+    card.dataset.live = String(live || inSession);
 
-    // Colour band with the class initial and its live status
-    const band = el("div", "class-band");
-    const initial = el("span", "class-band-initial", ([...item.name.trim()][0] || "C").toUpperCase());
-    initial.setAttribute("aria-hidden", "true");
-    const badge = el("span", "class-badge");
-    if (inSession) { badge.dataset.state = "in"; badge.append(el("span", "live-dot"), "You’re in"); }
-    else if (live) { badge.dataset.state = "live"; badge.append(el("span", "live-dot"), "Live now"); }
-    else if (status?.live && removedFromSession(item.id)) { badge.dataset.state = "removed"; badge.textContent = "Live · removed"; }
-    else if (status?.online) { badge.dataset.state = "online"; badge.textContent = "Teacher online"; }
-    else badge.hidden = true;
-    band.append(initial, badge);
-
-    // Name (the whole card opens the class) and teacher
-    const body = el("div", "class-body");
-    const title = el("h3", "class-name");
+    const head = el("div", "tclass-head");
+    const title = el("h3", "tclass-name");
     const link = el("a", "class-open-link", item.name);
     link.href = `#class/${item.id}`;
     link.dataset.focusKey = `open-${item.id}`;
     title.append(link);
-    const who = el("div", "class-teacher-row");
+    const who = el("span", "tclass-teacher");
     if (info?.name) {
       const face = el("span", "nf-avatar sm");
       paintAvatar(face, { name: info.name, preset: info.preset, url: info.url });
-      who.append(face, el("span", "", info.name));
-    } else who.append(el("span", "class-teacher-unknown", "Your teacher"));
-    if (live && status?.since) who.append(el("small", "class-since", `since ${clock(status.since)}`));
+      who.append(face, info.name);
+    } else who.append("Your teacher");
+    const state = el("span", "tclass-status");
+    if (inSession) { state.dataset.state = "live"; state.append(el("span", "live-dot"), "You’re in the live session"); }
+    else if (live) { state.dataset.state = "live"; state.append(el("span", "live-dot"), status?.since ? `Live since ${clock(status.since)}` : "Live now"); }
+    else if (status?.live && removedFromSession(item.id)) state.textContent = "Live · you were removed";
+    else if (status?.online) state.textContent = "Teacher online";
+    head.append(title, who, state);
 
-    // Attendance
-    const attendance = el("div", "class-attendance");
-    if (stats?.counted) {
-      const rate = Math.round((stats.attended / stats.counted) * 100);
-      const meter = el("span", "class-meter");
-      meter.setAttribute("role", "img");
-      meter.setAttribute("aria-label", `Attendance ${rate}%`);
-      const fill = el("span");
-      fill.style.setProperty("--rate", `${rate}%`);
-      meter.append(fill);
-      attendance.append(el("span", "class-attendance-label", "Attendance"), meter, el("b", "", `${rate}%`));
-      attendance.title = `${stats.attended} of ${stats.counted} live session${stats.counted === 1 ? "" : "s"}`;
-    } else attendance.append(el("span", "class-attendance-label", "No live sessions yet"));
-    body.append(title, who, attendance);
+    const statsRow = el("dl", "tclass-stats two");
+    const stat = (label, value, tone) => {
+      const box = el("div", "tclass-stat");
+      if (tone) box.dataset.tone = tone;
+      box.append(el("dt", "", label), el("dd", "", value));
+      statsRow.append(box);
+    };
+    const rate = stats?.counted ? Math.round((stats.attended / stats.counted) * 100) : null;
+    stat("Attendance", rate === null ? "—" : `${rate}%`, rate !== null && rate < 75 ? "low" : "");
+    stat("Sessions", stats?.counted ? `${stats.attended} of ${stats.counted}` : "—");
 
-    // Shortcuts to each part of the class
-    const tabs = el("nav", "class-shortcuts");
-    tabs.setAttribute("aria-label", `${item.name} sections`);
-    TAB_LINKS.forEach(([tab, iconId, label]) => {
-      const a = el("a", "class-shortcut");
-      a.href = `#class/${item.id}/${tab}`;
-      a.dataset.focusKey = `${tab}-${item.id}`;
-      a.title = label;
-      a.append(svgIcon(iconId), el("span", "", label === "Assignments" ? "Work" : label === "Live focus" ? "Live" : label));
-      a.setAttribute("aria-label", label);
-      if (tab === "live" && live) a.dataset.live = "true";
-      tabs.append(a);
-    });
-
-    // Main action and the ⋯ menu
-    const foot = el("div", "class-foot");
+    const foot = el("div", "tclass-foot");
     let main;
     if (live && !inSession) {
-      main = el("button", "btn-join class-main", "");
+      const provider = meetingProvider(item.meeting_url);
+      main = el("button", "btn-join", "");
       main.type = "button";
-      main.append(svgIcon("i-video"), "Join live session");
-      main.addEventListener("click", () => joinSession(item.id));
+      main.append(svgIcon("i-video"), provider ? `Join on ${provider.label}` : "Join live session");
+      main.addEventListener("click", () => (provider ? joinOnMeeting(item.id) : joinSession(item.id)));
     } else {
-      main = el("a", "btn-action class-main", "");
+      main = el("a", inSession ? "btn-primary" : "btn-action", inSession ? "Back to live session" : "Open class");
       main.href = inSession ? `#class/${item.id}/live` : `#class/${item.id}`;
-      main.append(inSession ? "Back to Live focus" : "Open class", svgIcon("i-chevron"));
     }
     main.dataset.focusKey = `main-${item.id}`;
     foot.append(main, classMenu(item));
-    card.append(band, body, tabs, foot);
+    card.append(head, statsRow, foot);
     return card;
   }
 
@@ -1109,16 +1081,16 @@ if (app) {
       banner.dataset.state = "sharing";
       kicker.append(liveDot(), checkIn.status === "late" ? "You’re in the live session · marked late" : "You’re in the live session");
       sub.textContent = checkIn.status
-        ? "Your attendance is recorded. Your teacher sees your attention score, never your video."
-        : "Your teacher sees your attention score, never your video.";
+        ? "Attendance recorded. Your teacher sees your score, never your video."
+        : "Your teacher sees your score, never your video.";
       appendMeetingActions(actions, item);
       actions.append(bannerButton("Leave session", "btn-action", leaveSession));
     } else if (status?.live && joined) {
       banner.dataset.state = "live";
       kicker.append(liveDot(), "You’ve joined");
       sub.textContent = !shareToggle?.checked
-        ? "Sharing is paused, so your teacher can’t see your attention score. Your attendance still counts."
-        : "Your camera is off, so nothing is shared. Your attendance still counts. Turn the camera on to share your attention score.";
+        ? "Sharing is paused. Your attendance still counts."
+        : "Camera off, so nothing is shared. Your attendance still counts.";
       if (!tracking && !cameraStarting) actions.append(bannerButton("Turn camera on", "btn-primary", () => window.dispatchEvent(new CustomEvent("neurofocus:start-camera"))));
       appendMeetingActions(actions, item);
       actions.append(bannerButton("Leave session", "btn-action", leaveSession));
@@ -1127,10 +1099,10 @@ if (app) {
       kicker.append(liveDot(), "Live now");
       const provider = meetingProvider(item.meeting_url);
       if (provider) {
-        sub.textContent = `Your teacher started a live session on ${provider.label}. Join to open the meeting and share your attention score (never video); a small focus window keeps tracking while the meeting is in front.`;
+        sub.textContent = `Join on ${provider.label} to share your score (never video).`;
         actions.append(bannerButton(`Join on ${provider.label}`, "btn-join", () => joinOnMeeting(item.id)), bannerButton("Join here only", "btn-action", () => joinSession(item.id)));
       } else {
-        sub.textContent = "Your teacher started a live session. Join to share your attention score (never video). Nothing is shared until you join.";
+        sub.textContent = "Join to share your score (never video).";
         actions.append(bannerButton("Join session", "btn-join", () => joinSession(item.id)));
       }
     } else if (joined) {
@@ -1142,8 +1114,8 @@ if (app) {
       banner.dataset.state = "";
       kicker.textContent = "Live focus";
       sub.textContent = status?.online
-        ? "Your teacher is online but hasn’t started a live session. You’ll get a notification when they do."
-        : "You’ll get a notification when your teacher starts a live session. For studying on your own, use Solo focus.";
+        ? "Your teacher is online. You’ll be notified when they go live."
+        : "You’ll be notified when your teacher goes live.";
     }
     $("#classTrackerNote").hidden = joined;
   }
