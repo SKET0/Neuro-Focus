@@ -9,6 +9,7 @@ import {
 import { paintAvatar, avatarUrls } from "../shared/avatars.js";
 import { classHue } from "../shared/class-colors.js";
 import { classColor } from "../student/class-colors.js";
+import { meetingProvider } from "../shared/meeting-links.js";
 
 const app = await window.neuroFocusReady;
 
@@ -42,6 +43,7 @@ if (app) {
   // A class opens on Live focus, the main feature (its board explains how to start a session).
   const defaultTab = () => "live";
   let hasClassSettings = true;     // false until the class management SQL has been run
+  let hasMeetingLinks = true;      // false until the online class links SQL has been run
   let newIds = new Set();          // roster rows to highlight once
   let refreshTimer;
   const channels = new Map();      // classId -> { channel, ready }
@@ -83,8 +85,10 @@ if (app) {
   async function loadClasses() {
     const columns = "id, name, join_code, join_password_protected, created_at, class_members(count)";
     // Columns added by later database updates are dropped if those haven't been run yet.
-    const missingColumn = (error) => error && (error.code === "42703" || /joining_open|late_after_minutes/.test(error.message || ""));
-    let { data, error } = await supabase.from("classes").select(`${columns}, joining_open, late_after_minutes`).order("created_at", { ascending: false });
+    const missingColumn = (error) => error && (error.code === "42703" || /joining_open|late_after_minutes|meeting_url/.test(error.message || ""));
+    let { data, error } = await supabase.from("classes").select(`${columns}, joining_open, late_after_minutes, meeting_url`).order("created_at", { ascending: false });
+    hasMeetingLinks = !missingColumn(error);
+    if (missingColumn(error)) ({ data, error } = await supabase.from("classes").select(`${columns}, joining_open, late_after_minutes`).order("created_at", { ascending: false }));
     if (missingColumn(error)) ({ data, error } = await supabase.from("classes").select(`${columns}, joining_open`).order("created_at", { ascending: false }));
     if (missingColumn(error)) {
       hasClassSettings = false;
@@ -95,6 +99,7 @@ if (app) {
       ...item,
       joining_open: item.joining_open ?? true,
       late_after_minutes: item.late_after_minutes ?? null,
+      meeting_url: item.meeting_url ?? null,
       memberCount: item.class_members?.[0]?.count ?? 0
     }));
     if (live && !classes.some((item) => item.id === live.classId)) {
@@ -712,6 +717,14 @@ if (app) {
     const toggle = $("#sessionToggle");
     toggle.dataset.live = String(isLive);
     toggle.textContent = isLive ? "■ End live session" : "▶ Start live session";
+    // The class's Zoom / Google Meet link, for the teacher to open their own meeting.
+    const provider = meetingProvider(item.meeting_url);
+    const open = $("#meetingOpen");
+    open.hidden = !provider;
+    if (provider) {
+      open.href = item.meeting_url;
+      open.querySelector("span").textContent = `Open ${provider.label}`;
+    } else open.removeAttribute("href");
     const other = live && live.classId !== item.id ? classes.find((entry) => entry.id === live.classId) : null;
     $("#sessionHint").textContent = isLive
       ? `Live since ${clock(live.since)} · ${joinedSummary(item)} · ${sharingCount(item.id)} sharing now`
@@ -882,10 +895,26 @@ if (app) {
     $("#lateHint").textContent = item.late_after_minutes === null
       ? "Run the attendance database update (see README) to change this."
       : `Students who join a live session more than ${plural(item.late_after_minutes, "minute")} after it starts are marked late.`;
+    renderMeetingSetting(item);
     ["#joiningToggle", "#regenerateCode", "#removePassword", "#passwordForm button[type='submit']", "#deleteClass"].forEach((selector) => {
       const element = $(selector);
       if (element && !hasClassSettings) element.disabled = true;
     });
+  }
+
+  // Settings → Online class: the class's Zoom or Google Meet link.
+  function renderMeetingSetting(item) {
+    const input = $("#meetingInput");
+    const provider = meetingProvider(item.meeting_url);
+    if (document.activeElement !== input) input.value = item.meeting_url || "";
+    $("#removeMeeting").disabled = !item.meeting_url || !hasMeetingLinks;
+    $("#meetingForm button[type='submit']").disabled = !hasMeetingLinks;
+    input.disabled = !hasMeetingLinks;
+    $("#meetingHint").textContent = !hasMeetingLinks
+      ? "Run the online class links database update (see README) to add a meeting link."
+      : provider
+        ? `Saved: ${provider.label}. When you start a live session, students get “Join on ${provider.label}”: it joins the live session, opens the meeting and keeps tracking their focus while the meeting is in front.`
+        : "Add your Zoom or Google Meet link. When you start a live session, students get a button that joins the session, opens the meeting and keeps tracking their focus while the meeting is in front.";
   }
 
   let shownView = null;
@@ -1345,6 +1374,23 @@ if (app) {
     }
     if (minutes === selected()?.late_after_minutes) return;
     await updateClass({ late_after_minutes: minutes }, `Late after ${plural(minutes, "minute")}`);
+  });
+
+  $("#meetingForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const value = $("#meetingInput").value.trim();
+    if (!value) { $("#removeMeeting").click(); return; }
+    const provider = meetingProvider(value);
+    if (!provider) {
+      notify({ title: "That isn’t a Zoom or Google Meet link", text: "Paste the full https:// link from your Zoom or Google Meet invitation, for example https://zoom.us/j/… or https://meet.google.com/…", kind: "error", timeoutMs: 9000 });
+      return;
+    }
+    if (value === selected()?.meeting_url) return;
+    await updateClass({ meeting_url: value }, `${provider.label} link saved`);
+  });
+  $("#removeMeeting").addEventListener("click", async () => {
+    if (!selected()?.meeting_url) return;
+    await updateClass({ meeting_url: null }, "Meeting link removed");
   });
 
   // Attendance data loaded by teacher-attendance.js fills the master list's columns.

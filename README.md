@@ -58,7 +58,7 @@ ml/                        Attention model training (train_lstm.py); recordings 
 backend/                   Optional Python prediction service (not used by the web app yet)
 tools/                     Local dev server
 supabase/                  Supabase config, Edge Functions and SQL migrations
-tests/                     Automated tests: tracker rules and database access rules
+tests/                     Automated tests: tracker rules, meeting links and database access rules
 .github/workflows/         Tests on every push; keeping Supabase awake
 ```
 
@@ -265,6 +265,17 @@ Run `supabase/migrations/20261013000000_quiz_focus.sql` once in **Supabase Dashb
 - **Student:** a bar above the quiz shows whether the camera is on and the current reading; the summary shows their own focus overall and per question.
 - **Privacy:** classmates never see each other's focus, even with the leaderboard on. Video never leaves the device. Focus never changes points.
 - **Limits:** like live class scores, the numbers come from the student's browser, so a determined student could send made-up ones. The camera rule stops students from simply skipping it. Starting the camera for a quiz also records a personal focus session in the student's My progress, like any other time the tracker runs.
+
+## Online classes update (Zoom and Google Meet)
+
+Run `supabase/migrations/20261014000000_class_meeting_links.sql` once in **Supabase Dashboard → SQL Editor**, after the quiz focus update. It is safe to run again and adds one column (`classes.meeting_url`). Until it is run, the site works as before without meeting links.
+
+- **Teacher:** **Settings → Online class** takes the class's Zoom or Google Meet link (https only, on zoom.us / zoom.com or meet.google.com; the database refuses anything else, including look-alike addresses). An **Open Zoom / Open Google Meet** button appears next to **Start live session**.
+- **Student:** when the teacher starts a live session, the class page, the Classes live strip and the invitation offer **Join on Zoom / Join on Google Meet**. It joins the live session exactly like **Join session** (attendance, focus shared with the teacher, never video) and opens a small **floating focus window** that stays on top of the meeting (Chrome and Edge, using Document Picture-in-Picture). The window shows the tracking state and focus score, and has **Open Zoom/Meet** and **Leave session** buttons. In other browsers the meeting opens straight away in a new tab instead. **Join here only** joins without the meeting.
+- **Tracking while the meeting is in front:** the tracker keeps running in the Neuro-Focus tab behind the meeting (see *Tracking in a background tab*).
+- **Camera:** in Chrome or Edge, Google Meet or Zoom in the browser and Neuro-Focus share the camera. The Zoom desktop app works alongside on macOS; on Windows, some webcams can only be used by one app at a time, so use Zoom in the browser there. Phones aren't supported: they pause pages in the background.
+- **Privacy:** nothing about the meeting is read or stored; the link is only opened. The floating window only shows what the tracker on this device reads.
+- Code: `scripts/shared/meeting-links.js` (the same link check as the database), `scripts/student/meeting-companion.js` (the floating window); tests in `tests/meeting-links.test.mjs` and `tests/access-rules.test.mjs`.
 
 ## Attention model data recorder
 

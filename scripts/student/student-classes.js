@@ -9,6 +9,8 @@ import { classColor } from "./class-colors.js";
 import { createMascot } from "./buddy-mascot.js";
 import { normalizeReading, legacyState } from "../shared/tracking-states.js";
 import { every } from "../shared/background-clock.js";
+import { meetingProvider } from "../shared/meeting-links.js";
+import { openCompanion, updateCompanion, closeCompanion, companionClassId, companionSupported } from "./meeting-companion.js";
 
 const app = await window.neuroFocusReady;
 
@@ -123,10 +125,10 @@ if (app) {
 
   // ---------- Data ----------
   async function loadClasses() {
-    const { data, error } = await supabase
-      .from("class_members")
-      .select("class_id, joined_at, classes(id, name, join_code, teacher_id)")
-      .order("joined_at", { ascending: false });
+    const query = (columns) => supabase.from("class_members").select(`class_id, joined_at, classes(${columns})`).order("joined_at", { ascending: false });
+    // meeting_url comes with the online class links database update.
+    let { data, error } = await query("id, name, join_code, teacher_id, meeting_url");
+    if (error && (error.code === "42703" || /meeting_url/.test(error.message || ""))) ({ data, error } = await query("id, name, join_code, teacher_id"));
     if (error) throw error;
     const previous = classes;
     classes = (data || []).map((membership) => membership.classes).filter(Boolean);
@@ -392,10 +394,14 @@ if (app) {
         liveNotices.get(classId)?.();
         liveNotices.set(classId, notify({
           title: firstSync ? `Live session in ${item.name}` : `${item.name} is live now`,
-          text: "You’re invited: your teacher started a live session. Join to share your focus (never your video).",
+          text: meetingProvider(item.meeting_url)
+            ? `You’re invited: your teacher started a live session on ${meetingProvider(item.meeting_url).label}. Join to open it and share your focus (never your video).`
+            : "You’re invited: your teacher started a live session. Join to share your focus (never your video).",
           kind: "live",
           timeoutMs: 20000,
-          actions: [{ label: "Join session", primary: true, onClick: () => joinSession(classId) }]
+          actions: meetingProvider(item.meeting_url)
+            ? [{ label: `Join on ${meetingProvider(item.meeting_url).label}`, primary: true, onClick: () => joinOnMeeting(classId) }, { label: "Join here only", onClick: () => joinSession(classId) }]
+            : [{ label: "Join session", primary: true, onClick: () => joinSession(classId) }]
         }));
       }
     } else if (!status.live && previous.live && !(status.online && tracking && focusInSession?.classId === classId)) {
@@ -551,9 +557,45 @@ if (app) {
     render(); // checks in for attendance even if the camera is slow to start
   }
 
+  // "Join on Zoom/Meet": joins the live session as usual, opens the floating focus window (Chrome
+  // and Edge) and the meeting. Must run straight from the student's click: browsers only allow a
+  // new window or tab then. With the floating window, the meeting opens from its own button (one
+  // click can't open both); without it, the meeting opens straight away in a new tab.
+  function joinOnMeeting(classId) {
+    const item = classes.find((entry) => entry.id === classId);
+    const provider = meetingProvider(item?.meeting_url);
+    if (!provider) { void joinSession(classId); return; }
+    const details = { classId, className: item.name, meetingUrl: item.meeting_url, providerLabel: provider.label, onLeave: () => { void leaveSession(); } };
+    if (companionSupported()) {
+      updateCompanion({ joined: joinedClassId === classId, live: true, removed: false, sharing: false });
+      void openCompanion(details).then((opened) => {
+        if (!opened) notify({ title: `Open ${provider.label}`, text: "The floating focus window couldn’t open. Open the meeting here; tracking keeps running in this tab.", kind: "live", timeoutMs: 20000, actions: [{ label: `Open ${provider.label}`, primary: true, onClick: () => window.open(item.meeting_url, "_blank", "noopener,noreferrer") }] });
+      });
+    } else {
+      window.open(item.meeting_url, "_blank", "noopener,noreferrer");
+    }
+    void joinSession(classId).then(() => {
+      // The student may have cancelled (e.g. kept their solo session): then nothing is open for them.
+      if (joinedClassId !== classId && companionClassId() === classId) closeCompanion();
+    });
+  }
+
+  // A link to the class's meeting, styled as a button.
+  function meetingLink(item, className = "btn-action") {
+    const provider = meetingProvider(item.meeting_url);
+    const link = document.createElement("a");
+    link.className = className;
+    link.href = item.meeting_url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = `Open ${provider.label}`;
+    return link;
+  }
+
   // Leaving the live session: the camera stops (the session so far is saved under the class) and
   // nothing more is shared. The student stays in the class.
   async function leaveSession() {
+    closeCompanion();
     await stopCameraAndWait();
     joinedClassId = null;
     joinedSessionId = null;
@@ -635,6 +677,20 @@ if (app) {
     renderSoloNotice();
     updateShareStatus();
     publishStatus();
+    syncCompanion();
+  }
+
+  // The floating focus window shows whether the student is in the session and sharing.
+  function syncCompanion() {
+    const classId = companionClassId();
+    if (!classId) return;
+    const status = teacher.get(classId);
+    updateCompanion({
+      joined: joinedClassId === classId,
+      live: Boolean(status?.live) || joinedClassId === classId,
+      removed: removedFromSession(classId),
+      sharing: joinedClassId === classId && tracking && Boolean(shareToggle?.checked) && !removedFromSession(classId)
+    });
   }
 
   // The class page's header (#view-class). The page shows the class in the address, which is
@@ -974,10 +1030,11 @@ if (app) {
         action = el("a", "btn-action", "Back to Live focus");
         action.href = `#class/${item.id}/live`;
       } else {
+        const provider = meetingProvider(item.meeting_url);
         action = el("button", "btn-join", "");
         action.type = "button";
-        action.append(svgIcon("i-video"), "Join live session");
-        action.addEventListener("click", () => joinSession(item.id));
+        action.append(svgIcon("i-video"), provider ? `Join on ${provider.label}` : "Join live session");
+        action.addEventListener("click", () => (provider ? joinOnMeeting(item.id) : joinSession(item.id)));
       }
       row.append(text, action);
       return row;
@@ -996,6 +1053,19 @@ if (app) {
     document.querySelectorAll(".class-menu-list").forEach((list) => { list.hidden = true; });
     document.querySelectorAll(".class-menu-button").forEach((button) => button.setAttribute("aria-expanded", "false"));
   });
+
+  // While in a live session with a meeting link: open the meeting, and reopen the floating window.
+  function appendMeetingActions(actions, item) {
+    if (!meetingProvider(item.meeting_url)) return;
+    actions.append(meetingLink(item));
+    if (companionSupported() && companionClassId() !== item.id) {
+      actions.append(bannerButton("Floating focus window", "btn-action", () => {
+        const provider = meetingProvider(item.meeting_url);
+        void openCompanion({ classId: item.id, className: item.name, meetingUrl: item.meeting_url, providerLabel: provider.label, onLeave: () => { void leaveSession(); } })
+          .then(() => { syncCompanion(); renderBanner(); });
+      }));
+    }
+  }
 
   function bannerButton(label, className, onClick) {
     const button = document.createElement("button");
@@ -1041,6 +1111,7 @@ if (app) {
       sub.textContent = checkIn.status
         ? "Your attendance is recorded. Your teacher sees your attention score, never your video."
         : "Your teacher sees your attention score, never your video.";
+      appendMeetingActions(actions, item);
       actions.append(bannerButton("Leave session", "btn-action", leaveSession));
     } else if (status?.live && joined) {
       banner.dataset.state = "live";
@@ -1049,12 +1120,19 @@ if (app) {
         ? "Sharing is paused, so your teacher can’t see your attention score. Your attendance still counts."
         : "Your camera is off, so nothing is shared. Your attendance still counts. Turn the camera on to share your attention score.";
       if (!tracking && !cameraStarting) actions.append(bannerButton("Turn camera on", "btn-primary", () => window.dispatchEvent(new CustomEvent("neurofocus:start-camera"))));
+      appendMeetingActions(actions, item);
       actions.append(bannerButton("Leave session", "btn-action", leaveSession));
     } else if (status?.live) {
       banner.dataset.state = "live";
       kicker.append(liveDot(), "Live now");
-      sub.textContent = "Your teacher started a live session. Join to share your attention score (never video). Nothing is shared until you join.";
-      actions.append(bannerButton("Join session", "btn-join", () => joinSession(item.id)));
+      const provider = meetingProvider(item.meeting_url);
+      if (provider) {
+        sub.textContent = `Your teacher started a live session on ${provider.label}. Join to open the meeting and share your attention score (never video); a small focus window keeps tracking while the meeting is in front.`;
+        actions.append(bannerButton(`Join on ${provider.label}`, "btn-join", () => joinOnMeeting(item.id)), bannerButton("Join here only", "btn-action", () => joinSession(item.id)));
+      } else {
+        sub.textContent = "Your teacher started a live session. Join to share your attention score (never video). Nothing is shared until you join.";
+        actions.append(bannerButton("Join session", "btn-join", () => joinSession(item.id)));
+      }
     } else if (joined) {
       banner.dataset.state = "";
       kicker.textContent = "Live session paused";

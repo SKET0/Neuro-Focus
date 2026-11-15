@@ -487,5 +487,29 @@ ok("a student in a class stays a student", (await profileOf(S1)).role === "stude
 ok("an older account can't switch to teacher", !(await tryQ(OLD_G, "select public.choose_teacher_role()")).ok && (await profileOf(OLD_G)).role === "student");
 ok("signed-out visitors can't call choose_teacher_role", !(await tryQ(null, "select public.choose_teacher_role()")).ok);
 
+// ---------- Online class links (Zoom / Google Meet) ----------
+console.log("\n— Online class links —");
+const setLink = (uid, url, classId = C1.id) => tryQ(uid, "update public.classes set meeting_url = $1 where id = $2", [url, classId]);
+const linkOf = async (classId = C1.id) => (await db.query("select meeting_url from public.classes where id = $1", [classId])).rows[0].meeting_url;
+ok("the teacher saves a Zoom link", (await setLink(T1, "https://us06web.zoom.us/j/81234567890?pwd=abc")).ok && (await linkOf()) === "https://us06web.zoom.us/j/81234567890?pwd=abc");
+ok("a Google Meet link is accepted", (await setLink(T1, "https://meet.google.com/abc-defg-hij")).ok);
+ok("a zoom.com link is accepted", (await setLink(T1, "https://app.zoom.com/wc/join/81234567890")).ok);
+for (const [label, bad] of [
+  ["http (not https)", "http://zoom.us/j/1"],
+  ["another site", "https://example.com/j/1"],
+  ["a look-alike host", "https://zoom.us.example.com/j/1"],
+  ["a look-alike name", "https://evilzoom.us/j/1"],
+  ["a sign-in trick", "https://zoom.us@example.com/j/1"],
+  ["a Meet look-alike", "https://meet.google.com.example.com/abc"],
+  ["a script link", "javascript:alert(1)"],
+  ["spaces", "https://meet.google.com/abc def"]
+]) ok(`a link with ${label} is refused`, !(await setLink(T1, bad)).ok);
+ok("the link can be removed", (await setLink(T1, null)).ok && (await linkOf()) === null);
+await setLink(T1, "https://meet.google.com/abc-defg-hij");
+ok("a student can't change the class link", (await setLink(S1, "https://meet.google.com/zzz-zzzz-zzz")).affected !== 1 && (await linkOf()) === "https://meet.google.com/abc-defg-hij");
+ok("another teacher can't change it", (await setLink(T2, "https://meet.google.com/zzz-zzzz-zzz")).affected !== 1 && (await linkOf()) === "https://meet.google.com/abc-defg-hij");
+ok("students in the class see the link", (await rows(S1, "select meeting_url from public.classes where id = $1", [C1.id]))[0]?.meeting_url === "https://meet.google.com/abc-defg-hij");
+ok("students of other classes don't", (await rows(S3, "select meeting_url from public.classes where id = $1", [C1.id])).length === 0);
+
 console.log(failures ? `\n${failures} CHECK(S) FAILED` : "\nALL CHECKS PASSED");
 process.exitCode = failures ? 1 : 0;
