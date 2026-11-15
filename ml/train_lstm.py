@@ -21,7 +21,8 @@ import numpy as np
 import torch
 from torch import nn
 
-# Must match FEATURE_NAMES in scripts/tracking/gaze-reading.js (same order).
+# Must match TRACKER_VERSION and FEATURE_NAMES in scripts/tracking/gaze-reading.js.
+TRACKER_VERSION = "2"
 FEATURES = ["gaze_x", "gaze_y", "eye_open", "head_turn", "face_size", "head_yaw", "head_pitch", "head_roll"]
 TASKS = ["read", "dot", "phone", "away", "tired"]
 TASK_TITLES = {"read": "Read the text", "dot": "Follow the dot", "phone": "Use your phone", "away": "Look away", "tired": "Act tired"}
@@ -44,15 +45,20 @@ MODEL_FILE = ROOT / "assets" / "models" / "attention-lstm.json"
 
 # ---------- Data ----------
 def load_rows(folder):
-    files = sorted(Path(folder).glob("*.csv"))
-    rows = []
-    for path in files:
+    files, rows = [], []
+    for path in sorted(Path(folder).glob("*.csv")):
         with open(path, newline="") as f:
             reader = csv.DictReader(f)
             missing = [name for name in FEATURES + ["participant", "task", "label", "t_ms", "usable"] if name not in (reader.fieldnames or [])]
             if missing:
                 sys.exit(f"{path.name} is missing columns: {', '.join(missing)}")
-            rows.extend(reader)
+            mine = list(reader)
+        # Older recorders measured some readings differently; mixing them would confuse the model.
+        if not mine or mine[0].get("tracker_version") != TRACKER_VERSION:
+            print(f"Skipping {path.name}: recorded with an older version of the tracker. Record it again.")
+            continue
+        files.append(path)
+        rows.extend(mine)
     return files, rows
 
 
@@ -285,7 +291,8 @@ def report(files, rows, windows, method, overall, by_task, by_person):
     lines += ["", f"Windows tested: {lstm['windows']}.", "", "## Accuracy by task", "", "| Task | Windows | LSTM | Rules |", "|---|---|---|---|"]
     for task, row in by_task.items():
         lines.append(f"| {TASK_TITLES[task]} | {row['windows']} | {pct(row['lstm'])} | {pct(row['rules'])} |")
-    lines += ["", "## Balanced accuracy by person (tested on a model that never saw them)", "", "| Person | Windows | LSTM | Rules |", "|---|---|---|---|"]
+    heading = "tested on a model that never saw them" if method.startswith("Leave one person out") else "tested on round 2 only"
+    lines += ["", f"## Balanced accuracy by person ({heading})", "", "| Person | Windows | LSTM | Rules |", "|---|---|---|---|"]
     for person, row in by_person.items():
         lines.append(f"| {person} | {row['windows']} | {pct(row['lstm'])} | {pct(row['rules'])} |")
     lines += ["", "## Confusion (windows)", "", "| | Predicted focused | Predicted distracted |", "|---|---|---|"]
@@ -361,7 +368,7 @@ def main():
 
     files, rows = load_rows(args.data)
     if not rows:
-        sys.exit(f"No CSV readings found in {args.data}")
+        sys.exit(f"No recordings to use in {args.data}")
     windows = make_windows(rows)
     if len({w["focused"] for w in windows}) < 2:
         sys.exit("Need both focused and distracted windows to train.")

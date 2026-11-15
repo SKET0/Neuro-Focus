@@ -13,12 +13,17 @@ export const LANDMARKS = {
 };
 export const LIMITS = {
   edge: 0.01,          // key points closer than this to the frame edge: face partly out of view
-  minEyeWidth: 0.025,  // eye width as a share of the frame width: smaller means too far away
+  minEyeWidth: 0.025,  // eye width (in 3D) as a share of the frame width: smaller means too far away
   minEyeOpen: 0.1,     // lid gap / eye width: smaller means eyes closed or hidden
   gazeLow: 0.36,       // iris position inside the eye (0.5 = centred): outside 0.36–0.64 = looking aside
   gazeHigh: 0.64,
   headTurn: 0.25       // nose position between the outer eye corners (0.5 = facing the camera)
 };
+
+// Goes up whenever a reading's meaning changes, so recordings made with different versions
+// aren't mixed when training (ml/train_lstm.py checks it).
+// 2: eye width and openness measured in 3D, so turning the head no longer reads as "too far".
+export const TRACKER_VERSION = 2;
 
 // The numbers saved for each usable frame, in this order (the recorder's CSV columns and the
 // model's inputs). Head angles come from MediaPipe's face transformation matrix.
@@ -31,6 +36,16 @@ function irisPosition(face, outer, inner, iris) {
   const width = Math.abs(face[inner].x - face[outer].x);
   const centre = iris.reduce((total, index) => total + face[index].x, 0) / iris.length;
   return width ? (centre - left) / width : 0.5;
+}
+
+// Eye width from corner to corner in 3D, as a share of the frame width. Seen flat in the
+// picture an eye looks narrower when the head turns, which used to read as "too far away";
+// adding depth (z, on about the same scale as x) keeps the width the same however the head turns.
+// aspect = frame height / width, because y is a share of the frame height.
+function eyeWidth3d(face, a, b, aspect) {
+  const p = face[a];
+  const q = face[b];
+  return Math.hypot(q.x - p.x, (q.y - p.y) * aspect, (q.z ?? 0) - (p.z ?? 0));
 }
 
 // Iris height between the upper and lower lid: 0 = at the upper lid, 1 = at the lower lid.
@@ -59,7 +74,8 @@ export function headAngles(matrix) {
 //   gaze:     average iris position inside both eyes, 0.5 = looking straight ahead
 //   headTurn: how far the head is turned, 0 = facing the camera, 0.5 = fully sideways
 //   features: the FEATURE_NAMES numbers (head angles are null without a matrix)
-export function assessFrame(faces, matrices = []) {
+// aspect: the camera frame's height / width (4:3 by default).
+export function assessFrame(faces, matrices = [], aspect = 0.75) {
   if (!faces || !faces.length) return { usable: false, reason: "no-face" };
   if (faces.length > 1) return { usable: false, reason: "multiple-faces" };
   const face = faces[0];
@@ -69,8 +85,8 @@ export function assessFrame(faces, matrices = []) {
     return !point || point.x < LIMITS.edge || point.x > 1 - LIMITS.edge || point.y < LIMITS.edge || point.y > 1 - LIMITS.edge;
   });
   if (outside) return { usable: false, reason: "partly-out-of-view" };
-  const leftWidth = Math.abs(face[LANDMARKS.leftInner].x - face[LANDMARKS.leftOuter].x);
-  const rightWidth = Math.abs(face[LANDMARKS.rightOuter].x - face[LANDMARKS.rightInner].x);
+  const leftWidth = eyeWidth3d(face, LANDMARKS.leftOuter, LANDMARKS.leftInner, aspect);
+  const rightWidth = eyeWidth3d(face, LANDMARKS.rightInner, LANDMARKS.rightOuter, aspect);
   const eyeWidth = (leftWidth + rightWidth) / 2;
   if (eyeWidth < LIMITS.minEyeWidth) return { usable: false, reason: "too-far" };
   const leftOpen = Math.abs(face[LANDMARKS.leftLower].y - face[LANDMARKS.leftUpper].y) / (leftWidth || 1);

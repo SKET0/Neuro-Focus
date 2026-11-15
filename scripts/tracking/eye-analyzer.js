@@ -70,7 +70,8 @@ if (video) {
     busy = true;
     try {
       const result = landmarker.detectForVideo(video, performance.now());
-      const reading = filter.next(assessFrame(result.faceLandmarks || [], result.facialTransformationMatrixes || []), now);
+      const aspect = video.videoWidth ? video.videoHeight / video.videoWidth : 0.75;
+      const reading = filter.next(assessFrame(result.faceLandmarks || [], result.facialTransformationMatrixes || [], aspect), now);
       if (!reading) return; // a short glitch such as a blink: the last reading still stands
       showReading(reading);
       publish(reading);

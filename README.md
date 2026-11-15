@@ -254,6 +254,8 @@ Until it is run, the Quizzes tabs say the update is needed; everything else keep
 
 The page uses the same face tracker as the app (`scripts/tracking/face-model.js`, `gaze-reading.js`) at the same rate (about 8 readings a second). Each reading saves the numbers in `FEATURE_NAMES` (horizontal and vertical eye direction, eye openness, signed head turn, face size, and head yaw, pitch and roll from MediaPipe's transformation matrix), whether the face could be measured and why not, and the app's current rule-based score for comparison. **No video or pictures are kept and nothing is uploaded**: the participant downloads a CSV file and sends it to the team.
 
+Each file also records the tracker version (`TRACKER_VERSION` in `gaze-reading.js`), which goes up whenever a reading changes meaning. `ml/train_lstm.py` skips files from an older version, so recordings made in different ways are never mixed. Version 2 measures eye width and openness in 3D, so turning the head is no longer mistaken for sitting too far from the camera.
+
 ## Training the attention model
 
 `ml/train_lstm.py` trains a small LSTM on the recorder's CSV files and tests it against the app's current rules.

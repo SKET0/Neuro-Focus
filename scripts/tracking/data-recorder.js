@@ -2,7 +2,7 @@
 // focused (1) or distracted (0), while the same tracker as the app measures the face. Only the
 // numbers are kept (gaze-reading.js FEATURE_NAMES plus the current rule-based score) and they
 // are saved as a CSV file on this computer. No video is stored and nothing is uploaded.
-import { assessFrame, createReadingFilter, FEATURE_NAMES } from "./gaze-reading.js";
+import { assessFrame, createReadingFilter, FEATURE_NAMES, TRACKER_VERSION } from "./gaze-reading.js";
 import { loadFaceLandmarker } from "./face-model.js";
 import { REASONS } from "../shared/tracking-states.js";
 
@@ -14,7 +14,7 @@ const TASKS = {
   dot: { label: 1, seconds: 40, title: "Follow the dot", text: "Follow the moving dot with your eyes, all around the screen." },
   phone: { label: 0, seconds: 30, title: "Use your phone", text: "Pick up your phone and scroll through it, held where you normally hold it. No phone? Look down at your lap." },
   away: { label: 0, seconds: 30, title: "Look away", text: "Look away from the screen: around the room, out of a window or at something beside you." },
-  tired: { label: 0, seconds: 30, title: "Act tired", text: "Lean back and let your eyes get heavy, as if you're very tired. Keep them partly open." }
+  tired: { label: 0, seconds: 30, title: "Act tired", text: "Stay where you are and let your eyes get heavy, as if you're very tired. Keep them partly open." }
 };
 const LOOK_BACK = "You'll hear a beep when it's time to look back at the screen.";
 
@@ -83,7 +83,8 @@ function measure() {
     console.error("Frame error", error);
     return;
   }
-  const assessment = assessFrame(result.faceLandmarks || [], result.facialTransformationMatrixes || []);
+  const aspect = els.video.videoWidth ? els.video.videoHeight / els.video.videoWidth : 0.75;
+  const assessment = assessFrame(result.faceLandmarks || [], result.facialTransformationMatrixes || [], aspect);
   const reading = filter.next(assessment, now); // the app's current rule-based score, for comparison
   showFace(assessment);
   if (current) record(assessment, reading, now);
@@ -138,7 +139,7 @@ function record(assessment, reading, now) {
   });
 }
 
-const COLUMNS = ["participant", "glasses", "camera", "lighting", "session", "round", "task", "label", "t_ms", "usable", "reason", ...FEATURE_NAMES, "rule_tracking", "rule_score", "rule_engagement"];
+const COLUMNS = ["participant", "glasses", "camera", "lighting", "session", "tracker_version", "round", "task", "label", "t_ms", "usable", "reason", ...FEATURE_NAMES, "rule_tracking", "rule_score", "rule_engagement"];
 
 function toCsv() {
   const cell = (value) => {
@@ -289,7 +290,7 @@ function begin(event) {
   audio ??= new (window.AudioContext || window.webkitAudioContext)();
   meta = {
     participant, glasses: els.glasses.value, camera: els.camera.value, lighting: els.lighting.value,
-    session: Math.random().toString(36).slice(2, 10)
+    session: Math.random().toString(36).slice(2, 10), tracker_version: TRACKER_VERSION
   };
   rows = [];
   els.miniVideo.append(els.video);
