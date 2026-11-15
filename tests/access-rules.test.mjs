@@ -369,13 +369,26 @@ ok("class members now see the quiz", (await rows(S1, "select id from public.quiz
 ok("students of other classes don't", (await rows(S3, "select 1 from public.quizzes")).length === 0 && !(await tryQ(S3, "select public.quiz_state($1)", [Q])).ok);
 ok("a student of another class can't join", !(await tryQ(S3, "select public.join_quiz($1)", [Q])).ok);
 ok("teachers can't join as players", !(await tryQ(T1, "select public.join_quiz($1)", [Q])).ok);
+// Quizzes need the camera on: the browser reports it (report_quiz_focus) before joining and answering.
+const camera = (uid, on = true, quizId = Q) => tryQ(uid, "select public.report_quiz_focus($1, $2)", [quizId, on]);
+ok("joining with the camera never reported is refused", !(await tryQ(S1, "select public.join_quiz($1)", [Q])).ok);
+ok("a student of another class can't report a camera here", !(await camera(S3)).ok);
+ok("teachers can't report a camera as a player", !(await camera(T1)).ok);
+await camera(S1, false);
+ok("joining with the camera reported off is refused", !(await tryQ(S1, "select public.join_quiz($1)", [Q])).ok);
+await db.query("insert into public.quiz_camera (quiz_id, student_id, camera_on, seen_at) values ($1, $2, true, now() - interval '1 minute') on conflict (quiz_id, student_id) do update set camera_on = true, seen_at = excluded.seen_at", [Q, S1]);
+ok("joining with an old camera report is refused", !(await tryQ(S1, "select public.join_quiz($1)", [Q])).ok);
+ok("students can't write camera reports directly", !(await tryQ(S1, "insert into public.quiz_camera (quiz_id, student_id, camera_on) values ($1, $2, true)", [Q, S2])).ok);
+ok("students report the camera on", (await camera(S1)).ok && (await camera(S2)).ok);
 ok("students join explicitly", (await tryQ(S1, "select public.join_quiz($1)", [Q])).ok && (await tryQ(S2, "select public.join_quiz($1)", [Q])).ok);
 ok("joining again (a reconnect) is harmless", (await tryQ(S1, "select public.join_quiz($1)", [Q])).ok
   && (await db.query("select count(*)::int n from public.quiz_participants where quiz_id = $1", [Q])).rows[0].n === 2);
 ok("students can't add themselves to participants directly", !(await tryQ(S1, "insert into public.quiz_participants (quiz_id, student_id) values ($1, $2)", [Q, S1])).ok);
 const stateOf = async (uid) => (await rows(uid, "select public.quiz_state($1) as s", [Q]))[0].s;
 ok("the teacher sees who joined", JSON.stringify((await stateOf(T1)).participant_names) === JSON.stringify(["Sam Rivera", "Student Two"]), JSON.stringify((await stateOf(T1)).participant_names));
-ok("students don't see the list of who joined", (await stateOf(S1)).participant_names === null);
+ok("students don't see the list of who joined", (await stateOf(S1)).participant_names === null && (await stateOf(S1)).students === null);
+ok("the teacher sees each student's camera", (await stateOf(T1)).students.every((s) => s.camera_on === true && s.focus === null));
+ok("a student sees their own camera status", (await stateOf(S1)).my_camera_on === true);
 
 console.log("\n— Quizzes: answering —");
 ok("answering in the lobby is refused", !(await tryQ(S1, "select public.submit_quiz_answer($1, $2, 1)", [Q, q1])).ok);
@@ -385,6 +398,27 @@ ok("students see the question and choices", s1Live.question?.prompt === "Powerho
 ok("the correct choice is hidden while the question is open", s1Live.question.correct_index === null && s1Live.question.counts === null);
 ok("the teacher sees the correct choice", (await stateOf(T1)).question.correct_index === 1);
 const answer = (uid, qid, choice) => tryQ(uid, "select public.submit_quiz_answer($1, $2, $3) as r", [Q, qid, choice]);
+// Focus on the question: on-screen and measured milliseconds, never more than it has been open.
+const focus = (uid, qid, onScreen, usable) => tryQ(uid, "select public.report_quiz_focus($1, true, $2, $3, $4)", [Q, qid, onScreen, usable]);
+await db.query("update public.quizzes set question_opened_at = now() - interval '10 seconds' where id = $1", [Q]);
+ok("a student reports focus on the question", (await focus(S1, q1, 6000, 8000)).ok);
+const focusRow = async (uid, qid) => (await db.query("select on_screen_ms, usable_ms from public.quiz_focus where student_id = $1 and question_id = $2", [uid, qid])).rows[0];
+ok("focus is saved", JSON.stringify(await focusRow(S1, q1)) === JSON.stringify({ on_screen_ms: 6000, usable_ms: 8000 }));
+await focus(S1, q1, 1000, 2000);
+ok("a lower report can't lower the saved focus", JSON.stringify(await focusRow(S1, q1)) === JSON.stringify({ on_screen_ms: 6000, usable_ms: 8000 }));
+await focus(S2, q1, 900000, 900000);
+ok("focus can't exceed the time the question has been open", (await focusRow(S2, q1)).usable_ms <= 16000);
+await focus(S2, q1, 99999, 100);
+ok("on-screen time can't exceed measured time", (await focusRow(S2, q1)).on_screen_ms <= (await focusRow(S2, q1)).usable_ms);
+await focus(S1, q2, 5000, 5000);
+ok("focus for a question that isn't showing is ignored", !(await focusRow(S1, q2)));
+ok("students can't write focus directly", !(await tryQ(S1, "insert into public.quiz_focus (quiz_id, question_id, student_id, on_screen_ms, usable_ms) values ($1, $2, $3, 1, 1)", [Q, q1, S2])).ok);
+ok("students can't read anyone's focus directly", !(await tryQ(S1, "select * from public.quiz_focus")).ok);
+ok("the teacher sees focus on the current question", (await stateOf(T1)).students.find((s) => s.name === "Sam Rivera").focus === 75);
+await camera(S2, false);
+ok("answering with the camera off is refused", !(await answer(S2, q1, 1)).ok);
+ok("the teacher sees whose camera is off", (await stateOf(T1)).students.find((s) => s.name === "Student Two").camera_on === false);
+await camera(S2, true);
 const a1 = await answer(S1, q1, 1);
 ok("a student answers", a1.ok && a1.rows[0].r.accepted === true);
 const again = await answer(S1, q1, 0);
@@ -417,11 +451,16 @@ ok("with the leaderboard on, students see it after the quiz", r1.leaderboard.len
 const r2 = await resultsOf(S2);
 ok("the other student's score is right too (missed by the timer, then too late)", r2.mine.score === 0 && r2.mine.answered === 0);
 ok("the teacher sees every student's score", (await resultsOf(T1)).leaderboard.map((r) => r.score).sort().join() === "0,1");
+ok("a student sees their own focus over the quiz", r1.mine.focus === 75 && r1.mine.questions[0].focus === 75);
+ok("classmates never see each other's focus on the leaderboard", r1.leaderboard.every((r) => r.focus === null && r.measured_seconds === null));
+ok("the teacher sees every student's focus", (await resultsOf(T1)).leaderboard.find((r) => r.name === "Sam Rivera").focus === 75);
+ok("camera reports after the quiz has finished change nothing", (await camera(S1)).rows[0].report_quiz_focus.saved === false);
 ok("students of other classes can't see results", !(await tryQ(S3, "select public.quiz_results($1)", [Q])).ok);
 // Without a leaderboard, students only see their own result.
 const quiet = (await rows(T1, "insert into public.quizzes (class_id, title, show_leaderboard) values ($1, 'Quiet quiz', false) returning id", [C1.id]))[0].id;
 await rows(T1, "insert into public.quiz_questions (quiz_id, position, prompt, options, correct_index) values ($1, 0, 'Q', '{A,B}', 0)", [quiet]);
 await rows(T1, "select public.quiz_open_lobby($1)", [quiet]);
+await camera(S1, true, quiet);
 await rows(S1, "select public.join_quiz($1)", [quiet]);
 await rows(T1, "select public.quiz_next_question($1)", [quiet]);
 const quietQ = (await db.query("select id from public.quiz_questions where quiz_id = $1", [quiet])).rows[0].id;

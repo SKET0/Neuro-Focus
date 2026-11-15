@@ -148,6 +148,7 @@ if (video) {
       startButton.textContent = defaultStartLabel;
       stopButton.hidden = false;
       showStatus("Looking for your face…");
+      window.neuroFocusTracking = true; // read by student-quizzes.js (quizzes need the camera on)
       window.dispatchEvent(new CustomEvent("neurofocus:tracking-started"));
     } catch (error) {
       if (token !== startToken) return;
@@ -164,6 +165,7 @@ if (video) {
     startToken += 1;
     starting = false;
     const wasTracking = Boolean(timer);
+    window.neuroFocusTracking = false;
     window.clearInterval(timer);
     timer = undefined;
     stream?.getTracks().forEach((track) => track.stop());

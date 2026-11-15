@@ -4,7 +4,13 @@
 // class members only, one answer per question while it's open, 1 point per correct answer, and
 // the correct answer is only sent once the question has closed. Quiz points never use attention
 // scores. If the connection drops, the page keeps retrying and picks up where the quiz is now.
+//
+// The camera is required (supabase/migrations/20261013000000_quiz_focus.sql): joining and
+// answering only work while the attention tracker is on. Every few seconds the page reports
+// "camera on/off" and the student's focus on the current question (on-screen and measured time,
+// numbers only) for their teacher.
 import { el, errorText, infoButton, quizSqlMissing, QUIZ_SETUP_TEXT, CHOICE_LETTERS, secondsLeft } from "../shared/classroom.js";
+import { createSessionAccumulator, normalizeReading, describeReading, TRACKING } from "../shared/tracking-states.js";
 
 const app = await window.neuroFocusReady;
 
@@ -24,6 +30,115 @@ if (app && document.querySelector("#classPanelQuizzes")) {
   let failures = 0;
   let joinOnOpen = false;    // the student pressed Join quiz in the list
   let listSignature = "";    // what the quiz list currently shows
+  const REPORT_MS = 3000;    // how often the camera state and focus go to the database
+  let lastReportAt = 0;
+  let questionFocus = null;  // { questionId, acc, final } focus on the question showing now
+  let lastReading = null;    // the tracker's latest reading, for the camera bar
+
+  // ---------- Camera (required) ----------
+  const cameraOn = () => window.neuroFocusTracking === true;
+
+  // Turns the tracker on (eye-analyzer.js) and waits until it's running. Resolves false if the
+  // camera can't start (permission denied, no camera, …).
+  function startCamera() {
+    if (cameraOn()) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      const done = (result) => {
+        window.removeEventListener("neurofocus:tracking-started", started);
+        window.removeEventListener("neurofocus:tracking-error", failed);
+        window.clearTimeout(timeout);
+        resolve(result);
+      };
+      const started = () => done(true);
+      const failed = () => done(false);
+      const timeout = window.setTimeout(() => done(cameraOn()), 30000);
+      window.addEventListener("neurofocus:tracking-started", started);
+      window.addEventListener("neurofocus:tracking-error", failed);
+      window.dispatchEvent(new CustomEvent("neurofocus:start-camera"));
+    });
+  }
+
+  // Sends "camera on/off" and, during a question, the focus on it so far.
+  async function reportFocus() {
+    const forQuiz = playId;
+    if (!forQuiz) return false;
+    lastReportAt = Date.now();
+    const args = { p_quiz_id: forQuiz, p_camera_on: cameraOn() };
+    if (questionFocus) {
+      const totals = questionFocus.final || questionFocus.acc.snapshot(Date.now());
+      Object.assign(args, { p_question_id: questionFocus.questionId, p_on_screen_ms: Math.round(totals.onScreenMs), p_usable_ms: Math.round(totals.usableMs) });
+    }
+    const { error } = await supabase.rpc("report_quiz_focus", args);
+    if (error) console.warn("Quiz focus report failed", error.message);
+    return !error;
+  }
+
+  // Focus is counted while a question is open; it's frozen once the question closes.
+  function followQuestion(question, open) {
+    if (!question || !state?.joined) { questionFocus = null; return; }
+    if (questionFocus?.questionId !== question.id) {
+      questionFocus = { questionId: question.id, acc: createSessionAccumulator(), final: null };
+      if (lastReading && cameraOn()) questionFocus.acc.add(lastReading, Date.now());
+      void reportFocus();
+    }
+    if (!open && !questionFocus.final) {
+      questionFocus.final = questionFocus.acc.snapshot(Date.now());
+      void reportFocus();
+    }
+  }
+
+  function paintCamera() {
+    const bar = $("#studentQuizCamera");
+    const running = Boolean(playId) && state && state.quiz.status !== "finished";
+    bar.hidden = !running;
+    if (!running) return;
+    const on = cameraOn();
+    bar.dataset.state = on ? "on" : "off";
+    const reading = on ? describeReading(normalizeReading(lastReading || { tracking: TRACKING.UNAVAILABLE, reason: "no-recent-readings" })) : null;
+    const score = on && lastReading?.tracking === TRACKING.ACTIVE && lastReading.score !== null ? ` ${lastReading.score}%` : "";
+    const signature = on ? `on:${reading.label}:${score}` : "off";
+    if (bar.dataset.signature === signature) return;
+    bar.dataset.signature = signature;
+    const dot = el("span", "quiz-camera-dot");
+    dot.setAttribute("aria-hidden", "true");
+    const text = el("span", "quiz-camera-text");
+    if (on) {
+      text.append(el("b", "", "Camera on"), ` · ${reading.label}${score}. Your focus is shared with your teacher for this quiz; video never leaves this device.`);
+      bar.replaceChildren(dot, text);
+    } else {
+      text.append(el("b", "", "Camera off"), " · Quizzes need your camera on to join and answer. Only focus numbers are shared, never video.");
+      const button = el("button", "btn-primary", "Turn camera on");
+      button.type = "button";
+      button.addEventListener("click", async () => {
+        button.disabled = true;
+        button.textContent = "Starting…";
+        if (!(await startCamera())) {
+          button.disabled = false;
+          button.textContent = "Turn camera on";
+          status("Your camera didn’t start. Check the camera permission for this site, then try again.");
+        }
+      });
+      bar.replaceChildren(dot, text, button);
+    }
+  }
+
+  window.addEventListener("neurofocus:attention-update", (event) => {
+    lastReading = event.detail;
+    if (questionFocus && !questionFocus.final) questionFocus.acc.add(event.detail, Date.now());
+    if (playId) paintCamera();
+  });
+  const cameraChanged = () => {
+    if (!cameraOn()) {
+      lastReading = null;
+      if (questionFocus && !questionFocus.final) questionFocus.acc.add({ tracking: TRACKING.OFF }, Date.now());
+    }
+    if (!playId) return;
+    paintCamera();
+    void reportFocus();
+    if (state && state.quiz.status !== "finished") { shownKey = ""; void render(); }
+  };
+  window.addEventListener("neurofocus:tracking-started", cameraChanged);
+  window.addEventListener("neurofocus:tracking-stopped", cameraChanged);
 
   const status = (text) => { $("#studentQuizStatus").textContent = text; };
   const showOnly = (section) => {
@@ -56,7 +171,7 @@ if (app && document.querySelector("#classPanelQuizzes")) {
       const text = el("span", "assignment-text");
       text.append(el("b", "", quiz.title), el("small", "", quiz.status === "finished"
         ? "See your score and the answers"
-        : quiz.time_limit_seconds ? `${quiz.time_limit_seconds} s per question` : "No timer"));
+        : `${quiz.time_limit_seconds ? `${quiz.time_limit_seconds} s per question` : "No timer"} · camera required`));
       const chip = el("span", "status-chip-sm", STATUS_TEXT[quiz.status]);
       chip.dataset.state = { lobby: "soon", live: "submitted", finished: "marked" }[quiz.status];
       // An open quiz is joined straight from here (the student's own click); a finished one shows results.
@@ -79,6 +194,8 @@ if (app && document.querySelector("#classPanelQuizzes")) {
     state = null;
     shownKey = "";
     failures = 0;
+    questionFocus = null;
+    paintCamera();
   }
 
   async function play(quizId, { join = false } = {}) {
@@ -111,6 +228,8 @@ if (app && document.querySelector("#classPanelQuizzes")) {
       failures = 0;
       state = { ...data, fetchedAt: Date.now() };
       await render();
+      paintCamera();
+      if (state.quiz.status !== "finished" && Date.now() - lastReportAt >= REPORT_MS) void reportFocus();
     }
     if (playId === forQuiz && state?.quiz.status !== "finished") pollTimer = window.setTimeout(poll, POLL_MS);
   }
@@ -124,17 +243,28 @@ if (app && document.querySelector("#classPanelQuizzes")) {
       shownKey = "join";
       status(quiz.status === "lobby" ? "The lobby is open." : "This quiz has already started. You can still join for the remaining questions.");
       const box = el("div", "quiz-lobby");
-      const join = el("button", "btn-primary quiz-join", "Join quiz");
+      const joinLabel = cameraOn() ? "Join quiz" : "Turn camera on and join";
+      const join = el("button", "btn-primary quiz-join", joinLabel);
       join.type = "button";
       join.addEventListener("click", async () => {
         join.disabled = true;
+        const reset = (message) => { join.disabled = false; join.textContent = cameraOn() ? "Join quiz" : "Turn camera on and join"; status(message); };
+        if (!cameraOn()) {
+          join.textContent = "Starting your camera…";
+          if (!(await startCamera())) { reset("Your camera didn’t start, so you can’t join yet. Check the camera permission for this site, then try again."); return; }
+        }
         join.textContent = "Joining…";
+        if (!(await reportFocus())) { reset("Couldn’t send your camera status. Check your connection and try again."); return; }
         const { error } = await supabase.rpc("join_quiz", { p_quiz_id: playId });
-        if (error) { join.disabled = false; join.textContent = "Join quiz"; status(errorText(error, "Couldn’t join. Try again.")); return; }
+        if (error) { reset(errorText(error, "Couldn’t join. Try again.")); return; }
         shownKey = "";
         await poll();
       });
-      box.append(el("p", "panel-sub", `${quiz.question_count} question${quiz.question_count === 1 ? "" : "s"}${quiz.time_limit_seconds ? ` · ${quiz.time_limit_seconds} s each` : ""} · 1 point per correct answer`), join);
+      box.append(
+        el("p", "panel-sub", `${quiz.question_count} question${quiz.question_count === 1 ? "" : "s"}${quiz.time_limit_seconds ? ` · ${quiz.time_limit_seconds} s each` : ""} · 1 point per correct answer`),
+        el("p", "panel-sub", "Your camera must stay on during the quiz. Your teacher sees how focused you were on each question (numbers only, never video). Focus never changes your points."),
+        join
+      );
       $("#studentQuizBody").replaceChildren(box);
       if (joinOnOpen && quiz.status !== "finished") { joinOnOpen = false; join.click(); return; }
       join.focus();
@@ -157,7 +287,9 @@ if (app && document.querySelector("#classPanelQuizzes")) {
     const timeUp = !closed && left === 0;
     // question.answered is how many students have answered; my_choice is this student's answer.
     const iAnswered = question.my_choice !== null && question.my_choice !== undefined;
-    const key = `q:${question.id}:${closed}:${iAnswered}:${timeUp}`;
+    followQuestion(question, !closed && !timeUp);
+    const camera = cameraOn();
+    const key = `q:${question.id}:${closed}:${iAnswered}:${timeUp}:${camera}`;
     if (key === shownKey) { tick(); return; }
     const isNewQuestion = !shownKey.startsWith(`q:${question.id}:`);
     shownKey = key;
@@ -187,7 +319,7 @@ if (app && document.querySelector("#classPanelQuizzes")) {
         if (i === question.correct_index) button.append(el("span", "quiz-correct-tag", "Correct answer"));
       }
       if (mine) button.append(el("span", "quiz-mine-tag", "Your answer"));
-      button.disabled = closed || timeUp || iAnswered;
+      button.disabled = closed || timeUp || iAnswered || !camera;
       button.setAttribute("aria-pressed", String(mine));
       button.addEventListener("click", () => answer(question, i));
       choices.append(button);
@@ -205,6 +337,9 @@ if (app && document.querySelector("#classPanelQuizzes")) {
     } else if (timeUp) {
       note.textContent = "Time’s up.";
       status("Time’s up. Waiting for your teacher…");
+    } else if (!camera) {
+      note.textContent = "Turn your camera on to answer.";
+      status("Your camera is off. Turn it on to answer.");
     } else {
       note.textContent = "Pick one answer. You can’t change it once it’s in.";
       status("");
@@ -224,17 +359,20 @@ if (app && document.querySelector("#classPanelQuizzes")) {
     timer.dataset.state = left === 0 ? "done" : left <= 5 ? "low" : "";
     if (left === 0 && !state.question.closed) {
       $("#studentQuizBody").querySelectorAll(".quiz-choice").forEach((button) => { button.disabled = true; });
+      followQuestion(state.question, false);
     }
   }
   window.setInterval(() => { if (playId && state?.quiz.status === "live") tick(); }, 250);
 
   async function answer(question, choice) {
     if (sending || !playId) return;
+    if (!cameraOn()) { status("Turn your camera on to answer."); return; }
     sending = true;
     const buttons = [...$("#studentQuizBody").querySelectorAll(".quiz-choice")];
     buttons.forEach((button) => { button.disabled = true; });
     buttons[choice]?.setAttribute("data-sending", "true");
     status("Sending your answer…");
+    await reportFocus(); // the database needs a recent "camera on" before it accepts the answer
     const { data, error } = await supabase.rpc("submit_quiz_answer", { p_quiz_id: playId, p_question_id: question.id, p_choice: choice });
     sending = false;
     buttons[choice]?.removeAttribute("data-sending");
@@ -265,16 +403,25 @@ if (app && document.querySelector("#classPanelQuizzes")) {
       status(`Quiz finished · you scored ${mine.score} out of ${data.question_count}.`);
       const score = el("div", "class-quiz-score");
       score.append(el("span", "class-quiz-score-num", `${mine.score}`), el("span", "class-quiz-score-of", `out of ${data.question_count}`));
+      const focusNote = el("p", "panel-sub", mine.focus === null || mine.focus === undefined
+        ? "Your focus couldn’t be measured during this quiz (your face wasn’t in view)."
+        : `Your focus during this quiz: ${mine.focus}%. Your teacher sees this too; it doesn’t change your points.`);
       const list = el("ol", "class-quiz-review");
       (mine.questions || []).forEach((q) => {
         const item = el("li", "class-quiz-review-item");
         item.dataset.state = q.correct ? "right" : "wrong";
         const answerText = q.my_choice === null || q.my_choice === undefined ? "No answer" : `${CHOICE_LETTERS[q.my_choice]}. ${q.options[q.my_choice]}`;
-        item.append(el("b", "", `${q.number}. ${q.prompt}`), el("small", "", `Your answer: ${answerText}`));
+        item.append(el("b", "", `${q.number}. ${q.prompt}`), el("small", "", `Your answer: ${answerText}${q.focus === null || q.focus === undefined ? "" : ` · focus ${q.focus}%`}`));
         if (!q.correct) item.append(el("small", "", `Correct: ${CHOICE_LETTERS[q.correct_index]}. ${q.options[q.correct_index]}`));
         list.append(item);
       });
-      body.replaceChildren(score, list);
+      body.replaceChildren(score, focusNote, list);
+      if (cameraOn()) {
+        const off = el("button", "btn-action quiz-camera-off", "Turn camera off");
+        off.type = "button";
+        off.addEventListener("click", () => { off.remove(); window.dispatchEvent(new CustomEvent("neurofocus:stop-camera")); });
+        body.append(off);
+      }
     }
     if (data.leaderboard?.length) {
       const board = el("div", "quiz-leaderboard");
@@ -308,6 +455,6 @@ if (app && document.querySelector("#classPanelQuizzes")) {
   // A quiz the teacher opens appears without the student having to refresh.
   window.setInterval(() => { if (active && !playId && document.visibilityState === "visible") void loadQuizzes(); }, 5000);
   document.addEventListener("visibilitychange", () => { if (active && !playId && document.visibilityState === "visible") void loadQuizzes(); });
-  $("#studentQuizTips").append(infoButton("quizzes", "Press Join quiz when your teacher opens one. Each question can be answered once, and the correct answer shows when the question closes. Points are 1 per correct answer — your focus and attention scores are never used."));
+  $("#studentQuizTips").append(infoButton("quizzes", "Press Join quiz when your teacher opens one. Your camera must be on to join and answer: your teacher sees how focused you were on each question (numbers only, never video). Each question can be answered once, and the correct answer shows when the question closes. Points are 1 per correct answer; focus never changes them."));
   followRoute();
 }

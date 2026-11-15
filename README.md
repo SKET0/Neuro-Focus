@@ -256,6 +256,17 @@ Run `supabase/migrations/20261011000000_class_quizzes.sql` once in **Supabase Da
 
 Until it is run, the Quizzes tabs say the update is needed; everything else keeps working.
 
+## Quiz focus update (camera required during quizzes)
+
+Run `supabase/migrations/20261013000000_quiz_focus.sql` once in **Supabase Dashboard → SQL Editor**, after the open teacher sign-up update, **before** the matching website code goes live (students can't join quizzes on the new site until it's run, and can't join on the old site after it's run). It is safe to run again.
+
+- **Camera required:** students can only join a quiz and answer while their attention tracker is on. The Join button turns the camera on first, and answers are blocked (on the page and in the database) while it's off. The student's browser reports "camera on/off" every 3 seconds (`report_quiz_focus`); `join_quiz()` and `submit_quiz_answer()` need a "camera on" report from the last 15 seconds.
+- **Focus per question:** the same reports carry the student's focus on the current question (on-screen and measured time, numbers only). The database only lets the numbers grow, never beyond how long the question has been open, and on-screen time can't exceed measured time. Unavailable time (face not in view) isn't counted either way, as everywhere else.
+- **Teacher:** the lobby shows whose camera is off; each question shows every student's camera, focus so far and whether they've answered; the results table has a Focus column (share of measured time focused over the whole quiz).
+- **Student:** a bar above the quiz shows whether the camera is on and the current reading; the summary shows their own focus overall and per question.
+- **Privacy:** classmates never see each other's focus, even with the leaderboard on. Video never leaves the device. Focus never changes points.
+- **Limits:** like live class scores, the numbers come from the student's browser, so a determined student could send made-up ones. The camera rule stops students from simply skipping it. Starting the camera for a quiz also records a personal focus session in the student's My progress, like any other time the tracker runs.
+
 ## Attention model data recorder
 
 `pages/model-data.html` (not linked from the site; live at `https://neurofocus.site/pages/model-data.html`) collects labelled data for training the attention model. A participant enters a code (not their name), agrees to the use of the data, and follows about 6 minutes of guided tasks, each done twice in a random order: **read the text** and **follow the dot** (labelled focused), and **use your phone**, **look away** and **act tired** (labelled distracted). A beep marks the start and end of each task.

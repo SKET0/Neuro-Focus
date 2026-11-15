@@ -700,6 +700,23 @@ button.text-link { border: 0; background: none; padding: 0; font: inherit; font-
 .quiz-names li { padding: 4px 10px; border-radius: 999px; font-size: 12.5px; background: var(--surface-raised); border: 1px solid var(--border); animation: quiz-pop 0.25s ease; }
 .quiz-names li.empty-state { border: 0; background: none; }
 .quiz-join { min-width: 160px; }
+/* Camera during quizzes (required): the student's bar, and the teacher's per-student list. */
+.quiz-camera { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 14px; margin-bottom: 12px; border-radius: 12px; font-size: 13px; background: var(--surface-sunken); border: 1px solid var(--border); }
+.quiz-camera[data-state="on"] { border-color: color-mix(in srgb, var(--green) 40%, var(--border)); }
+.quiz-camera[data-state="off"] { border-color: color-mix(in srgb, var(--amber) 45%, var(--border)); background: color-mix(in srgb, var(--amber) 7%, var(--surface-sunken)); }
+.quiz-camera-dot { width: 9px; height: 9px; flex: none; border-radius: 50%; background: var(--text-muted); }
+.quiz-camera[data-state="on"] .quiz-camera-dot { background: var(--green); }
+.quiz-camera[data-state="off"] .quiz-camera-dot { background: var(--amber); }
+.quiz-camera-text { flex: 1 1 160px; min-width: 0; color: var(--text-soft); }
+.quiz-camera-text b { color: var(--text); font-weight: 650; }
+.quiz-camera-off { margin-top: 12px; }
+.quiz-names li[data-camera="off"] { border-color: color-mix(in srgb, var(--amber) 50%, var(--border)); color: var(--warning-text); }
+.quiz-students { list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; }
+.quiz-students li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border-radius: 10px; font-size: 13px; background: var(--surface-sunken); border: 1px solid var(--border); }
+.quiz-students li[data-camera="off"] { border-color: color-mix(in srgb, var(--amber) 50%, var(--border)); }
+.quiz-students .quiz-student-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quiz-students .quiz-student-meta { flex: none; font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.quiz-students li[data-camera="off"] .quiz-student-meta { color: var(--warning-text); }
 .quiz-waiting { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 50%, transparent); animation: quiz-pulse 1.6s ease-out infinite; }
 .quiz-question-card { display: flex; flex-direction: column; gap: 14px; }
 .quiz-question-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }

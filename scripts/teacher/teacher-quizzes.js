@@ -3,7 +3,8 @@
 // Everything is checked again by the database (supabase/migrations/20261011000000_class_quizzes.sql):
 // only this class's teacher writes and runs quizzes, answers are scored there (1 point per correct
 // answer, no speed bonus), and students only see a question's answer once it has closed.
-// Quiz points have nothing to do with attention tracking.
+// Quiz points have nothing to do with attention tracking. Students must have their camera on to
+// join and answer; the teacher sees each student's camera and focus (20261013000000_quiz_focus.sql).
 import { confirmAction, notify } from "../shared/class-live.js";
 import { el, errorText, infoButton, quizSqlMissing, QUIZ_SETUP_TEXT, CHOICE_LETTERS, secondsLeft, whenText } from "../shared/classroom.js";
 
@@ -286,13 +287,31 @@ if (app && document.querySelector("#tab-quizzes")) {
     return button;
   }
 
+  // Each joined student's camera and focus on the current question (quiz_state's "students";
+  // students must keep their camera on during quizzes). Focus never changes points.
+  function studentList(students, { live }) {
+    const list = el("ul", "quiz-students");
+    list.setAttribute("aria-label", "Students' cameras and focus");
+    students.forEach((student) => {
+      const item = el("li");
+      item.dataset.camera = student.camera_on ? "on" : "off";
+      const meta = !student.camera_on ? "Camera off"
+        : !live ? "Camera on"
+        : `${student.focus === null || student.focus === undefined ? "Focus —" : `Focus ${student.focus}%`}${student.answered ? " · answered" : ""}`;
+      item.append(el("span", "quiz-student-name", student.name), el("span", "quiz-student-meta", meta));
+      list.append(item);
+    });
+    return list;
+  }
+
   // Rebuilds the host view only when something on it changed (so buttons aren't replaced
   // under the mouse); otherwise just the countdown is updated.
   function renderHost() {
     const state = hostState;
     const { quiz, question } = state;
     const leftNow = secondsLeft(question?.closes_at, state.now, state.fetchedAt);
-    const key = [quiz.status, state.participants, (state.participant_names || []).join("|"), question?.id, question?.closed, leftNow === 0, question?.answered, busy].join(":");
+    const students = state.students || (state.participant_names || []).map((name) => ({ name, camera_on: null, focus: null, answered: false }));
+    const key = [quiz.status, state.participants, JSON.stringify(students), question?.id, question?.closed, leftNow === 0, question?.answered, busy].join(":");
     if (key === hostKey) { hostTick(); return; }
     hostKey = key;
     $("#quizHostTitle").textContent = quiz.title;
@@ -303,9 +322,13 @@ if (app && document.querySelector("#tab-quizzes")) {
       const lobby = el("div", "quiz-lobby");
       lobby.append(el("p", "quiz-big", `${state.participants}`), el("p", "panel-sub", state.participants === 1 ? "student has joined" : "students have joined"));
       const names = el("ul", "quiz-names");
-      (state.participant_names || []).forEach((name) => names.append(el("li", "", name)));
-      if (!state.participant_names?.length) names.append(el("li", "empty-state", "Waiting for students to join from their Quizzes tab…"));
-      lobby.append(names);
+      students.forEach((student) => {
+        const item = el("li", "", student.camera_on === false ? `${student.name} · camera off` : student.name);
+        if (student.camera_on === false) item.dataset.camera = "off";
+        names.append(item);
+      });
+      if (!students.length) names.append(el("li", "empty-state", "Waiting for students to join from their Quizzes tab…"));
+      lobby.append(names, el("p", "panel-sub", "Students need their camera on to join and answer. You’ll see each student’s focus on every question (numbers only; video stays on their device)."));
       controls.append(hostButton(`Start quiz (${quiz.question_count} question${quiz.question_count === 1 ? "" : "s"})`, "btn-primary", "quiz_next_question"), hostButton("End without playing", "btn-action", "quiz_finish"));
       body.replaceChildren(lobby, controls);
       return;
@@ -339,6 +362,10 @@ if (app && document.querySelector("#tab-quizzes")) {
       choices.append(choice);
     });
     card.append(choices);
+    if (students.length) {
+      const off = students.filter((student) => student.camera_on === false).length;
+      card.append(el("h4", "quiz-sub-title", `Students’ focus on this question${off ? ` · ${off} camera${off === 1 ? "" : "s"} off` : ""}`), studentList(students, { live: true }));
+    }
     if (!closed) controls.append(hostButton("Reveal answer", "btn-primary", "quiz_close_question"));
     else controls.append(hostButton(question.number < quiz.question_count ? "Next question" : "Show results", "btn-primary", "quiz_next_question"));
     controls.append(hostButton("End quiz now", "btn-action", "quiz_finish"));
@@ -368,17 +395,18 @@ if (app && document.querySelector("#tab-quizzes")) {
     if (!rows.length) wrap.append(el("p", "empty-state", "Nobody joined this quiz."));
     else {
       const table = el("table", "data-table");
-      table.innerHTML = "<thead><tr><th>#</th><th>Student</th><th class=\"num\">Score</th><th class=\"num\">Answered</th></tr></thead>";
+      table.innerHTML = "<thead><tr><th>#</th><th>Student</th><th class=\"num\">Score</th><th class=\"num\">Answered</th><th class=\"num\">Focus</th></tr></thead>";
       const tbody = el("tbody");
       rows.forEach((row, i) => {
         const tr = el("tr");
-        tr.append(el("td", "", String(i + 1)), el("td", "", row.name), el("td", "num", `${row.score} / ${data.question_count}`), el("td", "num", String(row.answered)));
+        const focus = row.focus === null || row.focus === undefined ? "—" : `${row.focus}%`;
+        tr.append(el("td", "", String(i + 1)), el("td", "", row.name), el("td", "num", `${row.score} / ${data.question_count}`), el("td", "num", String(row.answered)), el("td", "num", focus));
         tbody.append(tr);
       });
       table.append(tbody);
       const scroll = el("div", "table-scroll");
       scroll.append(table);
-      wrap.append(scroll, el("p", "panel-sub", data.show_leaderboard ? "Students see this leaderboard with their own summary." : "The leaderboard is off: each student sees only their own result."));
+      wrap.append(scroll, el("p", "panel-sub", `${data.show_leaderboard ? "Students see this leaderboard (scores only) with their own summary." : "The leaderboard is off: each student sees only their own result."} Focus is the share of measured time each student was focused while questions were open; only you and that student see it, and it never changes points. “—” means it couldn’t be measured.`));
     }
     $("#quizHostBody").replaceChildren(wrap);
     await loadQuizzes();
@@ -413,7 +441,7 @@ if (app && document.querySelector("#tab-quizzes")) {
     tab = "";
     refresh();
   });
-  $("#teacherQuizTips").append(infoButton("running a quiz", "Open the lobby, wait for students to join, then Start. After each question press Reveal answer (or let the timer run out), then Next question. Scores are 1 point per correct answer, worked out by the database, and saved."));
+  $("#teacherQuizTips").append(infoButton("running a quiz", "Open the lobby, wait for students to join, then Start. After each question press Reveal answer (or let the timer run out), then Next question. Students need their camera on to join and answer, and you see each student’s focus on every question. Scores are 1 point per correct answer, worked out by the database, and saved; focus never changes them."));
   $("#quizLeaderboardInfo").append(infoButton("the leaderboard", "When on, students see everyone’s scores after the quiz. When off, each student sees only their own result."));
   classId = window.neuroFocusClass?.id || classId;
   if (window.neuroFocusView === "class") tab = window.neuroFocusClassTab || "";
