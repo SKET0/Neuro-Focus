@@ -54,16 +54,14 @@ a.brand-box:hover { background: var(--nf-hover, #17171b); }
 .sidebar-foot .user-card b { display: block; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sidebar-foot .user-card small { display: block; font-size: 11.5px; color: var(--text-muted); }
 .sidebar-foot .user-card > .icon { width: 15px; height: 15px; color: var(--text-muted); }
-.tour-card {
-  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; padding: 12px; border-radius: 12px;
-  border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border));
-  background: radial-gradient(ellipse 80% 90% at 0% 0%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 70%), var(--surface-2);
+/* The guided tour: one small link above Profile settings */
+.tour-link {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 10px; border: 0; border-radius: 9px; background: none;
+  color: var(--text-muted); font: inherit; font-size: 12.5px; font-weight: 550; text-align: left; cursor: pointer;
 }
-.tour-card .chip-icon { width: 30px; height: 30px; border-radius: 9px; }
-.tour-card .chip-icon svg { width: 15px; height: 15px; }
-.tour-card b { display: block; font-size: 13px; font-weight: 650; }
-.tour-card small { display: block; font-size: 11.5px; color: var(--text-muted); line-height: 1.4; margin-top: 1px; }
-.tour-card .btn-action { grid-column: 1 / -1; width: 100%; }
+.tour-link .icon { width: 15px; height: 15px; color: var(--accent); }
+.tour-link:hover { background: var(--surface-2); color: var(--text-main); }
+.tour-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .nav-toggle {
   display: none; align-items: center; justify-content: center; width: 34px; height: 34px; flex: none;

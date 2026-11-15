@@ -233,9 +233,8 @@ export function setupDashboardTour({ supabase, user, name, place, steps, isReady
   const $ = (selector) => document.querySelector(selector);
   function updateCard() {
     const seen = tourSeen(user, name);
-    $("#tourCardTitle").textContent = seen ? "Need a refresher?" : "New here?";
-    $("#tourCardText").textContent = seen ? `Replay the one-minute tour of your ${place}.` : `Take a one-minute tour of your ${place}.`;
-    $("#tourCard [data-start-tour]").textContent = seen ? "Replay the tour" : "Take the tour";
+    const label = $("#tourCard [data-start-tour] span");
+    if (label) label.textContent = seen ? "Replay the tour" : "Take the tour";
   }
 
   function run({ fromStart = false } = {}) {
