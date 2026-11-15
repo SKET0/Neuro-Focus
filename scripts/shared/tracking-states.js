@@ -11,6 +11,7 @@
 //   2. Only when active: the estimated engagement, engagement: "on-screen" | "looking-away",
 //      and an estimated score from 0 to 100 (share of the last couple of seconds the face and
 //      eyes pointed at the screen). Otherwise score and engagement are null, never 0.
+//      drowsy: true marks a looking-away reading that means "eyes closed for 3 s or more".
 //
 // Scores are estimates from face and eye direction. Looking away is not proof of distraction:
 // a student may be reading notes or thinking. Unavailable and break time never counts as
@@ -28,6 +29,7 @@ export const REASONS = {
   "partly-out-of-view": "Face partly out of view",
   "too-far": "Too far from the camera",
   "eyes-not-visible": "Eyes not visible",
+  "eyes-closed": "Eyes closed",
   "no-recent-readings": "No recent readings",
   "older-version": "Recorded by an older version"
 };
@@ -55,7 +57,10 @@ export function normalizeReading(raw = {}) {
   const value = raw.score === null || raw.score === undefined || raw.score === "" ? NaN : Number(raw.score);
   if (!Number.isFinite(value)) return { tracking: TRACKING.UNAVAILABLE, score: null, engagement: null, reason: "no-recent-readings" };
   const lookingAway = raw.engagement === ENGAGEMENT.LOOKING_AWAY || (raw.engagement === undefined && raw.state === SAMPLE_STATE.LOOKING_AWAY);
-  return { tracking: TRACKING.ACTIVE, score: clampScore(value), engagement: lookingAway ? ENGAGEMENT.LOOKING_AWAY : ENGAGEMENT.ON_SCREEN, reason: null };
+  const reading = { tracking: TRACKING.ACTIVE, score: clampScore(value), engagement: lookingAway ? ENGAGEMENT.LOOKING_AWAY : ENGAGEMENT.ON_SCREEN, reason: null };
+  // Eyes closed for a few seconds (gaze-reading.js): measured, and counted as looking away.
+  if (lookingAway && raw.drowsy === true) reading.drowsy = true;
+  return reading;
 }
 
 // The state name sent with live readings and shown on screen ("Focused" / "Distracted" are kept
@@ -71,6 +76,7 @@ export function describeReading(reading) {
   if (!reading || reading.tracking === TRACKING.OFF) return { key: "off", label: "Camera off", detail: "" };
   if (reading.tracking === TRACKING.BREAK) return { key: "break", label: "On a break", detail: "Not counted" };
   if (reading.tracking === TRACKING.UNAVAILABLE) return { key: "unavailable", label: "Tracking unavailable", detail: REASONS[reading.reason] || "" };
+  if (reading.drowsy) return { key: "looking-away", label: "Eyes closed", detail: "Estimate" };
   return reading.engagement === ENGAGEMENT.LOOKING_AWAY
     ? { key: "looking-away", label: "Looking away", detail: "Estimate" }
     : { key: "on-screen", label: "Looking at screen", detail: "Estimate" };

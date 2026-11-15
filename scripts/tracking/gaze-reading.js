@@ -5,6 +5,11 @@
 // enough to see the irises. Unusable frames give no score at all. A short glitch (a blink, a
 // quick head movement) is skipped rather than reported; only when measuring stays impossible
 // for holdMs does the reading become "Tracking unavailable".
+//
+// One exception: eyes closed for drowsyMs (3 s) or more, while the face is clearly in view and
+// roughly facing the screen, is measured, not unavailable: the reading says "eyes closed"
+// (drowsy) and counts as not focused. Blinks and slow blinks are far shorter (in the P02
+// recording, closed-eye runs while reading lasted at most about 1.2 s).
 
 export const LANDMARKS = {
   leftOuter: 33, leftInner: 133, rightInner: 362, rightOuter: 263,
@@ -17,7 +22,11 @@ export const LIMITS = {
   minEyeOpen: 0.1,     // lid gap / eye width: smaller means eyes closed or hidden
   gazeLow: 0.36,       // iris position inside the eye (0.5 = centred): outside 0.36–0.64 = looking aside
   gazeHigh: 0.64,
-  headTurn: 0.25       // nose position between the outer eye corners (0.5 = facing the camera)
+  headTurn: 0.25,      // nose position between the outer eye corners (0.5 = facing the camera)
+  closedYaw: 30,       // eyes closed only counts while the head is turned less than this (degrees)…
+  closedPitch: 35,     // …and nodded down less than this (degrees; a drooping head is ~20–25°)
+  drowsyMs: 3000,      // eyes closed this long (or more) reads as drowsy
+  drowsyScore: 10      // the score while drowsy: the rules' lowest score
 };
 
 // Goes up whenever a reading's meaning changes, so recordings made with different versions
@@ -95,7 +104,12 @@ export function assessFrame(faces, matrices = [], aspect = 0.75) {
   if (eyeWidth / turnAllowance < LIMITS.minEyeWidth) return { usable: false, reason: "too-far" };
   const leftOpen = Math.abs(face[LANDMARKS.leftLower].y - face[LANDMARKS.leftUpper].y) / (leftWidth || 1);
   const rightOpen = Math.abs(face[LANDMARKS.rightLower].y - face[LANDMARKS.rightUpper].y) / (rightWidth || 1);
-  if (Math.max(leftOpen, rightOpen) < LIMITS.minEyeOpen) return { usable: false, reason: "eyes-not-visible" };
+  if (Math.max(leftOpen, rightOpen) < LIMITS.minEyeOpen) {
+    // Lids together on a face that's clearly in view and roughly facing the screen: eyes closed.
+    // With the head turned far or bowed low, the lids can't be judged: eyes not visible.
+    const facing = !angles || (Math.abs(angles.yaw) <= LIMITS.closedYaw && angles.pitch <= LIMITS.closedPitch);
+    return { usable: false, reason: facing ? "eyes-closed" : "eyes-not-visible" };
+  }
   const gaze = (irisPosition(face, LANDMARKS.leftOuter, LANDMARKS.leftInner, LANDMARKS.leftIris)
     + irisPosition(face, LANDMARKS.rightInner, LANDMARKS.rightOuter, LANDMARKS.rightIris)) / 2;
   const from = Math.min(face[LANDMARKS.leftOuter].x, face[LANDMARKS.rightOuter].x);
@@ -116,13 +130,32 @@ export function assessFrame(faces, matrices = [], aspect = 0.75) {
 }
 
 // Frames in, readings out. Returns null while a short glitch is being skipped.
-// Readings: { timestamp, tracking, reason, score, engagement, state, gazeRatio }.
-export function createReadingFilter({ holdMs = 500, windowSize = 15, smoothing = 0.28 } = {}) {
+// Readings: { timestamp, tracking, reason, score, engagement, state, gazeRatio }, plus
+// drowsy: true on the "eyes closed" reading.
+export function createReadingFilter({ holdMs = 500, windowSize = 15, smoothing = 0.28, drowsyMs = LIMITS.drowsyMs } = {}) {
   let smoothed;
   const recent = [];
   let unusableSince = null;
+  let closedSince = null; // eyes closed since (frames where the lids can't be judged don't end it)
   return {
     next(assessment, now) {
+      const eyesShut = !assessment.usable && (assessment.reason === "eyes-closed"
+        || (closedSince !== null && assessment.reason === "eyes-not-visible"));
+      if (eyesShut) {
+        closedSince ??= now;
+        unusableSince = null;
+        const closedFor = now - closedSince;
+        if (closedFor < holdMs) return null; // a blink: the last reading stands
+        smoothed = undefined;
+        recent.length = 0;
+        // A slow blink or a moment with eyes shut: not measured (as before) until it lasts drowsyMs.
+        if (closedFor < drowsyMs) return { timestamp: now, tracking: "unavailable", reason: "eyes-closed", score: null, engagement: null, state: "Unavailable", gazeRatio: null };
+        return {
+          timestamp: now, tracking: "active", reason: null, score: LIMITS.drowsyScore,
+          engagement: "looking-away", state: "Distracted", gazeRatio: null, drowsy: true
+        };
+      }
+      closedSince = null;
       if (!assessment.usable) {
         unusableSince ??= now;
         if (now - unusableSince < holdMs) return null;
@@ -146,6 +179,6 @@ export function createReadingFilter({ holdMs = 500, windowSize = 15, smoothing =
         gazeRatio: smoothed
       };
     },
-    reset() { smoothed = undefined; recent.length = 0; unusableSince = null; }
+    reset() { smoothed = undefined; recent.length = 0; unusableSince = null; closedSince = null; }
   };
 }

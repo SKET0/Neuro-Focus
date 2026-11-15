@@ -1264,6 +1264,7 @@ if (app) {
     lastSentTracking = reading.tracking;
     sendAttention(sharingClassId, {
       tracking: reading.tracking, score: reading.score, engagement: reading.engagement, reason: reading.reason,
+      drowsy: reading.drowsy === true, // eyes closed for 3 s or more
       state: legacyState(reading), cumulativeFocus: window.neuroFocusSessionStats?.focusPercent ?? null
     });
   });

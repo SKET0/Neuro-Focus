@@ -146,6 +146,7 @@ function liveStep() {
     student.status = tracking !== "off" && now - entry.lastSeen >= LIVE_STALE_MS ? "stale" : tracking === "active" ? "active" : tracking;
     student.reason = student.status === "unavailable" ? entry.reading.reason : null;
     student.score = student.status === "active" ? entry.reading.score : null;
+    student.drowsy = student.status === "active" && entry.reading.drowsy === true; // eyes closed for 3 s+
     // Flags only ever come from measured readings; anything else resets the count without a flag.
     if (student.status === "active") updateFlagState(student);
     else { student.distractedTicks = 0; student.flagged = false; }
@@ -457,7 +458,8 @@ function boardState(student) {
     const key = band === "Focused" ? "focused" : band === "Drifting" ? "mixed" : "away";
     // A flag means low readings several times in a row: they need attention even if just recovering.
     const group = student.flagged ? "attention" : BOARD[key].group;
-    const text = student.flagged ? `${BOARD[key].label} · check in?` : BOARD[key].label;
+    const label = student.drowsy ? "Eyes closed" : BOARD[key].label;
+    const text = student.flagged ? `${label} · check in?` : label;
     return { key, group, text, order: student.flagged ? 0 : BOARD[key].order };
   }
   const row = attendanceRows.classId === liveClassId ? attendanceRows.current.get(student.id) : null;

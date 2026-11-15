@@ -58,7 +58,7 @@ ml/                        Attention model training (train_lstm.py); recordings 
 backend/                   Optional Python prediction service (not used by the web app yet)
 tools/                     Local dev server
 supabase/                  Supabase config, Edge Functions and SQL migrations
-tests/                     Automated tests: tracker rules, meeting links and database access rules
+tests/                     Automated tests: tracker rules, drowsiness, meeting links and database access rules
 .github/workflows/         Tests on every push; keeping Supabase awake
 ```
 
@@ -313,6 +313,16 @@ How it works: each task is cut into windows of 16 readings (about 2 seconds). Un
 5. **Teacher receives updates** on the class's Live focus tab every second, and can remove a student from the session, let them back in or invite them again.
 6. **Session ends** (`end_class_session`, or automatically after the dashboard has been gone for 15 minutes): no-shows are marked absent.
 7. **Saved records:** attendance (Attendance tab, spreadsheet download), shared attention history per session (History tab, plus a Focus column in each session's attendance), and the student's own Focus history, which includes their personal tracking too.
+
+## Eyes closed (drowsiness)
+
+Closed eyes used to read only as *Tracking unavailable*, so a student dozing off never counted as distracted. Now, when the face is clearly in view and roughly facing the screen (head turned under 30°, nodded down under 35°) and the eyelids stay together:
+
+- under 0.5 s (a blink): nothing changes;
+- 0.5–3 s: *Tracking unavailable · Eyes closed*, not counted, as before;
+- 3 s or more: **Eyes closed**, a measured reading that counts as not focused (score 10, the rules' lowest; saved and sent as Distracted). Students see "Eyes closed" and get a "Feeling sleepy?" nudge suggesting a reset or a break; teachers see "Eyes closed" on the live board.
+
+With the head turned or bowed further (e.g. reading notes on the desk) the lids can't be judged, so those frames stay *Eyes not visible* (unavailable). Replaying the P02 recording: about 17% of "act tired" now reads as eyes closed, and none of reading, following the dot, phone use or looking away does. The rules live in `scripts/tracking/gaze-reading.js` (`LIMITS.closedYaw`, `closedPitch`, `drowsyMs`); tests are in `tests/drowsiness.test.mjs`. Recordings made with the data recorder now say `eyes-closed` instead of `eyes-not-visible` for these frames; the model's inputs are unchanged.
 
 ## Tracking in a background tab
 

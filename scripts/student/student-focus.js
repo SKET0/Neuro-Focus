@@ -522,11 +522,25 @@ if (app) {
 
   // A gentle nudge only when the tracker estimates the student has looked away for a few seconds
   // while it could measure. Never because tracking is unavailable, and never during a break.
-  function onLookingAway() {
+  function onLookingAway(reading) {
     if (!$("#nudgeToggle").checked || Date.now() < snoozeUntil || window.neuroFocusBreakActive()) return;
     nudgesShown += 1;
     const task = MICRO_TASKS[Math.floor(Math.random() * MICRO_TASKS.length)];
     const goal = nextGoal();
+    if (reading?.drowsy) {
+      // Eyes closed for a while: suggest a reset or a proper break rather than "look back".
+      showToast({
+        icon: "😴", kind: "nudge",
+        title: "Feeling sleepy?",
+        text: "Your eyes have been closed for a few seconds. Try standing up, a glass of water or some fresh air, or take a short break if you need one.",
+        actions: [
+          { label: "I’m awake", primary: true },
+          { label: "Snooze 5 min", onClick: () => { snoozeUntil = Date.now() + 5 * 60 * 1000; } }
+        ]
+      });
+      chime();
+      return;
+    }
     showToast({
       icon: "🌱", kind: "nudge",
       title: "Looked away for a bit?",
@@ -601,7 +615,7 @@ if (app) {
     if (!startedAt) startedAt = now;
     const reading = normalizeReading(event.detail);
     const { episodeStarted, returned } = session.add(reading, now);
-    if (episodeStarted) onLookingAway();
+    if (episodeStarted) onLookingAway(reading);
     if (returned) onReturned();
     // A reminder never stays up once tracking can't measure, or a break starts.
     if (reading.tracking !== "active" && toast.el.dataset.kind === "nudge") hideToast();
