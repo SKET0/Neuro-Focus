@@ -1,0 +1,27 @@
+# Supabase pauses free projects after about a week with no activity, which breaks sign-in on
+# neurofocus.site. Every three days this makes one small read from the database so the project
+# stays active. It uses the public key that is already in the website
+# (scripts/services/supabase-client.js), so it can only read what a signed-out visitor can.
+# If the request fails, the run fails and GitHub emails the repository owner.
+name: Keep Supabase awake
+
+on:
+  schedule:
+    - cron: "17 6 */3 * *"   # 06:17 UTC on every third day of the month
+  workflow_dispatch:          # "Run workflow" button on the Actions tab
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Read one row from the database
+        env:
+          SUPABASE_URL: https://awklqioisiiyaqixnnbl.supabase.co
+          SUPABASE_KEY: sb_publishable_NNY55ArTOwOhB7GwYmyHVQ_d7D7hOcw
+        run: |
+          curl --fail --silent --show-error --max-time 30 --retry 3 --retry-delay 10 \
+            -H "apikey: $SUPABASE_KEY" \
+            "$SUPABASE_URL/rest/v1/classes?select=id&limit=1"
+          echo
+          echo "Supabase answered."
