@@ -43,7 +43,7 @@ For sign-in and NeuroBuddy to work on the live site:
 index.html                 Home page (project root)
 login.html, student.html,  Small redirects to pages/, so old links and emailed
 teacher.html               sign-in / reset links keep working
-pages/                     login.html, student.html, teacher.html (+ an old teacher landing backup)
+pages/                     login.html, student.html, teacher.html, model-data.html (attention model recorder)
 styles/                    Shared stylesheets (each page also has its own inline styles)
 scripts/
   auth/                    Login page (auth.js) and dashboard sign-in guard (auth-guard.js)
@@ -54,13 +54,12 @@ scripts/
   services/                Supabase client and the NeuroBuddy (Edge Function) API
   shared/                  Used by more than one page: live channels, Markdown, dashboard nav, 3D background
 assets/images/             Images
-assets/models/             3D models
 ml/                        Attention model training (train_lstm.py); recordings go in ml/data/ (not committed)
 backend/                   Optional Python prediction service (not used by the web app yet)
 tools/                     Local dev server
-database/                  Reference MySQL schema
 supabase/                  Supabase config, Edge Functions and SQL migrations
-tests/                     Database access-rule tests
+tests/                     Automated tests: tracker rules and database access rules
+.github/workflows/         Tests on every push; keeping Supabase awake
 ```
 
 ## Sign-in options: Google and password reset
@@ -319,7 +318,7 @@ Enforced by the database (Row Level Security), not just by the pages:
 | Notes | Own | No | No |
 | Live scores (realtime) | Can send in their own classes | Receives | Never receive |
 
-`tests/access-rules.test.mjs` checks all of this against every migration in an in-memory Postgres: `cd tests && npm install && npm test`.
+`tests/access-rules.test.mjs` checks all of this against every migration in an in-memory Postgres: `cd tests && npm install && npm test`. The same tests (and the tracker tests) run on GitHub after every push (**Actions → Tests**); a red cross next to a commit means a check failed.
 
 **Known limits:**
 - Live scores are reported by each student's browser, so a student could send made-up numbers for themselves. Realtime messages can't prove who sent them, so another class member could also post numbers under a classmate's ID to the teacher's live view. Students act on "removed" messages only after checking with the database. The saved records (attendance and history) are always written as the signed-in student and checked by the database.
