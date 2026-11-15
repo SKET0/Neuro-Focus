@@ -136,6 +136,8 @@ if (form) {
     if (/exchange external code/i.test(text)) return "Google sign-in couldn’t finish. The Google Client ID or Client Secret saved in Supabase doesn’t match Google Cloud (see README → Sign-in options). You can sign in with email meanwhile.";
     if (/access_denied|denied|cancel/i.test(text)) return "Google sign-in was cancelled. Try again, or sign in with email.";
     if (/provider is not enabled|unsupported provider/i.test(text)) return "Google sign-in isn’t turned on for this project yet.";
+    // The server couldn't be reached at all (Safari: "Load failed", Chrome: "Failed to fetch").
+    if (/load failed|failed to fetch|networkerror|network request failed/i.test(text)) return "Can’t reach the Neuro-Focus server. Check your internet connection and try again. If it keeps happening, the server may be down for a while.";
     return text || "Something went wrong. Please try again.";
   }
 
