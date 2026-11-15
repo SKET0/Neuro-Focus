@@ -725,6 +725,7 @@ if (app) {
       open.href = item.meeting_url;
       open.querySelector("span").textContent = `Open ${provider.label}`;
     } else open.removeAttribute("href");
+    $("#meetingAdd").hidden = Boolean(provider) || !hasMeetingLinks;
     const other = live && live.classId !== item.id ? classes.find((entry) => entry.id === live.classId) : null;
     $("#sessionHint").textContent = isLive
       ? `Live since ${clock(live.since)} · ${joinedSummary(item)} · ${sharingCount(item.id)} sharing now`
@@ -1387,6 +1388,15 @@ if (app) {
     }
     if (value === selected()?.meeting_url) return;
     await updateClass({ meeting_url: value }, `${provider.label} link saved`);
+  });
+  // "Add Zoom/Meet link" next to Start live session: straight to the field in Settings.
+  $("#meetingAdd").addEventListener("click", () => {
+    openClass(selectedId, "settings");
+    window.requestAnimationFrame(() => {
+      const input = $("#meetingInput");
+      input.scrollIntoView({ block: "center", behavior: "smooth" });
+      input.focus({ preventScroll: true });
+    });
   });
   $("#removeMeeting").addEventListener("click", async () => {
     if (!selected()?.meeting_url) return;

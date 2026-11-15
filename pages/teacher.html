@@ -726,6 +726,7 @@
             <button class="btn-live" type="button" id="sessionToggle">▶ Start live session</button>
             <!-- The class's Zoom / Google Meet link (Settings → Online class), teacher-classes.js -->
             <a class="btn-action" id="meetingOpen" target="_blank" rel="noopener noreferrer" hidden><svg class="icon" aria-hidden="true"><use href="#i-video"/></svg><span>Open meeting</span></a>
+            <button class="btn-action" type="button" id="meetingAdd" hidden><svg class="icon" aria-hidden="true"><use href="#i-video"/></svg>Add Zoom/Meet link</button>
             <small id="sessionHint">Students share their attention only during a live session.</small>
           </div>
         </div>
@@ -1100,6 +1101,14 @@
         <!-- Settings (teacher-classes.js) -->
         <div class="tab-panel" id="tab-settings" role="tabpanel" aria-labelledby="tabBtn-settings" hidden>
           <div class="settings-grid">
+            <form class="panel-card settings-card" id="meetingForm" novalidate>
+              <div class="panel-title"><span class="chip-icon"><svg><use href="#i-video"/></svg></span>Online class (Zoom or Google Meet)</div>
+              <label class="field-label" for="meetingInput">Meeting link</label>
+              <input class="field-input" id="meetingInput" type="url" inputmode="url" maxlength="500" autocomplete="off" spellcheck="false" placeholder="https://zoom.us/j/… or https://meet.google.com/…" aria-describedby="meetingHint">
+              <p class="panel-sub" id="meetingHint">Students get a “Join on Zoom/Meet” button when you start a live session. It joins the live session, opens the meeting and keeps tracking their focus while the meeting is in front.</p>
+              <div class="settings-actions"><button class="btn-action" type="button" id="removeMeeting">Remove link</button><button class="btn-primary" type="submit">Save link</button></div>
+            </form>
+
             <form class="panel-card settings-card" id="renameForm">
               <div class="panel-title"><span class="chip-icon"><svg><use href="#i-pen"/></svg></span>Class name</div>
               <input class="field-input" id="renameInput" type="text" minlength="2" maxlength="80" required autocomplete="off" aria-label="Class name">
@@ -1123,14 +1132,6 @@
               </label>
               <p class="panel-sub" id="lateHint">Students who join a live session after this many minutes are marked late.</p>
               <div class="settings-actions"><button class="btn-primary" type="submit">Save</button></div>
-            </form>
-
-            <form class="panel-card settings-card" id="meetingForm" novalidate>
-              <div class="panel-title"><span class="chip-icon"><svg><use href="#i-video"/></svg></span>Online class (Zoom or Google Meet)</div>
-              <label class="field-label" for="meetingInput">Meeting link</label>
-              <input class="field-input" id="meetingInput" type="url" inputmode="url" maxlength="500" autocomplete="off" spellcheck="false" placeholder="https://zoom.us/j/… or https://meet.google.com/…" aria-describedby="meetingHint">
-              <p class="panel-sub" id="meetingHint">Students get a “Join on Zoom/Meet” button when you start a live session. It joins the live session, opens the meeting and keeps tracking their focus while the meeting is in front.</p>
-              <div class="settings-actions"><button class="btn-action" type="button" id="removeMeeting">Remove link</button><button class="btn-primary" type="submit">Save link</button></div>
             </form>
 
             <div class="panel-card settings-card">
