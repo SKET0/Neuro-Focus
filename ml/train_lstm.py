@@ -126,6 +126,20 @@ def normaliser(X):
     return flat.mean(axis=0), np.maximum(flat.std(axis=0), 1e-6)
 
 
+# Readings that change sign (or flip around 0.5) when someone looks the other way.
+MIRRORED = {"gaze_x": lambda v: 1 - v, "head_turn": lambda v: -v, "head_yaw": lambda v: -v, "head_roll": lambda v: -v}
+
+
+def with_mirrored(X, y):
+    """Add a left-right mirrored copy of every window: looking left is as distracted as looking
+    right, so a person who only turned one way while recording still teaches both."""
+    flipped = X.copy()
+    for name, flip in MIRRORED.items():
+        i = FEATURES.index(name)
+        flipped[..., i] = flip(flipped[..., i])
+    return np.concatenate([X, flipped]), np.concatenate([y, y])
+
+
 def train(X, y, seed=SEED):
     torch.manual_seed(seed)
     model = AttentionLSTM()
@@ -212,7 +226,7 @@ def evaluate(windows):
     for train_windows, test_windows in folds:
         if not train_windows or not test_windows:
             continue
-        X_train, y_train = as_arrays(train_windows)
+        X_train, y_train = with_mirrored(*as_arrays(train_windows))
         mean, std = normaliser(X_train)
         model = train((X_train - mean) / std, y_train)
         X_test, _ = as_arrays(test_windows)
@@ -278,7 +292,7 @@ def report(files, rows, windows, method, overall, by_task, by_person):
         "## Method", "",
         f"- Features per reading ({len(FEATURES)}): {', '.join(FEATURES)}",
         f"- Window: {WINDOW} readings (about {WINDOW * READING_MS / 1000:.1f} s), a new window every {STRIDE} readings; each task's first {SETTLE_MS / 1000:.0f} s skipped; unusable readings are gaps, never inputs",
-        f"- Model: LSTM ({HIDDEN} units) then one output (probability of focused); {EPOCHS} epochs, Adam, learning rate {LEARNING_RATE}, classes weighted equally",
+        f"- Model: LSTM ({HIDDEN} units) then one output (probability of focused); {EPOCHS} epochs, Adam, learning rate {LEARNING_RATE}, classes weighted equally; every training window also used left-right mirrored",
         f"- Testing: {method}",
         "- Rules: the app's current rule-based estimate (on-screen / looking-away) on the same windows", "",
         "## LSTM compared with the current rules", "",
@@ -306,8 +320,9 @@ def report(files, rows, windows, method, overall, by_task, by_person):
 # ---------- Export for the website ----------
 def export(windows, overall, method):
     X, y = as_arrays(windows)
-    mean, std = normaliser(X)
-    model = train((X - mean) / std, y)
+    X_all, y_all = with_mirrored(X, y)
+    mean, std = normaliser(X_all)
+    model = train((X_all - mean) / std, y_all)
 
     # Round the weights, then load them back so the check values match the saved file exactly.
     state = {name: torch.round(value * 1e6) / 1e6 for name, value in model.state_dict().items()}

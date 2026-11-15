@@ -88,7 +88,11 @@ export function assessFrame(faces, matrices = [], aspect = 0.75) {
   const leftWidth = eyeWidth3d(face, LANDMARKS.leftOuter, LANDMARKS.leftInner, aspect);
   const rightWidth = eyeWidth3d(face, LANDMARKS.rightInner, LANDMARKS.rightOuter, aspect);
   const eyeWidth = (leftWidth + rightWidth) / 2;
-  if (eyeWidth < LIMITS.minEyeWidth) return { usable: false, reason: "too-far" };
+  // MediaPipe's depth is only an estimate, so a strongly turned head can still look smaller.
+  // Allow for the turn (measured well by the head angle) before calling the face too far away.
+  const angles = headAngles(matrices[0]);
+  const turnAllowance = angles ? Math.max(0.5, Math.cos((angles.yaw * Math.PI) / 180)) : 1;
+  if (eyeWidth / turnAllowance < LIMITS.minEyeWidth) return { usable: false, reason: "too-far" };
   const leftOpen = Math.abs(face[LANDMARKS.leftLower].y - face[LANDMARKS.leftUpper].y) / (leftWidth || 1);
   const rightOpen = Math.abs(face[LANDMARKS.rightLower].y - face[LANDMARKS.rightUpper].y) / (rightWidth || 1);
   if (Math.max(leftOpen, rightOpen) < LIMITS.minEyeOpen) return { usable: false, reason: "eyes-not-visible" };
@@ -97,7 +101,6 @@ export function assessFrame(faces, matrices = [], aspect = 0.75) {
   const from = Math.min(face[LANDMARKS.leftOuter].x, face[LANDMARKS.rightOuter].x);
   const span = Math.abs(face[LANDMARKS.rightOuter].x - face[LANDMARKS.leftOuter].x);
   const nose = span ? (face[LANDMARKS.noseTip].x - from) / span : 0.5;
-  const angles = headAngles(matrices[0]);
   const features = {
     gaze_x: gaze,
     gaze_y: (irisHeight(face, LANDMARKS.leftUpper, LANDMARKS.leftLower, LANDMARKS.leftIris)

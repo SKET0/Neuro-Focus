@@ -156,6 +156,13 @@ ok("a head turned 30° is not mistaken for being too far away", assessFrame([tur
 ok("…and its eye size stays the same as facing the camera", Math.abs(assessFrame([turned(face({ eyeWidth: 0.028 }), 30)]).features.face_size - 0.028) < 0.0005);
 ok("a face that really is far away is still too far", assessFrame([turned(face({ eyeWidth: 0.018 }), 30)]).reason === "too-far");
 ok("a 16:9 camera frame is measured in the right units", assessFrame([face()], [], 9 / 16).usable === true);
+{
+  // When depth isn't estimated well, a turned head still looks narrower; the head angle covers it.
+  const flatTurn = turned(face({ eyeWidth: 0.028 }), 40).map((p) => ({ ...p, z: 0 }));
+  const yaw40 = { data: [Math.cos(0.698), 0, -Math.sin(0.698), 0, 0, 1, 0, 0, Math.sin(0.698), 0, Math.cos(0.698), 0, 0, 0, 0, 1] };
+  ok("a head turned 40° with poor depth is still not 'too far' (head angle allowed for)", assessFrame([flatTurn], [yaw40]).usable === true);
+  ok("…without a head angle it would have been", assessFrame([flatTurn]).reason === "too-far");
+}
 ok("a clear face looking ahead is usable", assessFrame([face()]).usable === true && Math.abs(assessFrame([face()]).gaze - 0.5) < 0.01);
 {
   const filter = createReadingFilter();
