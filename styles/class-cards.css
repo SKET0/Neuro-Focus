@@ -128,3 +128,36 @@ button.class-shortcut { font-family: inherit; cursor: pointer; }
 .class-facts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: 12.5px; color: var(--text-muted); }
 .class-facts .is-online { color: var(--success-text); font-weight: 600; }
 .class-facts .is-closed { color: var(--warning-text); }
+
+/* ---------- Teacher class cards (compact): name, who's online, three numbers, two actions ---------- */
+.tclass-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px; }
+.tclass-card {
+  position: relative; display: flex; flex-direction: column; gap: 14px; padding: 18px 18px 16px; border-radius: 16px;
+  background: var(--surface); border: 1px solid var(--border); border-top: 3px solid var(--class-color, var(--accent));
+}
+.tclass-card[data-live="true"] { border-color: color-mix(in srgb, var(--green) 45%, var(--border)); border-top-color: var(--green); }
+.tclass-head {
+  display: grid; gap: 4px; text-align: left; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer;
+}
+.tclass-head:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 8px; }
+.tclass-head:hover .tclass-name { text-decoration: underline; text-underline-offset: 3px; }
+.tclass-name { font-size: 16.5px; font-weight: 700; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+.tclass-people { font-size: 13px; color: var(--text-soft); }
+.tclass-people b { color: var(--success-text); font-weight: 600; }
+.tclass-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-muted); min-height: 1.2em; }
+.tclass-status[data-state="live"] { color: var(--success-text); font-weight: 600; }
+.tclass-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0; }
+.tclass-stat { padding: 10px 12px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border); }
+.tclass-stat dt { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); }
+.tclass-stat dd { margin: 2px 0 0; font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tclass-stat[data-tone="low"] dd { color: var(--danger-text); }
+.tclass-stat[data-tone="due"] dd { color: var(--warning-text); }
+.tclass-foot { display: flex; gap: 8px; margin-top: auto; }
+.tclass-foot > * { flex: 1; justify-content: center; }
+@media (max-width: 520px) { .tclass-grid { grid-template-columns: 1fr; } }
+
+/* ---------- Simple page headers: a title and the actions, no art or pill ---------- */
+.page-hero { background: none; border: 0; border-radius: 0; overflow: visible; }
+#classListView .eyebrow-pill, #allStudentsView .eyebrow-pill, #reportView .eyebrow-pill { display: none; }
+.page-hero .page-hero-inner { padding: 2px 0 0; align-items: center; }
+.page-hero .welcome-title { font-size: clamp(22px, 2.4vw, 28px); }

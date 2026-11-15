@@ -212,7 +212,6 @@
             <div class="panel-head">
               <div>
                 <h2 class="panel-title" id="tClassesTitle"><span class="chip-icon"><svg><use href="#i-school"/></svg></span>Your classes</h2>
-                <p class="panel-sub">Pick a class to see how it’s doing.</p>
               </div>
               <button class="text-link" type="button" data-nav="classes">All classes<svg class="icon"><use href="#i-chevron"/></svg></button>
             </div>
@@ -228,7 +227,6 @@
             <div class="panel-head">
               <div>
                 <h2 class="panel-title" id="tTodoTitle"><span class="chip-icon amber"><svg><use href="#i-bell"/></svg></span>Needs your attention <span class="count-badge" id="tTodoCount" hidden></span></h2>
-                <p class="panel-sub">Most urgent first. Each one takes you straight there.</p>
               </div>
             </div>
             <ul class="todo-list" id="tTodo"><li class="empty-state">Loading…</li></ul>
@@ -251,7 +249,6 @@
             </section>
             <section aria-labelledby="tActivityTitle">
               <h3 class="more-heading" id="tActivityTitle">Recent activity</h3>
-              <p class="panel-sub">Submissions, live sessions, posts and quizzes from the last two weeks.</p>
               <ul class="activity-list" id="tActivity"><li class="empty-state">Loading…</li></ul>
             </section>
           </div>
@@ -271,26 +268,14 @@
       <!-- ================= Classes (teacher-classes.js): every class, plus pages across classes ================= -->
       <section class="stack view classes-view" id="classListView" hidden aria-labelledby="classListTitle">
         <section class="home-hero page-hero" aria-labelledby="classListTitle">
-          <div class="home-hero-art" aria-hidden="true">
-            <svg viewBox="0 0 560 200" fill="none">
-              <g stroke="currentColor" stroke-width="1.2">
-                <path d="M318 84 410 40l92 44-92 44Z" stroke-opacity="0.3"/>
-                <path d="M356 102v34c30 22 78 22 108 0v-34" stroke-opacity="0.22"/>
-                <path d="M502 84v46" stroke-opacity="0.22"/>
-                <path d="M250 150 318 84M502 84l40 56" stroke-opacity="0.14"/>
-              </g>
-              <circle cx="502" cy="134" r="4" fill="currentColor" fill-opacity="0.5"/>
-              <circle cx="250" cy="150" r="3" fill="currentColor" fill-opacity="0.35"/>
-              <circle cx="542" cy="140" r="2.5" fill="currentColor" fill-opacity="0.35"/>
-            </svg>
-          </div>
           <div class="page-hero-inner">
             <div class="hero-copy">
               <p class="eyebrow-pill"><span class="tag">Classes</span><span id="sumClassesLine">Your classes</span></p>
               <h1 class="welcome-title" id="classListTitle">Classes</h1>
-              <p class="hero-lead">Open a class for its live focus, posts, assignments, quizzes, master list and attendance.</p>
             </div>
             <div class="page-hero-actions">
+              <button class="btn-action" type="button" data-nav="all-students"><svg class="icon"><use href="#i-users"/></svg>All students</button>
+              <button class="btn-action" type="button" data-nav="attendance-report"><svg class="icon"><use href="#i-attendance"/></svg>Attendance report</button>
               <button class="btn-primary" type="button" data-nav="new-class"><svg class="icon"><use href="#i-plus"/></svg>New class</button>
             </div>
           </div>
@@ -310,40 +295,17 @@
           </div>
         </div>
 
-        <div class="class-card-grid" id="classGrid" role="list" aria-label="Your classes"><p class="empty-state">Loading classes…</p></div>
+        <div class="tclass-grid" id="classGrid" role="list" aria-label="Your classes"><p class="empty-state">Loading classes…</p></div>
 
-        <section class="panel-card" aria-labelledby="acrossTitle">
-          <div class="panel-head">
-            <div>
-              <h2 class="panel-title" id="acrossTitle"><span class="chip-icon"><svg><use href="#i-users"/></svg></span>Across all classes</h2>
-              <p class="panel-sub">Each class has its own master list and attendance. These pages put every class together.</p>
-            </div>
-          </div>
-          <div class="across-links">
-            <button class="across-link" type="button" data-nav="all-students"><span class="chip-icon"><svg><use href="#i-users"/></svg></span><span><b>All students</b><small>Everyone on your master lists, with attendance and focus</small></span></button>
-            <button class="across-link" type="button" data-nav="attendance-report"><span class="chip-icon green"><svg><use href="#i-attendance"/></svg></span><span><b>Attendance report</b><small>Every finished live session, with a spreadsheet download</small></span></button>
-          </div>
-        </section>
       </section>
 
       <!-- ================= All students (teacher-overview.js) ================= -->
       <section class="stack view overview-view" id="allStudentsView" hidden aria-labelledby="allStudentsTitle">
         <section class="home-hero page-hero" aria-labelledby="allStudentsTitle">
-          <div class="home-hero-art" aria-hidden="true">
-            <svg viewBox="0 0 560 200" fill="none">
-              <g stroke="currentColor" stroke-width="1.2">
-                <circle cx="400" cy="70" r="22" stroke-opacity="0.32"/><path d="M362 140a38 38 0 0 1 76 0" stroke-opacity="0.32"/>
-                <circle cx="470" cy="84" r="17" stroke-opacity="0.22"/><path d="M440 142a30 30 0 0 1 60 0" stroke-opacity="0.22"/>
-                <circle cx="334" cy="88" r="15" stroke-opacity="0.18"/><path d="M308 142a26 26 0 0 1 52 0" stroke-opacity="0.18"/>
-              </g>
-              <path d="M520 36l3 8 8 3-8 3-3 8-3-8-8-3 8-3Z" fill="currentColor" fill-opacity="0.45"/>
-            </svg>
-          </div>
           <div class="page-hero-inner">
             <div class="hero-copy">
               <p class="eyebrow-pill"><span class="tag">All classes</span><span id="allStudentsCount">Loading…</span></p>
               <h1 class="welcome-title" id="allStudentsTitle">All students</h1>
-              <p class="hero-lead">Everyone on your master lists in one place, with their attendance and focus over the last 30 days.</p>
             </div>
             <div class="page-hero-actions">
               <button class="btn-action" type="button" id="allStudentsDownload"><svg class="icon"><use href="#i-download"/></svg>Download spreadsheet</button>
@@ -378,7 +340,6 @@
           <div class="panel-head list-head">
             <div>
               <h2 class="panel-title" id="allStudentsListTitle"><span class="chip-icon"><svg><use href="#i-users"/></svg></span>Students</h2>
-              <p class="panel-sub">Attendance counts finished live sessions; excused sessions don’t count against anyone.</p>
             </div>
             <div class="list-tools">
               <label class="search-field">
@@ -408,23 +369,10 @@
       <!-- ================= Attendance report (teacher-overview.js) ================= -->
       <section class="stack view overview-view" id="reportView" hidden aria-labelledby="reportTitle">
         <section class="home-hero page-hero" aria-labelledby="reportTitle">
-          <div class="home-hero-art" aria-hidden="true">
-            <svg viewBox="0 0 560 200" fill="none">
-              <g stroke="currentColor" stroke-width="1.2">
-                <rect x="320" y="30" width="200" height="140" rx="16" stroke-opacity="0.26"/>
-                <path d="M320 66h200M370 30v140M420 30v140M470 30v140" stroke-opacity="0.16"/>
-              </g>
-              <g fill="currentColor">
-                <circle cx="345" cy="92" r="6" fill-opacity="0.45"/><circle cx="395" cy="92" r="6" fill-opacity="0.45"/><circle cx="445" cy="92" r="6" fill-opacity="0.2"/><circle cx="495" cy="92" r="6" fill-opacity="0.45"/>
-                <circle cx="345" cy="132" r="6" fill-opacity="0.45"/><circle cx="395" cy="132" r="6" fill-opacity="0.2"/><circle cx="445" cy="132" r="6" fill-opacity="0.45"/><circle cx="495" cy="132" r="6" fill-opacity="0.45"/>
-              </g>
-            </svg>
-          </div>
           <div class="page-hero-inner">
             <div class="hero-copy">
               <p class="eyebrow-pill"><span class="tag">All classes</span><span id="reportRangeLabel">Last 30 days</span></p>
               <h1 class="welcome-title" id="reportTitle">Attendance report</h1>
-              <p class="hero-lead">Every finished live session across your classes: who came, who was late and who missed out.</p>
             </div>
             <div class="page-hero-actions">
               <div class="range-switch" role="group" aria-label="Time range">
@@ -466,7 +414,6 @@
             <div class="panel-head">
               <div>
                 <h2 class="panel-title" id="reportTrendTitle"><span class="chip-icon"><svg><use href="#i-chart"/></svg></span>Attendance over time</h2>
-                <p class="panel-sub">Share of invited students who came, per day with a live session.</p>
               </div>
             </div>
             <div class="chart-box report-chart">
@@ -479,7 +426,6 @@
             <div class="panel-head">
               <div>
                 <h2 class="panel-title" id="reportMissedTitle"><span class="chip-icon red"><svg><use href="#i-flag"/></svg></span>Missed the most</h2>
-                <p class="panel-sub">Students with the most absences in this range.</p>
               </div>
             </div>
             <ul class="continue-list" id="reportMissed"><li class="empty-state">Loading…</li></ul>
@@ -490,7 +436,6 @@
           <div class="panel-head">
             <div>
               <h2 class="panel-title" id="reportClassesTitle"><span class="chip-icon"><svg><use href="#i-attendance"/></svg></span>By class</h2>
-              <p class="panel-sub">Open a class to see each session and change any mark.</p>
             </div>
           </div>
           <div class="table-scroll overview-scroll">
@@ -531,7 +476,6 @@
               <div class="panel-head">
                 <div>
                   <h2 class="panel-title" id="identityTitle"><span class="chip-icon"><svg><use href="#i-user"/></svg></span>Picture and name</h2>
-                  <p class="panel-sub">Your students see your name and picture on their class cards.</p>
                 </div>
               </div>
 
@@ -592,7 +536,6 @@
               <div class="panel-head">
                 <div>
                   <h2 class="panel-title" id="appearanceTitle"><span class="chip-icon"><svg><use href="#i-palette"/></svg></span>Theme and accent</h2>
-                  <p class="panel-sub">Pick one to preview it on the whole page. It’s only kept when you save.</p>
                 </div>
               </div>
 
@@ -657,7 +600,6 @@
           <div class="panel-head">
             <div>
               <h2 class="panel-title" id="securityTitle"><span class="chip-icon"><svg><use href="#i-lock"/></svg></span>Sign-in and security</h2>
-              <p class="panel-sub">Change the email and password you sign in with. These save on their own, separately from your picture and theme.</p>
             </div>
           </div>
           <div class="security-grid">
@@ -727,7 +669,7 @@
             <!-- The class's Zoom / Google Meet link (Settings → Online class), teacher-classes.js -->
             <a class="btn-action" id="meetingOpen" target="_blank" rel="noopener noreferrer" hidden><svg class="icon" aria-hidden="true"><use href="#i-video"/></svg><span>Open meeting</span></a>
             <button class="btn-action" type="button" id="meetingAdd" hidden><svg class="icon" aria-hidden="true"><use href="#i-video"/></svg>Add Zoom/Meet link</button>
-            <small id="sessionHint">Students share their attention only during a live session.</small>
+            <small id="sessionHint" hidden></small>
           </div>
         </div>
 
@@ -737,9 +679,8 @@
           <button role="tab" type="button" id="tabBtn-assignments" aria-controls="tab-assignments" data-tab="assignments" aria-selected="false" tabindex="-1"><svg class="icon"><use href="#i-assignment"/></svg>Assignments</button>
           <button role="tab" type="button" id="tabBtn-quizzes" aria-controls="tab-quizzes" data-tab="quizzes" aria-selected="false" tabindex="-1"><svg class="icon"><use href="#i-quiz"/></svg>Quizzes</button>
           <span class="tab-divider" aria-hidden="true"></span>
-          <button role="tab" type="button" id="tabBtn-students" aria-controls="tab-students" data-tab="students" aria-selected="false" tabindex="-1"><svg class="icon"><use href="#i-users"/></svg>Master list <span class="tab-count" id="tabStudentCount"></span></button>
-          <button role="tab" type="button" id="tabBtn-attendance" aria-controls="tab-attendance" data-tab="attendance" aria-selected="false" tabindex="-1"><svg class="icon"><use href="#i-attendance"/></svg>Attendance</button>
-          <button role="tab" type="button" id="tabBtn-history" aria-controls="tab-history" data-tab="history" aria-selected="false" tabindex="-1"><svg class="icon"><use href="#i-history"/></svg>History</button>
+          <button role="tab" type="button" id="tabBtn-students" aria-controls="tab-students" data-tab="students" aria-selected="false" tabindex="-1"><svg class="icon"><use href="#i-users"/></svg>Students <span class="tab-count" id="tabStudentCount"></span></button>
+          <button role="tab" type="button" id="tabBtn-attendance" aria-controls="tab-attendance" data-tab="attendance" aria-selected="false" tabindex="-1"><svg class="icon"><use href="#i-history"/></svg>Sessions</button>
           <button role="tab" type="button" id="tabBtn-settings" aria-controls="tab-settings" data-tab="settings" aria-selected="false" tabindex="-1"><svg class="icon"><use href="#i-settings"/></svg>Settings</button>
         </div>
 
@@ -785,7 +726,6 @@
               <div class="panel-head live-board-head">
                 <div>
                   <h3 class="panel-title" id="liveBoardTitle"><span class="chip-icon"><svg><use href="#i-users"/></svg></span>Students</h3>
-                  <p class="panel-sub">Anyone who may need a check-in comes first. Scores come from each student’s own device, never video.</p>
                 </div>
                 <div class="live-filters" id="liveFilters" role="group" aria-label="Show students"></div>
               </div>
@@ -793,12 +733,8 @@
               <p class="live-board-none" id="liveBoardNone" hidden>No students match this filter right now.</p>
               <div class="live-board-empty" id="liveBoardEmpty">
                 <span class="chip-icon"><svg><use href="#i-live"/></svg></span>
-                <b id="liveBoardEmptyTitle">This class isn’t live</b>
-                <ol class="live-steps">
-                  <li><span>Press <strong>Start live session</strong>. Everyone on the master list is invited and attendance starts.</span></li>
-                  <li><span>Students press <strong>Join</strong>, which turns on their attention tracker.</span></li>
-                  <li><span>Each student appears here with their attention, updated every second. <strong>End session</strong> stops sharing.</span></li>
-                </ol>
+                <b id="liveBoardEmptyTitle">Not live</b>
+                <span class="live-empty-line">Press Start live session above to see each student’s focus here.</span>
               </div>
             </section>
 
@@ -807,7 +743,6 @@
                 <div class="panel-head">
                   <div>
                     <div class="panel-title"><span class="chip-icon"><svg><use href="#i-chart"/></svg></span>Attention curve</div>
-                    <div class="panel-sub">Class average and the lowest student over the last 30 readings.</div>
                   </div>
                 </div>
                 <div class="chart-box"><canvas id="attentionChart" aria-label="Class attention over time" role="img"></canvas></div>
@@ -817,7 +752,6 @@
                 <div class="panel-head">
                   <div>
                     <div class="panel-title"><span class="chip-icon red"><svg><use href="#i-bell"/></svg></span>Check-in alerts</div>
-                    <div class="panel-sub">When a student’s attention stays low. They may be reading notes, so check in gently.</div>
                   </div>
                 </div>
                 <ul class="alert-feed" id="alertFeed"></ul>
@@ -829,7 +763,6 @@
               <div class="panel-head">
                 <div>
                   <div class="panel-title"><span class="chip-icon"><svg><use href="#i-grid4"/></svg></span>Engagement heatmap</div>
-                  <div class="panel-sub">One cell per reading for each student, oldest to newest.</div>
                 </div>
               </div>
               <div class="heatmap-scroll"><div class="heatmap" id="engagementHeatmap"></div></div>
@@ -851,7 +784,6 @@
               <div class="panel-head">
                 <div>
                   <div class="panel-title"><span class="chip-icon"><svg><use href="#i-megaphone"/></svg></span>New announcement</div>
-                  <div class="panel-sub">Everyone in this class sees it in their Posts tab.</div>
                 </div>
               </div>
               <label class="field-label" for="postTitle">Title <span class="optional">(optional)</span></label>
@@ -867,7 +799,6 @@
               <div class="panel-head">
                 <div>
                   <h3 class="panel-title" id="teacherPostsTitle"><span class="chip-icon"><svg><use href="#i-megaphone"/></svg></span>Posts</h3>
-                  <p class="panel-sub">Newest first.</p>
                 </div>
               </div>
               <ul class="post-list" id="teacherPostList"><li class="empty-state">Loading…</li></ul>
@@ -908,7 +839,6 @@
               <div class="panel-head">
                 <div>
                   <h3 class="panel-title" id="teacherAssignmentsTitle"><span class="chip-icon"><svg><use href="#i-assignment"/></svg></span>Assignments</h3>
-                  <p class="panel-sub">Open one to see who has submitted, download files and add marks or feedback.</p>
                 </div>
               </div>
               <ul class="assignment-list" id="teacherAssignmentList"><li class="empty-state">Loading…</li></ul>
@@ -942,7 +872,6 @@
               <div class="panel-head">
                 <div>
                   <h3 class="panel-title" id="teacherQuizzesTitle"><span class="chip-icon"><svg><use href="#i-quiz"/></svg></span>Quizzes <span id="teacherQuizTips"></span></h3>
-                  <p class="panel-sub">Write a quiz, open the lobby, then run it question by question.</p>
                 </div>
                 <button class="btn-primary" type="button" id="newQuiz"><svg class="icon"><use href="#i-plus"/></svg>New quiz</button>
               </div>
@@ -953,7 +882,6 @@
               <div class="panel-head">
                 <div>
                   <h3 class="panel-title" id="quizEditorTitle"><span class="chip-icon"><svg><use href="#i-pencil"/></svg></span>New quiz</h3>
-                  <p class="panel-sub">Students can’t see a quiz until you open its lobby.</p>
                 </div>
               </div>
               <label class="field-label" for="quizTitle">Title</label>
@@ -1003,97 +931,39 @@
           <div class="panel-card">
             <div class="panel-head">
               <div>
-                <div class="panel-title"><span class="chip-icon"><svg><use href="#i-users"/></svg></span>Master list</div>
+                <div class="panel-title"><span class="chip-icon"><svg><use href="#i-users"/></svg></span>Students</div>
                 <div class="panel-sub" id="studentsStatus">Students appear here the moment they join. Everyone on this list is invited to each live session automatically.</div>
               </div>
               <button class="btn-action" type="button" id="copyInvite"><svg class="icon"><use href="#i-copy"/></svg>Copy join code</button>
             </div>
             <div class="table-scroll" style="max-height: none;">
               <table class="data-table students-table" id="studentsTable">
-                <thead><tr><th>Student</th><th>Status</th><th>This session</th><th>Attendance</th><th><span class="sr-only">Actions</span></th></tr></thead>
+                <thead><tr><th>Student</th><th>Status</th><th>This session</th><th>Attendance</th><th>Focus</th><th><span class="sr-only">Actions</span></th></tr></thead>
                 <tbody id="studentRows"></tbody>
               </table>
             </div>
-            <p class="table-note">“Remove from session” only takes a student out of the live session; they stay on this list and are invited next time. To take someone off the list, use ⋯ → Remove from class.</p>
           </div>
         </div>
 
-        <!-- Attendance (teacher-attendance.js) -->
+        <!-- Sessions (teacher-attendance.js): every live session with its attendance and focus -->
         <div class="tab-panel" id="tab-attendance" role="tabpanel" aria-labelledby="tabBtn-attendance" hidden>
           <div class="stack">
-            <p class="attendance-status" id="attendanceStatus" aria-live="polite">Loading attendance…</p>
+            <p class="attendance-status" id="attendanceStatus" aria-live="polite">Loading sessions…</p>
             <div id="attendanceContent" class="stack">
-              <div class="stat-grid">
-                <article class="stat-card">
-                  <span class="stat-label">Sessions held</span>
-                  <span class="chip-icon"><svg><use href="#i-attendance"/></svg></span>
-                  <strong id="attSessions">—</strong>
-                  <small id="attSessionsNote">&nbsp;</small>
-                </article>
-                <article class="stat-card">
-                  <span class="stat-label">Average attendance</span>
-                  <span class="chip-icon green"><svg><use href="#i-users"/></svg></span>
-                  <strong id="attRate">—</strong>
-                  <small id="attRateNote">&nbsp;</small>
-                </article>
-                <article class="stat-card">
-                  <span class="stat-label">Arrived late</span>
-                  <span class="chip-icon amber"><svg><use href="#i-timer"/></svg></span>
-                  <strong id="attLate">—</strong>
-                  <small id="attLateNote">&nbsp;</small>
-                </article>
-                <article class="stat-card">
-                  <span class="stat-label">Need a check-in</span>
-                  <span class="chip-icon red"><svg><use href="#i-flag"/></svg></span>
-                  <strong id="attLow">—</strong>
-                  <small id="attLowNote">&nbsp;</small>
-                </article>
+              <div class="session-glance">
+                <div><span>Sessions</span><b id="attSessions">—</b><small id="attSessionsNote">&nbsp;</small></div>
+                <div><span>Attendance</span><b id="attRate">—</b><small id="attRateNote">&nbsp;</small></div>
+                <div><span>Average focus</span><b id="attFocus">—</b><small id="attFocusNote">&nbsp;</small></div>
               </div>
 
               <div class="panel-card">
                 <div class="panel-head">
-                  <div>
-                    <div class="panel-title"><span class="chip-icon"><svg><use href="#i-users"/></svg></span>By student</div>
-                    <div class="panel-sub">Lowest attendance first. Excused sessions don’t count against a student.</div>
-                  </div>
+                  <div class="panel-title"><span class="chip-icon"><svg><use href="#i-history"/></svg></span>Sessions</div>
                   <button class="btn-action" type="button" id="attDownload"><svg class="icon"><use href="#i-download"/></svg>Download spreadsheet</button>
-                </div>
-                <div class="table-scroll" style="max-height: 420px;">
-                  <table class="data-table att-students">
-                    <thead><tr><th>Student</th><th class="num">Present</th><th class="num">Late</th><th class="num">Absent</th><th class="num">Excused</th><th>Attendance</th></tr></thead>
-                    <tbody id="attStudentRows"></tbody>
-                  </table>
-                </div>
-              </div>
-
-              <div class="panel-card">
-                <div class="panel-head">
-                  <div>
-                    <div class="panel-title"><span class="chip-icon"><svg><use href="#i-history"/></svg></span>Sessions</div>
-                    <div class="panel-sub">Open a session to see who came and change any mark.</div>
-                  </div>
                 </div>
                 <ul class="att-session-list" id="attSessionList"></ul>
                 <button class="btn-action att-more" type="button" id="attMore" hidden>Show older sessions</button>
               </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- History (teacher-analytics.js) -->
-        <div class="tab-panel" id="tab-history" role="tabpanel" aria-labelledby="tabBtn-history" hidden>
-          <div class="panel-card" id="session-history">
-            <div class="panel-head">
-              <div>
-                <div class="panel-title"><span class="chip-icon"><svg><use href="#i-history"/></svg></span>Session history</div>
-                <div class="panel-sub" id="sessionHistoryStatus" aria-live="polite">Select a class to see its saved sessions.</div>
-              </div>
-            </div>
-            <div class="table-scroll" style="max-height: none;">
-              <table class="data-table history-table">
-                <thead><tr><th>Learner</th><th>Live session</th><th>Started</th><th>Tracked</th><th>Focus</th><th>Avg score</th><th>Lapses</th><th>Status</th></tr></thead>
-                <tbody id="sessionHistoryRows"></tbody>
-              </table>
             </div>
           </div>
         </div>
@@ -1105,7 +975,7 @@
               <div class="panel-title"><span class="chip-icon"><svg><use href="#i-video"/></svg></span>Online class (Zoom or Google Meet)</div>
               <label class="field-label" for="meetingInput">Meeting link</label>
               <input class="field-input" id="meetingInput" type="url" inputmode="url" maxlength="500" autocomplete="off" spellcheck="false" placeholder="https://zoom.us/j/… or https://meet.google.com/…" aria-describedby="meetingHint">
-              <p class="panel-sub" id="meetingHint">Students get a “Join on Zoom/Meet” button when you start a live session. It joins the live session, opens the meeting and keeps tracking their focus while the meeting is in front.</p>
+              <p class="panel-sub" id="meetingHint">Students get a “Join on Zoom/Meet” button when you go live.</p>
               <div class="settings-actions"><button class="btn-action" type="button" id="removeMeeting">Remove link</button><button class="btn-primary" type="submit">Save link</button></div>
             </form>
 
@@ -1121,7 +991,6 @@
                 <input type="checkbox" id="joiningToggle">
                 <span>Allow new students to join with the code</span>
               </label>
-              <p class="panel-sub">Students already in the class can always get back in.</p>
             </div>
 
             <form class="panel-card settings-card" id="lateForm">
@@ -1130,13 +999,13 @@
                 <input class="field-input" id="lateInput" type="number" min="0" max="240" step="1" inputmode="numeric" aria-describedby="lateHint">
                 minutes
               </label>
-              <p class="panel-sub" id="lateHint">Students who join a live session after this many minutes are marked late.</p>
+              <p class="panel-sub" id="lateHint"></p>
               <div class="settings-actions"><button class="btn-primary" type="submit">Save</button></div>
             </form>
 
             <div class="panel-card settings-card">
               <div class="panel-title"><span class="chip-icon"><svg><use href="#i-key"/></svg></span>Join code</div>
-              <p class="panel-sub">Make a new code if the old one was shared too widely. The old code stops working immediately.</p>
+              <p class="panel-sub">The old code stops working straight away.</p>
               <div class="settings-actions">
                 <button class="btn-action" type="button" id="copyCodeSetting"><svg class="icon"><use href="#i-copy"/></svg>Copy code</button>
                 <button class="btn-action" type="button" id="regenerateCode">Make a new code</button>

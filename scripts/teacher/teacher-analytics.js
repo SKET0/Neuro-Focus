@@ -3,7 +3,7 @@
 // class's saved sessions. Real data only.
 // Chart colours follow the teacher's theme and accent (styles/theme.css).
 import { themeColor, withAlpha } from "../shared/appearance.js";
-import { normalizeReading, describeReading, sampleKind, selectWithQuality, hasQualityInfo, SCORE_BANDS } from "../shared/tracking-states.js";
+import { normalizeReading, describeReading, sampleKind, SCORE_BANDS } from "../shared/tracking-states.js";
 import { paintAvatar } from "../shared/avatars.js";
 
 const HISTORY = 30;      // points kept on the attention curve
@@ -203,17 +203,9 @@ window.addEventListener("neurofocus:classchange", (event) => {
 
 // ---------- Saved history (Supabase) ----------
 // After a refresh the live view is rebuilt from the last 10 minutes of saved samples
-// (one per student every 5 seconds), and the Session History card lists saved sessions.
+// (one per student every 5 seconds). Saved sessions are listed in the Sessions tab (teacher-attendance.js).
 const appReady = window.neuroFocusReady;
-const historyEls = { rows: $("#sessionHistoryRows"), status: $("#sessionHistoryStatus") };
-const SETUP_HINT = "Saved history needs the Phase 2 database update (see README).";
-const missingTables = (error) => error && (error.code === "PGRST205" || error.code === "42P01" || /attention_sessions|attention_samples/.test(error.message || ""));
 const shortTime = (date) => date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-
-function setHistoryStatus(text, isError = false) {
-  historyEls.status.textContent = text;
-  historyEls.status.dataset.state = isError ? "error" : "";
-}
 
 // After a refresh mid-session, rebuild the live view from this session's saved samples only.
 let seededKey = "";
@@ -291,80 +283,10 @@ async function seedLiveFromSaved(classId, members) {
   render();
 }
 
-async function loadSessionHistory() {
-  const app = await appReady;
-  const classId = window.neuroFocusClass?.id;
-  if (!app || !classId) {
-    historyEls.rows.replaceChildren();
-    setHistoryStatus("Select a class to see its saved sessions.");
-    return;
-  }
-  const columns = "id, student_id, started_at, last_seen_at, ended_at, tracked_seconds, focus_percent, average_score, lapses, profiles(display_name)";
-  const select = (cols) => selectWithQuality((quality) => app.supabase.from("attention_sessions").select(`${cols}${quality}`)
-    .eq("class_id", classId).gt("tracked_seconds", 4).order("started_at", { ascending: false }).limit(25));
-  let { data, error } = await select(`${columns}, class_session_id`);
-  if (error && /class_session_id/.test(error.message || "")) ({ data, error } = await select(columns));
-  // Which live session each record came from.
-  const liveSessions = new Map();
-  const sessionIds = [...new Set((data || []).map((row) => row.class_session_id).filter(Boolean))];
-  if (sessionIds.length) {
-    const { data: rows } = await app.supabase.from("class_sessions").select("id, started_at").in("id", sessionIds);
-    (rows || []).forEach((row) => liveSessions.set(row.id, row.started_at));
-  }
-  if (classId !== window.neuroFocusClass?.id) return;
-  historyEls.rows.replaceChildren();
-  if (error) {
-    setHistoryStatus(missingTables(error) ? SETUP_HINT : "Couldn’t load saved sessions. Refresh to try again.", true);
-    return;
-  }
-  setHistoryStatus(data.length
-    ? `Last ${data.length} saved session${data.length === 1 ? "" : "s"} in ${window.neuroFocusClass.name}. Updates every minute.`
-    : `No saved sessions in ${window.neuroFocusClass.name} yet. They appear once students track their attention.`);
-  data.forEach((session) => {
-    const live = !session.ended_at && Date.now() - new Date(session.last_seen_at).getTime() < 30000;
-    const minutes = Math.floor(session.tracked_seconds / 60);
-    const liveStart = liveSessions.get(session.class_session_id);
-    const cells = [
-      session.profiles?.display_name || "Student",
-      liveStart ? new Date(liveStart).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—",
-      new Date(session.started_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
-      `${minutes}:${String(session.tracked_seconds % 60).padStart(2, "0")}`,
-      // Estimated share of measured time on screen. Older records (before tracking-quality checks)
-      // counted time with no face in view as not focused, so they're marked.
-      session.focus_percent === null ? (hasQualityInfo(session) ? "Not enough measured" : "—")
-        : hasQualityInfo(session) ? `${session.focus_percent}% of ${Math.round(session.usable_seconds / 60)} min measured`
-          : `${session.focus_percent}% (older method)`,
-      session.average_score === null ? "—" : `${session.average_score}%`,
-      String(session.lapses)
-    ];
-    const row = document.createElement("tr");
-    cells.forEach((text) => {
-      const cell = document.createElement("td");
-      cell.textContent = text;
-      row.append(cell);
-    });
-    const statusCell = document.createElement("td");
-    const pill = document.createElement("span");
-    pill.className = "state-pill";
-    pill.dataset.state = live ? "Focused" : "Offline";
-    pill.textContent = live ? "Live now" : "Ended";
-    statusCell.append(pill);
-    row.append(statusCell);
-    historyEls.rows.append(row);
-  });
-}
-
 window.addEventListener("neurofocus:roster-loaded", (event) => {
   const { classId, members } = event.detail;
   void seedLiveFromSaved(classId, members);
-  void loadSessionHistory();
 });
-// A student stopping tracking finishes a session, so refresh the list shortly after.
-window.addEventListener("neurofocus:live-attention", (event) => {
-  if (event.detail?.state === "Stopped") window.setTimeout(() => { void loadSessionHistory(); }, 2500);
-});
-window.addEventListener("neurofocus:classchange", () => { if (!window.neuroFocusClass) void loadSessionHistory(); });
-window.setInterval(() => { void loadSessionHistory(); }, 60000);
 
 // ---------- Shared ----------
 function updateFlagState(student) {
@@ -437,7 +359,10 @@ function render() {
     ? "Live updates are blocked: run the Phase 2 database updates (see README), then refresh."
     : !className ? "Open a class to watch it live."
       : sessionLive ? `Live session in ${className}${since ? ` since ${since}` : ""} · ${active.length} of ${students.length} sharing attention.`
-        : `${className} isn’t live. Press Start live session to begin.`;
+        : "";
+  els.liveClassName.hidden = !els.liveClassName.textContent;
+  // Not live: only the "Not live" panel shows (the empty summary, chart and heat map are hidden).
+  $("#overview").dataset.live = String(sessionLive);
   els.status.textContent = !sessionLive ? "Not live" : active.length ? `Live · ${active.length} sharing` : "Live · waiting for students";
   els.status.dataset.state = sessionLive ? "live" : "";
 
@@ -483,8 +408,8 @@ function renderBoard() {
   els.board.hidden = !showBoard;
   els.boardEmpty.hidden = showBoard;
   els.boardEmptyTitle.textContent = !students.length
-    ? "No students in this class yet. Share its join code from the Master list tab."
-    : `${selectedClassName() || "This class"} isn’t live`;
+    ? "No students yet. Share the class’s join code from the Students tab."
+    : "Not live";
   if (!showBoard) { els.boardNone.hidden = true; return; }
 
   // Cards are kept and updated in place (no flicker); they're only re-ordered when the order changes.
@@ -719,4 +644,3 @@ setupChart();
 try { localStorage.removeItem("neuroFocusTeacherMode"); } catch { /* storage unavailable */ }
 startLive();
 // teacher-classes.js may have picked a class before this script started listening.
-void loadSessionHistory();

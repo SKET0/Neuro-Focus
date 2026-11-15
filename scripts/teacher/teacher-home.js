@@ -155,6 +155,7 @@ if (app && view) {
     };
     loading = false;
     renderAll();
+    window.dispatchEvent(new CustomEvent("neurofocus:class-facts"));
     void loadPictures();
   }
 
@@ -371,7 +372,7 @@ if (app && view) {
         detail.removeAttribute("aria-labelledby");
         const empty = el("div", "welcome-empty");
         empty.append(chipIcon("i-school"), el("b", "", "Create your first class"),
-          el("p", "", "You’ll get a join code to share. Students appear on your master list the moment they join, and you can post, set assignments, run quizzes and go live."),
+          el("p", "", "You’ll get a join code to share with your students."),
           button("New class", "btn-primary", () => actions().openNewClass?.(), "i-plus"));
         detail.replaceChildren(empty);
       });
@@ -422,7 +423,7 @@ if (app && view) {
     } else if (facts.last) {
       liveText.append(el("b", "", "Last live "), `${ago(facts.last.at)}${facts.last.counted ? ` · ${facts.last.attended} of ${facts.last.counted} came` : ""}`);
     } else {
-      liveText.append(el("b", "", "No live sessions yet. "), "Going live shows each student’s focus and takes attendance for you.");
+      liveText.append(el("b", "", "No live sessions yet"));
     }
     const goLive = button(live ? "Open live monitor" : "Go live", live ? "btn-live-sm" : "btn-primary btn-sm", () => open("live", item.id), "i-live");
     goLive.dataset.focusKey = "golive";
@@ -752,7 +753,7 @@ if (app && view) {
     const sessions = finishedSessions().length;
     $("#tMoreSub").textContent = sessions || events.length
       ? [sessions ? `${plural(sessions, "live session")} in 30 days` : "", events.length ? `${plural(events.length, "update")} in the last two weeks` : ""].filter(Boolean).join(" · ")
-      : "What’s going well, what’s worth a look, and the latest submissions and sessions.";
+      : "Nothing yet";
   }
 
   // ---------- More: class insights ----------
@@ -824,6 +825,13 @@ if (app && view) {
   });
 
   // ---------- Wiring ----------
+  // The Classes page (teacher-classes.js) shows the same per-class numbers on its cards; it's told
+  // when fresh numbers arrive (not on every redraw, which would loop through its status updates).
+  window.neuroFocusClassFacts = (classId) => {
+    const item = classById(classId);
+    return item && data ? factsFor(item) : null;
+  };
+
   function renderAll() {
     renderLive();
     renderGreeting();

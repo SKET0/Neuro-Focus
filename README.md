@@ -182,9 +182,9 @@ Run this once, after the updates above. It is safe to run again.
 
 It saves every live session (`class_sessions`) and takes attendance (`session_attendance`):
 
-- **Master list:** everyone who has joined a class. Starting a live session invites the whole list automatically, including students who join the class during the session. **Invite again** re-sends the invite to a student who hasn't joined.
+- **Students tab (master list):** everyone who has joined a class, with their attendance and average focus. Starting a live session invites the whole list automatically, including students who join the class during the session. **Invite again** re-sends the invite to a student who hasn't joined.
 - **Remove from session:** takes a student out of the current live session only. Their focus stops being shared and they can't rejoin it until you press **Let back in**. They stay on the master list and are invited to the next session. **⋯ → Remove from class** is still there for taking someone off the list.
-- **Attendance:** students are marked present when they join, late if they join after the class's late threshold (10 minutes by default, set in **Settings**), and absent if they never join before you end the session. Teachers can change any mark to present, late, absent or excused in the **Attendance** tab and download a spreadsheet. Attendance records keep the student's name, so they survive the student leaving the class. Students see their own attendance on their class cards.
+- **Attendance:** students are marked present when they join, late if they join after the class's late threshold (10 minutes by default, set in **Settings**), and absent if they never join before you end the session. Teachers can change any mark to present, late, absent or excused in the **Sessions** tab and download a spreadsheet. Attendance records keep the student's name, so they survive the student leaving the class. Students see their own attendance on their class cards.
 
 Without this update, live sessions still work as before, but nothing is saved and attendance isn't taken.
 
@@ -312,7 +312,7 @@ How it works: each task is cut into windows of 16 readings (about 2 seconds). Un
 4. **Student joins and tracks:** the attention tracker runs on the student's device. While they're in the session their browser checks in every 30 seconds (`check_in_session`, marking them present or late) and sends numbers only (score, state, focus) to the teacher. Video never leaves the device.
 5. **Teacher receives updates** on the class's Live focus tab every second, and can remove a student from the session, let them back in or invite them again.
 6. **Session ends** (`end_class_session`, or automatically after the dashboard has been gone for 15 minutes): no-shows are marked absent.
-7. **Saved records:** attendance (Attendance tab, spreadsheet download), shared attention history per session (History tab, plus a Focus column in each session's attendance), and the student's own Focus history, which includes their personal tracking too.
+7. **Saved records:** the **Sessions** tab lists every live session (who came and the class's focus); opening one shows each student's mark, time in the session and focus, with a spreadsheet download. Students keep their own Focus history, which includes their personal tracking too.
 
 ## Eyes closed (drowsiness)
 
@@ -371,14 +371,14 @@ If one tab's account changes because another tab on the same address signed in o
 - **Both dashboards share one sidebar layout:** the main pages at the top, then **Your classes** (each class in its own colour, the same everywhere, with a red dot while it is live; **+** creates or joins a class), and at the bottom the **Take the tour** card and a **Profile settings** card. The shared parts live in `styles/dashboard-layout.css`, `scripts/shared/class-colors.js` and `scripts/shared/tour.js`.
 - **Students:** Home, Classes, Solo focus, My notes, My progress. NeuroBuddy is the one button in the header on every page; Profile settings is in the account menu and at the bottom of the sidebar. New students get the same kind of guided tour as teachers the first time they open Home.
 - **Teachers:** Home, Classes, All students and Attendance report, then **Your classes** (every class with who's online and a live dot; **+** creates one). A running session also gets a **Live now** shortcut, and Home's badge counts submissions waiting to be marked. New teachers get a short guided tour the first time they open Home; **Take the tour** at the bottom of the sidebar replays it. Whether it has been seen is saved on the account (auth user metadata), so it doesn't come back on another device.
-- **Inside a class:** Posts, Assignments, Quizzes, Live focus (teachers then have Master list, Attendance, History and Settings). A class opens on Live focus while its session is live, otherwise on Posts. Arrow keys move between tabs.
+- **Inside a class:** Posts, Assignments, Quizzes, Live focus (teachers then have Students, Sessions and Settings). Arrow keys move between tabs. Teachers' Classes page shows each class as a card with its attendance, focus and work to mark.
 - The header breadcrumb shows where you are (Home / Classes / Biology / Posts) and every part of it is a link; on phones it shows the last two parts. Old links (`#home`, `#class/<id>`, `#students`, `#attendance-report`, `#buddy`, …) still work.
 - Opening a page never turns the camera on. Only **Start focus session**, **Join live session** and **Turn camera on** do; the Zoom and Google Meet links on Solo focus only open the meeting.
 
 ## How classes and learning tools work
 
 - Teachers create classes and get a unique join code. They can add a password; class passwords are hashed in the database and are never returned to the browser.
-- Each class has the same first tabs for teachers and students: **Posts**, **Assignments**, **Quizzes** and **Live focus** (the teacher's live monitor). Teachers also get **Master list** (online status, session status, attendance rate, **Remove from session**, **Remove from class**), **Attendance**, **History** (saved attention sessions) and **Settings** (rename, open/close joining, late threshold, password, new join code, delete).
+- Each class has the same first tabs for teachers and students: **Posts**, **Assignments**, **Quizzes** and **Live focus** (the teacher's live monitor). Teachers also get **Students** (online status, session status, attendance, average focus, **Remove from session**, **Remove from class**), **Sessions** (every live session with attendance and focus; marks can be changed) and **Settings** (online class link, rename, open/close joining, late threshold, password, new join code, delete).
 - Students join by code, and must also provide the password if one was set. Students already in a class can always rejoin; new students need joining to be open.
 - Students share attention scores (never video) only while their teacher runs a live session in the class they are working in. Outside a live session their saved history is personal and teachers can't see it.
 - A student's notes belong to their account (Row Level Security). They can file a note under one of their classes or keep it personal. Teachers do not have access to those notes.

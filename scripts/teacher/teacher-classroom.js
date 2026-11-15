@@ -49,7 +49,7 @@ if (app && document.querySelector("#tab-posts")) {
       return;
     }
     if (!data.length) {
-      list.replaceChildren(el("li", "empty-state", "No posts yet. Your first announcement will appear here and in your students’ Posts tab."));
+      list.replaceChildren(el("li", "empty-state", "No posts yet."));
       return;
     }
     list.replaceChildren(...data.map((post) => {

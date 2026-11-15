@@ -497,7 +497,7 @@ button.code-chip:hover { background: color-mix(in srgb, var(--accent) 14%, trans
   .class-hero .class-initial { display: none; }
   .settings-grid { grid-template-columns: 1fr; }
   .att-session-row { grid-template-columns: 1fr 18px; }
-  .att-session-row .att-chips, .att-session-row .att-rate { grid-column: 1; justify-content: flex-start; }
+  .att-session-row .att-came, .att-session-row .att-focus { grid-column: 1; justify-self: start; }
 }
 
 /* =====================================================================
@@ -568,3 +568,50 @@ button.code-chip:hover { background: color-mix(in srgb, var(--accent) 14%, trans
 .across-link b { display: block; font-size: 14px; font-weight: 650; }
 .across-link small { display: block; font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }
 .class-tabs { position: relative; } /* keeps the hidden ", live now" text inside the scrolling strip */
+
+/* ---------- Sessions tab: three numbers, then one row per live session ---------- */
+.session-glance { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.session-glance > div { display: grid; gap: 2px; padding: 14px 16px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border); }
+.session-glance span { font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); }
+.session-glance b { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.session-glance small { font-size: 12px; color: var(--text-muted); }
+.att-came { font-size: 13px; color: var(--text-soft); white-space: nowrap; }
+.att-came b { color: var(--text-main); font-weight: 650; font-variant-numeric: tabular-nums; }
+.att-came small { font-size: 12px; color: var(--warning-text); }
+.att-focus { justify-self: end; font-size: 12.5px; font-weight: 650; padding: 4px 10px; border-radius: 999px; white-space: nowrap; font-variant-numeric: tabular-nums;
+  background: var(--surface); border: 1px solid var(--border); color: var(--text-soft); }
+.att-focus[data-level="good"] { color: var(--success-text); border-color: color-mix(in srgb, var(--green) 40%, var(--border)); }
+.att-focus[data-level="mid"] { color: var(--warning-text); border-color: color-mix(in srgb, var(--amber) 40%, var(--border)); }
+.att-focus[data-level="low"] { color: var(--danger-text); border-color: color-mix(in srgb, var(--red) 40%, var(--border)); }
+.att-focus[data-empty="true"] { font-weight: 500; color: var(--text-muted); }
+.att-note { display: block; font-size: 11.5px; color: var(--text-muted); }
+@media (max-width: 640px) {
+  .session-glance { gap: 8px; }
+  .session-glance > div { padding: 10px 12px; }
+  .session-glance b { font-size: 19px; }
+  .session-glance span { font-size: 10.5px; }
+  .session-glance small { display: none; }
+  .session-control { justify-content: flex-start; }
+}
+
+/* Students tab: attendance with "2 of 3", and average focus in live sessions */
+.attendance-cell .att-of { display: block; font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
+.focus-cell { font-weight: 650; font-variant-numeric: tabular-nums; }
+.focus-cell[data-level="good"] { color: var(--success-text); }
+.focus-cell[data-level="mid"] { color: var(--warning-text); }
+.focus-cell[data-level="low"] { color: var(--danger-text); }
+
+/* Live tab when the class isn't live: just the "Not live" panel */
+#overview[data-live="false"] .section-head,
+#overview[data-live="false"] .live-summary-bar,
+#overview[data-live="false"] .analytics-grid,
+#overview[data-live="false"] #heatmap,
+#overview[data-live="false"] .live-filters,
+#overview[data-live="false"] #live-students .panel-head { display: none; }
+.live-empty-line { font-size: 13.5px; color: var(--text-soft); }
+
+/* Class header: name, join code and who's online, with the live controls; no badge or glow */
+.class-hero { padding: 18px 22px; background: var(--surface); box-shadow: none; }
+.class-hero .class-initial { display: none; }
+.session-control { flex-direction: row; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.session-control small { flex-basis: 100%; }

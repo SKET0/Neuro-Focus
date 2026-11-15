@@ -1,5 +1,6 @@
-// Attendance for the open class: summary numbers, attendance by student, and every saved live
-// session with editable marks (present, late, absent, excused), plus a spreadsheet download.
+// The Sessions tab for the open class: three numbers (sessions, attendance, average focus) and
+// every saved live session; opening one shows each student once, with their mark (editable:
+// present, late, absent, excused), time in the session and focus. Plus a spreadsheet download.
 // Marks are taken automatically by the database (see 20261005000000_sessions_attendance.sql).
 // It also publishes "neurofocus:attendance" so the master list (teacher-classes.js) can show
 // each student's attendance and who has joined the live session.
@@ -13,7 +14,6 @@ if (app) {
   const PAGE = 1000;           // Supabase returns at most 1,000 rows per request
   const SESSIONS_SHOWN = 10;
   const LIVE_POLL_MS = 8000;
-  const LOW_RATE = 75;
   const STATUS_LABELS = { present: "Present", late: "Late", absent: "Absent", excused: "Excused", invited: "Not joined yet" };
 
   let classId = window.neuroFocusClass?.id || "";
@@ -131,7 +131,18 @@ if (app) {
       const status = row.status === "invited" ? "absent" : row.status;
       stats[status] += 1;
     });
+    // Focus each student shared across this class's live sessions.
+    const shared = new Map();
+    focus.forEach((entry, key) => {
+      const studentId = key.slice(key.indexOf(":") + 1);
+      const total = shared.get(studentId) || { tracked: 0, focused: 0 };
+      total.tracked += entry.tracked;
+      total.focused += entry.focused;
+      shared.set(studentId, total);
+    });
     byStudent.forEach((stats) => {
+      const total = shared.get(stats.id);
+      stats.focus = total && total.tracked >= 5 ? Math.round((total.focused / total.tracked) * 100) : null;
       stats.attended = stats.present + stats.late;
       stats.counted = stats.attended + stats.absent;
       stats.rate = stats.counted ? Math.round((stats.attended / stats.counted) * 100) : null;
@@ -156,65 +167,38 @@ if (app) {
     content.hidden = missing;
     if (missing) return;
     renderStats(summary);
-    renderStudents(summary);
     renderSessions();
-    const live = sessions.find(isOpen);
-    $("#attendanceStatus").textContent = !sessions.length
-      ? "No live sessions yet. Start one and attendance is taken automatically: everyone on the master list is invited, and students are marked present when they join."
-      : `${plural(summary.endedCount, "finished session")}${live ? " · 1 live now" : ""}. Students are marked late if they join more than ${plural(live?.late_after_minutes ?? sessions[0].late_after_minutes, "minute")} after the start; change any mark below.`;
+    const status = $("#attendanceStatus");
+    status.textContent = sessions.length ? "" : "No live sessions yet. Start one from the Live tab and attendance is taken for you.";
+    status.hidden = Boolean(sessions.length);
+  }
+
+  // Focus shared in one session: { tracked, focused } seconds over everyone, or for one student.
+  function sessionFocus(sessionId) {
+    let tracked = 0;
+    let focused = 0;
+    focus.forEach((entry, key) => {
+      if (!key.startsWith(`${sessionId}:`)) return;
+      tracked += entry.tracked;
+      focused += entry.focused;
+    });
+    return tracked >= 5 ? Math.round((focused / tracked) * 100) : null;
   }
 
   function renderStats(summary) {
     const students = [...summary.byStudent.values()];
     const attended = students.reduce((sum, stats) => sum + stats.attended, 0);
     const counted = students.reduce((sum, stats) => sum + stats.counted, 0);
-    const late = students.reduce((sum, stats) => sum + stats.late, 0);
-    const low = students.filter((stats) => stats.inClass && stats.rate !== null && stats.rate < LOW_RATE);
     const lastEnded = sessions.find((session) => !isOpen(session));
+    let tracked = 0;
+    let focused = 0;
+    focus.forEach((entry) => { tracked += entry.tracked; focused += entry.focused; });
     $("#attSessions").textContent = String(summary.endedCount);
-    $("#attSessionsNote").textContent = lastEnded ? `Last: ${day(lastEnded.started_at)}` : "None finished yet";
+    $("#attSessionsNote").textContent = lastEnded ? `Last on ${day(lastEnded.started_at)}` : "None finished yet";
     $("#attRate").textContent = counted ? `${Math.round((attended / counted) * 100)}%` : "—";
-    $("#attRateNote").textContent = counted ? `${attended} of ${plural(counted, "expected attendance")}` : "Across finished sessions";
-    $("#attLate").textContent = attended ? `${Math.round((late / attended) * 100)}%` : "—";
-    $("#attLateNote").textContent = attended ? `${plural(late, "late arrival")}` : "Of students who came";
-    $("#attLow").textContent = String(low.length);
-    $("#attLowNote").textContent = low.length ? `Below ${LOW_RATE}%: ${low.slice(0, 2).map((stats) => stats.name).join(", ")}${low.length > 2 ? "…" : ""}` : `No one below ${LOW_RATE}%`;
-  }
-
-  function rateBar(rate) {
-    const wrap = el("span", "att-rate");
-    if (rate === null) { wrap.append(el("span", "muted", "—")); return wrap; }
-    wrap.dataset.level = rate >= 90 ? "good" : rate >= LOW_RATE ? "ok" : "low";
-    const bar = el("span", "att-bar");
-    const fill = el("span");
-    fill.style.width = `${rate}%`;
-    bar.append(fill);
-    wrap.append(bar, `${rate}%`);
-    return wrap;
-  }
-
-  function renderStudents(summary) {
-    const body = $("#attStudentRows");
-    const students = [...summary.byStudent.values()]
-      .sort((a, b) => (a.rate ?? 101) - (b.rate ?? 101) || a.name.localeCompare(b.name));
-    if (!students.length) {
-      const row = el("tr");
-      const cell = el("td", "empty-state", "No students on the master list yet.");
-      cell.colSpan = 6;
-      row.append(cell);
-      body.replaceChildren(row);
-      return;
-    }
-    body.replaceChildren(...students.map((stats) => {
-      const row = el("tr");
-      const name = el("td");
-      name.append(stats.name);
-      if (!stats.inClass) name.append(el("span", "left-tag", "Left class"));
-      const rate = el("td");
-      rate.append(rateBar(stats.rate));
-      row.append(name, el("td", "num", String(stats.present)), el("td", "num", String(stats.late)), el("td", "num", String(stats.absent)), el("td", "num", String(stats.excused)), rate);
-      return row;
-    }));
+    $("#attRateNote").textContent = counted ? `${attended} of ${counted} places filled` : "After your first session";
+    $("#attFocus").textContent = tracked >= 5 ? `${Math.round((focused / tracked) * 100)}%` : "—";
+    $("#attFocusNote").textContent = tracked >= 5 ? `Over ${minutes(Math.round(tracked))} tracked` : "Shared in live sessions";
   }
 
   function counts(sessionId) {
@@ -236,12 +220,6 @@ if (app) {
     more.textContent = `Show older sessions (${sessions.length - shown})`;
   }
 
-  function chip(kind, value, label) {
-    const node = el("span", `att-chip ${kind}`);
-    node.append(el("b", "", String(value)), ` ${label}`);
-    return node;
-  }
-
   function sessionItem(session) {
     const item = el("li", "att-session");
     const open = openSessions.has(session.id);
@@ -258,19 +236,18 @@ if (app) {
       title.append(live);
     }
     const length = session.ended_at ? Math.round((new Date(session.ended_at) - new Date(session.started_at)) / 60000) : null;
-    when.append(title, el("small", "", `${time(session.started_at)}${session.ended_at ? ` – ${time(session.ended_at)} · ${length} min` : " · in progress"}`));
-    const chips = el("span", "att-chips");
-    chips.append(chip("present", c.present, "present"), chip("late", c.late, "late"));
-    if (isOpen(session)) chips.append(chip("invited", c.invited, "not joined"));
-    else chips.append(chip("absent", c.absent, "absent"));
-    if (c.excused) chips.append(chip("excused", c.excused, "excused"));
+    when.append(title, el("small", "", `${time(session.started_at)}${session.ended_at ? ` · ${length} min` : " · in progress"}`));
     const expected = c.present + c.late + c.absent + (isOpen(session) ? c.invited : 0);
-    const rate = expected ? Math.round(((c.present + c.late) / expected) * 100) : null;
+    const came = el("span", "att-came");
+    came.append(el("b", "", `${c.present + c.late} of ${expected}`), isOpen(session) ? " joined" : " came");
+    if (c.late) came.append(el("small", "", ` · ${c.late} late`));
+    const sessionFocusValue = sessionFocus(session.id);
+    const focusPill = el("span", "att-focus", sessionFocusValue === null ? "No focus data" : `Focus ${sessionFocusValue}%`);
+    if (sessionFocusValue === null) focusPill.dataset.empty = "true";
+    else focusPill.dataset.level = sessionFocusValue >= 70 ? "good" : sessionFocusValue >= 45 ? "mid" : "low";
     const chevron = el("span", "att-chevron", "›");
     chevron.setAttribute("aria-hidden", "true");
-    // A session still in progress shows how many have joined rather than a (low-looking) rate.
-    const summary = isOpen(session) ? el("span", "att-rate muted", `${c.present + c.late} of ${expected} joined`) : rateBar(rate);
-    button.append(when, chips, summary, chevron);
+    button.append(when, came, focusPill, chevron);
 
     const detail = el("div", "att-detail");
     detail.hidden = !open;
@@ -294,13 +271,13 @@ if (app) {
     const table = el("table", "data-table att-table");
     const head = el("thead");
     const headRow = el("tr");
-    ["Student", "Mark", "Joined", "Time in session", "Focus", ""].forEach((label) => headRow.append(el("th", "", label)));
+    ["Student", "Mark", "Time in session", "Focus"].forEach((label) => headRow.append(el("th", "", label)));
     head.append(headRow);
     const body = el("tbody");
     if (!sessionRows.length) {
       const row = el("tr");
       const cell = el("td", "empty-state", "No one was on the master list for this session.");
-      cell.colSpan = 6;
+      cell.colSpan = 4;
       row.append(cell);
       body.append(row);
     }
@@ -309,6 +286,7 @@ if (app) {
       const name = el("td");
       name.append(row.name);
       if (!row.inClass) name.append(el("span", "left-tag", "Left class"));
+      if (row.removed_at) name.append(el("small", "att-note", `Removed at ${time(row.removed_at)}`));
       const markCell = el("td");
       const select = el("select", "field-select att-mark");
       select.dataset.status = row.status;
@@ -324,13 +302,11 @@ if (app) {
       select.addEventListener("change", () => { void setMark(session, row, select); });
       markCell.append(select);
       if (row.marked_by_teacher) markCell.append(el("span", "edited-tag", "edited"));
-      const notes = el("td", "muted");
-      if (row.removed_at) notes.textContent = `Removed from session ${time(row.removed_at)}`;
       const shared = focus.get(`${session.id}:${row.student_id}`);
-      const focusText = shared?.tracked >= 5 ? `${Math.round((shared.focused / shared.tracked) * 100)}% of ${minutes(shared.tracked)}` : "—";
+      const focusText = shared?.tracked >= 5 ? `${Math.round((shared.focused / shared.tracked) * 100)}%` : "—";
       const focusCell = el("td", shared?.tracked >= 5 ? "" : "muted", focusText);
       focusCell.title = shared?.tracked >= 5 ? "Share of tracked time spent looking at the screen" : "No attention was shared in this session";
-      tr.append(name, markCell, el("td", "", row.joined_at ? time(row.joined_at) : "—"), el("td", "", minutes(row.attended_seconds)), focusCell, notes);
+      tr.append(name, markCell, el("td", "", minutes(row.attended_seconds)), focusCell);
       body.append(tr);
     });
     table.append(head, body);
@@ -338,9 +314,6 @@ if (app) {
     scroll.style.maxHeight = "none";
     scroll.append(table);
     const foot = el("div", "att-detail-foot");
-    foot.append(el("span", "muted", isOpen(session)
-      ? "Marks update as students join. Anyone who hasn’t joined by the end is marked absent."
-      : "Change a mark if it isn’t right, for example to excuse an absence."));
     if (!isOpen(session)) {
       const remove = el("button", "btn-remove", "Delete this session");
       remove.type = "button";
