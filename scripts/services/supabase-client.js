@@ -15,6 +15,8 @@ export async function getSupabase() {
   }
 
   clientPromise ??= import("https://esm.sh/@supabase/supabase-js@2")
-    .then(({ createClient }) => createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY));
+    // The live connection's heartbeat runs in a worker, so live sessions stay connected while the
+    // tab is in the background (e.g. the student is in Zoom or Google Meet).
+    .then(({ createClient }) => createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, { realtime: { worker: true } }));
   return clientPromise;
 }

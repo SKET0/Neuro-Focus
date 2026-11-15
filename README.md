@@ -303,6 +303,16 @@ How it works: each task is cut into windows of 16 readings (about 2 seconds). Un
 6. **Session ends** (`end_class_session`, or automatically after the dashboard has been gone for 15 minutes): no-shows are marked absent.
 7. **Saved records:** attendance (Attendance tab, spreadsheet download), shared attention history per session (History tab, plus a Focus column in each session's attendance), and the student's own Focus history, which includes their personal tracking too.
 
+## Tracking in a background tab
+
+Students often keep Neuro-Focus open behind another tab or app, such as Zoom or Google Meet. Browsers slow a hidden page's own timers to about once a second (once a minute after 5 minutes), which used to pause tracking. `scripts/shared/background-clock.js` keeps time in a small web worker instead, whose timers aren't slowed, and the page does the work on each tick. It drives:
+
+- the attention tracker (a reading every 120 ms; in a hidden Chrome tab this kept about 8 readings a second, against 1 before),
+- live-session attendance check-ins (every 30 s; gaps over 75 s don't count as attended time),
+- saving a focus session's progress (every 10 s), the focus timer's countdown, and quiz camera reports (every 3 s).
+
+Supabase's live connection sends its heartbeat from a worker too (`realtime: { worker: true }` in `supabase-client.js`), so live sessions stay connected in the background. Tested in Chrome on macOS with a tab switch of 60 seconds; longer periods, minimised windows and other browsers still need a check.
+
 ## Privacy and access rules
 
 Enforced by the database (Row Level Security), not just by the pages:

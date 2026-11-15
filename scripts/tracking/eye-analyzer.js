@@ -5,6 +5,7 @@
 // score, never a score of 0. During the focus timer's break readings are marked as a break.
 import { assessFrame, createReadingFilter } from "./gaze-reading.js";
 import { loadFaceLandmarker } from "./face-model.js";
+import { every } from "../shared/background-clock.js";
 import { REASONS } from "../shared/tracking-states.js";
 
 const video = document.querySelector("#analyzerVideo");
@@ -143,7 +144,9 @@ if (video) {
       if (token !== startToken) return;
 
       filter.reset();
-      timer = window.setInterval(analyze, 120);
+      // A worker keeps the beat, so tracking carries on at full speed while the student is in
+      // another tab or app (e.g. Zoom or Google Meet). A page timer would slow to once a second.
+      timer = every(120, analyze);
       startButton.hidden = true;
       startButton.textContent = defaultStartLabel;
       stopButton.hidden = false;
@@ -166,7 +169,7 @@ if (video) {
     starting = false;
     const wasTracking = Boolean(timer);
     window.neuroFocusTracking = false;
-    window.clearInterval(timer);
+    timer?.();
     timer = undefined;
     stream?.getTracks().forEach((track) => track.stop());
     stream = undefined;

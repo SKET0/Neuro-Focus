@@ -11,6 +11,7 @@
 // numbers only) for their teacher.
 import { el, errorText, infoButton, quizSqlMissing, QUIZ_SETUP_TEXT, CHOICE_LETTERS, secondsLeft } from "../shared/classroom.js";
 import { createSessionAccumulator, normalizeReading, describeReading, TRACKING } from "../shared/tracking-states.js";
+import { every } from "../shared/background-clock.js";
 
 const app = await window.neuroFocusReady;
 
@@ -137,6 +138,11 @@ if (app && document.querySelector("#classPanelQuizzes")) {
     void reportFocus();
     if (state && state.quiz.status !== "finished") { shownKey = ""; void render(); }
   };
+  // Reports go out on time even while the quiz tab is in the background (the camera must count as
+  // "on" within the last 15 seconds).
+  every(REPORT_MS, () => {
+    if (playId && state && state.quiz.status !== "finished" && Date.now() - lastReportAt >= REPORT_MS - 500) void reportFocus();
+  });
   window.addEventListener("neurofocus:tracking-started", cameraChanged);
   window.addEventListener("neurofocus:tracking-stopped", cameraChanged);
 
@@ -229,7 +235,6 @@ if (app && document.querySelector("#classPanelQuizzes")) {
       state = { ...data, fetchedAt: Date.now() };
       await render();
       paintCamera();
-      if (state.quiz.status !== "finished" && Date.now() - lastReportAt >= REPORT_MS) void reportFocus();
     }
     if (playId === forQuiz && state?.quiz.status !== "finished") pollTimer = window.setTimeout(poll, POLL_MS);
   }

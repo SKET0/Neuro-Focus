@@ -4,6 +4,7 @@
 // micro-goals are also shared with the Home view (student-dashboard.js).
 import { themeColor, withAlpha } from "../shared/appearance.js";
 import { showSessionSummary } from "./session-summary.js";
+import { every } from "../shared/background-clock.js";
 import {
   createSessionAccumulator, createSampleWindow, normalizeReading, describeReading, LEGACY_SAMPLE_STATES, missingQualityColumns
 } from "../shared/tracking-states.js";
@@ -298,10 +299,11 @@ if (app) {
   }
 
   function setTimerRunning(running, { restoring = false } = {}) {
-    window.clearInterval(timer.interval);
+    timer.interval?.();
+    timer.interval = null;
     timer.running = running;
     if (running) {
-      timer.interval = window.setInterval(tickTimer, 1000);
+      timer.interval = every(1000, tickTimer); // keeps counting in a background tab
       // After a page refresh the camera stays off until the student starts it again.
       if (!restoring && timer.phase === "focus" && $("#timerWithTracking").checked && !window.neuroFocusClassContext?.().joinedClassId) {
         window.dispatchEvent(new CustomEvent("neurofocus:start-camera"));
@@ -713,7 +715,7 @@ if (app) {
       console.warn("Could not start a saved attention session", error);
       return null;
     });
-    p.timer = window.setInterval(() => { if (!p.ended) enqueue(() => saveProgress(p)); }, SAVE_EVERY_MS);
+    p.timer = every(SAVE_EVERY_MS, () => { if (!p.ended) enqueue(() => saveProgress(p)); });
     part = p;
     return p;
   }
@@ -725,7 +727,7 @@ if (app) {
   function endPart(p) {
     if (!p || p.ended) return saveQueue;
     p.ended = true;
-    window.clearInterval(p.timer);
+    p.timer?.();
     closeSampleWindow(p);
     p.final = partSummary(p, Date.now());
     if (p.classId) lastClassPart.set(p.classId, p);

@@ -8,6 +8,7 @@ import { paintAvatar, avatarUrls } from "../shared/avatars.js";
 import { classColor } from "./class-colors.js";
 import { createMascot } from "./buddy-mascot.js";
 import { normalizeReading, legacyState } from "../shared/tracking-states.js";
+import { every } from "../shared/background-clock.js";
 
 const app = await window.neuroFocusReady;
 
@@ -592,14 +593,14 @@ if (app) {
     const inSession = status?.live && status.sessionId && !removedFromSession(joinedClassId);
     const sessionId = inSession ? status.sessionId : null;
     if (sessionId === checkIn.sessionId) return;
-    window.clearInterval(checkIn.timer);
+    checkIn.timer?.();
     checkIn = { sessionId, timer: null, status: "" };
     if (!sessionId) return;
     const beat = async () => {
       const { data, error } = await supabase.rpc("check_in_session", { p_session_id: sessionId });
       if (checkIn.sessionId !== sessionId) return;
       if (error) {
-        if (isMissingSql(error)) window.clearInterval(checkIn.timer); // attendance SQL not run yet
+        if (isMissingSql(error)) checkIn.timer?.(); // attendance SQL not run yet
         return;
       }
       if (data?.removed && !serverRemoved.has(sessionId)) {
@@ -618,7 +619,8 @@ if (app) {
       }
     };
     void beat();
-    checkIn.timer = window.setInterval(() => { void beat(); }, CHECK_IN_MS);
+    // Kept on time in a background tab too (attendance only counts gaps of up to 75 seconds).
+    checkIn.timer = every(CHECK_IN_MS, () => { void beat(); });
   }
 
   // ---------- Rendering ----------
