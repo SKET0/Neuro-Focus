@@ -77,19 +77,27 @@ The login page has **Continue with Google**, **Forgot password?** and a confirm-
    - **Authorized redirect URIs:** `https://awklqioisiiyaqixnnbl.supabase.co/auth/v1/callback`
 3. Copy the client ID and client secret into **Supabase → Authentication → Sign In / Providers → Google**, turn it on and save.
 
-People who continue with Google get a student account named after their Google profile. Teachers are promoted with the SQL below, the same as email accounts. If someone already has an email account with the same Gmail address, Supabase links the two.
+People who continue with Google get an account named after their Google profile. If they picked **Teacher** on **Create account** before pressing the Google button, the new account becomes a teacher (see below); otherwise it's a student. If someone already has an email account with the same Gmail address, Supabase links the two and the account keeps its role.
 
-## Enable a teacher account
+## Teacher accounts
 
-New accounts always receive the student role. The teacher choice at signup is a request and cannot grant privileges by itself. After a trusted teacher account has been created and confirmed, the project owner can promote it in the Supabase SQL Editor:
+Anyone can create a teacher account: the role picked on **Create account** (Student or Teacher) is the role the account gets, with no approval step. A teacher only ever sees the classes they create and the students who join them with a code.
+
+This needs `supabase/migrations/20261012000000_open_teacher_signup.sql`, run once in **Supabase Dashboard → SQL Editor** after the quizzes update. It is safe to run again. It:
+
+- gives new email accounts the role picked at sign-up;
+- adds `choose_teacher_role()`, which the sign-in page calls when a brand-new Google account picked Teacher. It only works on an account created in the last 15 minutes that hasn't joined a class, so an existing student can't switch later;
+- turns teacher requests that were still waiting (student accounts that asked to be a teacher and haven't joined a class) into teachers.
+
+To change an existing account's role by hand, use the Supabase SQL Editor:
 
 ```sql
 update public.profiles
-set role = 'teacher'
+set role = 'teacher' -- or 'student'
 where id = (select id from auth.users where lower(email) = lower('teacher@example.com'));
 ```
 
-Sign out and back in after changing a role. Never let an untrusted user run this SQL.
+Sign out and back in after changing a role.
 
 ## Connect NeuroBuddy (free with Google Gemini)
 

@@ -17,7 +17,7 @@ await db.exec(`
   create role anon nologin; create role authenticated nologin; create role service_role nologin;
   create schema auth; create schema realtime; create schema extensions;
   grant usage on schema public, auth, realtime, extensions to anon, authenticated;
-  create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb default '{}'::jsonb);
+  create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb default '{}'::jsonb, created_at timestamptz default now());
   create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
   grant execute on function auth.uid() to anon, authenticated;
   create table realtime.messages (id bigserial primary key, topic text, extension text, payload jsonb, event text, private boolean default true);
@@ -430,6 +430,23 @@ await rows(T1, "select public.quiz_close_question($1)", [quiet]);
 await rows(T1, "select public.quiz_finish($1)", [quiet]);
 ok("with the leaderboard off, students see only their own result", (await rows(S1, "select public.quiz_results($1) as r", [quiet]))[0].r.leaderboard === null);
 ok("quiz points have nothing to do with attention: no attention tables are touched", (await db.query("select count(*)::int n from public.quiz_answers where points > 1")).rows[0].n === 0);
+
+// ---------- Open teacher sign-up ----------
+const NEW_T = id(21), NEW_X = id(22), NEW_G = id(23), OLD_G = id(24);
+const signUp = (uid, meta, createdAt = null) => db.query(
+  "insert into auth.users (id, email, raw_user_meta_data, created_at) values ($1, $2, $3, coalesce($4::timestamptz, now()))",
+  [uid, `${uid}@x.test`, meta, createdAt]
+);
+await signUp(NEW_T, { full_name: "New Teacher", role_request: "teacher" });
+await signUp(NEW_X, { full_name: "Sneaky", role_request: "admin" });
+await signUp(NEW_G, { full_name: "Google Teacher" });
+await signUp(OLD_G, { full_name: "Old Student" }, new Date(Date.now() - 3600 * 1000).toISOString());
+ok("email sign-up as a teacher gets the teacher role straight away", (await profileOf(NEW_T)).role === "teacher");
+ok("any other role request becomes a student", (await profileOf(NEW_X)).role === "student");
+ok("a brand-new Google account can choose to be a teacher", (await tryQ(NEW_G, "select public.choose_teacher_role()")).ok && (await profileOf(NEW_G)).role === "teacher");
+ok("a student in a class stays a student", (await profileOf(S1)).role === "student" && !(await tryQ(S1, "select public.choose_teacher_role()")).ok);
+ok("an older account can't switch to teacher", !(await tryQ(OLD_G, "select public.choose_teacher_role()")).ok && (await profileOf(OLD_G)).role === "student");
+ok("signed-out visitors can't call choose_teacher_role", !(await tryQ(null, "select public.choose_teacher_role()")).ok);
 
 console.log(failures ? `\n${failures} CHECK(S) FAILED` : "\nALL CHECKS PASSED");
 process.exitCode = failures ? 1 : 0;

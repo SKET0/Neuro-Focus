@@ -32,7 +32,8 @@ if (form) {
     forgot: { title: "Reset your password", subtitle: "Enter your account email and we’ll send you a link to choose a new password.", submit: "Send reset link" },
     reset: { title: "Choose a new password", subtitle: "", submit: "Save new password" }
   };
-  const teacherNote = "Teacher accounts start as a request. A project owner approves them before teacher tools unlock.";
+  // Google can't carry the role picked on "Create account", so it's remembered across the trip.
+  const GOOGLE_ROLE_KEY = "neurofocus-google-role";
   let mode = ["signup", "forgot"].includes(params.get("mode")) ? params.get("mode") : "login";
   let roleRequest = "student";
   let resetEmail = "";
@@ -77,14 +78,13 @@ if (form) {
 
   function setMode(next, { focus = false } = {}) {
     mode = next;
-    showMessage(mode === "signup" && roleRequest === "teacher" ? teacherNote : "");
+    showMessage("");
     paint();
     if (focus) ({ signup: fullName, reset: password }[mode] || email).focus();
   }
 
   roleButtons.forEach((button) => button.addEventListener("click", () => {
     roleRequest = button.dataset.role;
-    showMessage(roleRequest === "teacher" ? teacherNote : "");
     paint();
   }));
   modeButtons.forEach((button) => button.addEventListener("click", () => setMode(button.dataset.mode)));
@@ -204,9 +204,7 @@ if (form) {
           paint();
           password.value = "";
           confirm.value = "";
-          showMessage(roleRequest === "teacher"
-            ? "Teacher request submitted. Confirm your email, then sign in. A teacher must be approved before creating classes."
-            : `Account created. Check ${address} for a confirmation link, then sign in here.`, "success");
+          showMessage(`Account created. Check ${address} for a confirmation link, then sign in here.`, "success");
           return;
         }
         showMessage("Account created. Opening your workspace…", "success");
@@ -259,6 +257,10 @@ if (form) {
         showMessage("Google sign-in isn’t turned on for this project yet. The project owner can enable it in Supabase → Authentication → Sign In / Providers → Google (see README).", "error");
         return;
       }
+      try {
+        if (mode === "signup" && roleRequest === "teacher") sessionStorage.setItem(GOOGLE_ROLE_KEY, "teacher");
+        else sessionStorage.removeItem(GOOGLE_ROLE_KEY);
+      } catch { /* storage blocked: the account starts as a student */ }
       const supabase = await getSupabase();
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
@@ -336,6 +338,20 @@ if (form) {
       if (emailChanged) {
         showMessage(`Your sign-in email is now ${session.user.email}. Opening your workspace…`, "success");
         await new Promise((resolve) => window.setTimeout(resolve, 1800));
+      }
+      // A new Google account whose owner picked "Teacher" before leaving for Google.
+      let wantsTeacher = false;
+      try {
+        wantsTeacher = sessionStorage.getItem(GOOGLE_ROLE_KEY) === "teacher";
+        sessionStorage.removeItem(GOOGLE_ROLE_KEY);
+      } catch { /* storage blocked */ }
+      if (wantsTeacher) {
+        const { error } = await supabase.rpc("choose_teacher_role");
+        if (error) {
+          // An existing account keeps its role; say so before opening it.
+          showMessage("You already had a Neuro-Focus account with this Google account, so it keeps its current role. Opening your workspace…", "success");
+          await new Promise((resolve) => window.setTimeout(resolve, 2500));
+        }
       }
       const { data: profile } = await supabase.from("profiles").select("role").eq("id", session.user.id).maybeSingle();
       if (profile) window.location.replace(profile.role === "teacher" ? "teacher.html" : "student.html");
