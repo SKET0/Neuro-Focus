@@ -32,6 +32,14 @@
     :focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; border-radius: 6px; }
     [hidden] { display: none !important; }
     .container { width: min(760px, 100% - 48px); margin: 0 auto; padding: 56px 0 64px; }
+    /* Links to the main site open in a new tab, so a recording in progress or not yet downloaded is never lost */
+    .site-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 36px; }
+    .site-brand { display: inline-flex; align-items: center; gap: 10px; color: var(--text-main); text-decoration: none; font-weight: 600; font-size: 15px; white-space: nowrap; }
+    .site-brand img { width: 26px; height: 26px; }
+    .site-link { color: var(--cyan); text-decoration: none; font-size: 14px; font-weight: 500; white-space: nowrap; }
+    .site-brand:hover, .site-link:hover { text-decoration: underline; }
+    .site-card { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .site-card p { margin: 0; }
     .kicker { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--cyan); margin-bottom: 12px; }
     h1 { font-size: clamp(28px, 5vw, 40px); font-weight: 600; letter-spacing: -0.03em; line-height: 1.15; color: var(--text-main); margin-bottom: 14px; }
     h2 { font-size: 18px; font-weight: 600; color: var(--text-main); margin: 32px 0 10px; }
@@ -62,6 +70,8 @@
     .dot.bad { background: var(--amber); }
     .status-detail { font-size: 13.5px; color: var(--text-muted); margin-top: 6px; }
 
+    .button-link { display: inline-block; padding: 11px 18px; border-radius: 10px; border: 1px solid var(--line-strong); background: var(--surface-2); color: var(--text-main); font-weight: 600; font-size: 15px; text-decoration: none; }
+    .button-link:hover { border-color: var(--cyan); }
     .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px; }
     button {
       font: inherit; font-size: 15px; font-weight: 600; border-radius: 10px; padding: 11px 18px; cursor: pointer;
@@ -106,6 +116,10 @@
 </head>
 <body>
   <div class="container" id="setup">
+    <div class="site-bar">
+      <a class="site-brand" href="../index.html" target="_blank" rel="noopener"><img src="../assets/images/favicon.svg" alt=""> Neuro-Focus</a>
+      <a class="site-link" href="../index.html" target="_blank" rel="noopener">Visit the website ↗</a>
+    </div>
     <p class="kicker">Neuro-Focus · model data</p>
     <h1>Help train the Neuro-Focus attention model</h1>
     <p>This takes about <strong>6 minutes</strong>. First you look at the screen for 20 seconds. Then the screen will ask you to do a few short things: read some text, follow a dot, use your phone, look away and act tired. Each one lasts 30–40 seconds and each comes up twice.</p>
@@ -171,6 +185,10 @@
   </div>
 
   <div class="container" id="done" hidden>
+    <div class="site-bar">
+      <a class="site-brand" href="../index.html" target="_blank" rel="noopener"><img src="../assets/images/favicon.svg" alt=""> Neuro-Focus</a>
+      <a class="site-link" href="../index.html" target="_blank" rel="noopener">Visit the website ↗</a>
+    </div>
     <p class="kicker">Neuro-Focus · model data</p>
     <h1 id="doneTitle">Thank you, that's everything</h1>
     <p id="doneText">Download your file and send it to the Neuro-Focus team. It contains only the numbers described at the start.</p>
@@ -185,6 +203,10 @@
         <tbody id="summaryRows"></tbody>
       </table>
       <p class="status-detail" id="summaryNote"></p>
+    </div>
+    <div class="card site-card">
+      <p><strong>Curious what this is for?</strong> See how Neuro-Focus helps students stay focused.</p>
+      <a class="button-link" href="../index.html" target="_blank" rel="noopener">Visit Neuro-Focus ↗</a>
     </div>
   </div>
 
