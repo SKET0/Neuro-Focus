@@ -16,6 +16,11 @@ const TASKS = {
   away: { label: 0, seconds: 30, title: "Look away", text: "Look away from the screen: around the room, out of a window or at something beside you." },
   tired: { label: 0, seconds: 30, title: "Act tired", text: "Stay where you are and let your eyes get heavy, as if you're very tired. Keep them partly open." }
 };
+// First of all: 20 seconds looking at the screen. It's each person's baseline (how open their eyes
+// look, how far they sit, where the camera points): training measures some readings against it
+// and doesn't score it as a task.
+const CALIBRATION = { label: 1, seconds: 20, title: "Look at the screen", text: "Sit as you normally would and look at the dot in the middle of the screen. This sets your starting point." };
+const stepInfo = (step) => (step.task === "calibrate" ? CALIBRATION : TASKS[step.task]);
 const LOOK_BACK = "You'll hear a beep when it's time to look back at the screen.";
 
 const PASSAGES = [
@@ -165,7 +170,7 @@ function buildPlan() {
   const first = shuffle(names);
   let second = shuffle(names);
   while (second[0] === first[first.length - 1]) second = shuffle(names);
-  return [...first.map((task) => ({ round: 1, task })), ...second.map((task) => ({ round: 2, task }))];
+  return [{ round: 1, task: "calibrate" }, ...first.map((task) => ({ round: 1, task })), ...second.map((task) => ({ round: 2, task }))];
 }
 
 function beep(times = 1) {
@@ -186,7 +191,7 @@ function beep(times = 1) {
 const wait = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
 function showPrep(step, count) {
-  const task = TASKS[step.task];
+  const task = stepInfo(step);
   els.stageBody.innerHTML = "";
   const box = document.createElement("div");
   box.className = "prep";
@@ -200,7 +205,7 @@ function showPrep(step, count) {
 
 // Shows the task and returns a function that stops any animation it started.
 function showTask(step) {
-  const task = TASKS[step.task];
+  const task = stepInfo(step);
   els.stageBody.innerHTML = "";
   if (step.task === "read") {
     const box = document.createElement("div");
@@ -213,6 +218,14 @@ function showTask(step) {
     });
     box.append(article);
     els.stageBody.append(box);
+    return () => {};
+  }
+  if (step.task === "calibrate") {
+    const dot = document.createElement("div");
+    dot.className = "target";
+    dot.style.left = "50%";
+    dot.style.top = "50%";
+    els.stageBody.append(dot);
     return () => {};
   }
   if (step.task === "dot") {
@@ -243,10 +256,10 @@ function showTask(step) {
 async function runSequence() {
   const token = ++runToken;
   const plan = buildPlan();
-  const total = plan.reduce((sum, step) => sum + PREP_SECONDS + TASKS[step.task].seconds, 0);
+  const total = plan.reduce((sum, step) => sum + PREP_SECONDS + stepInfo(step).seconds, 0);
   let elapsed = 0;
   const progress = (step, index, seconds) => {
-    els.progressLabel.textContent = `Task ${index + 1} of ${plan.length} · ${TASKS[step.task].title}`;
+    els.progressLabel.textContent = `Task ${index + 1} of ${plan.length} · ${stepInfo(step).title}`;
     els.progressBar.style.width = `${Math.min(100, ((elapsed + seconds) / total) * 100)}%`;
   };
 
@@ -260,7 +273,7 @@ async function runSequence() {
     }
     elapsed += PREP_SECONDS;
 
-    const task = TASKS[step.task];
+    const task = stepInfo(step);
     const stopAnimation = showTask(step);
     beep(1);
     current = { round: step.round, task: step.task, label: task.label, startedAt: Date.now() };
@@ -317,11 +330,11 @@ function finish(completed) {
   els.downloadButton.disabled = !rows.length;
 
   els.summaryRows.innerHTML = "";
-  for (const name of Object.keys(TASKS)) {
+  for (const name of ["calibrate", ...Object.keys(TASKS)]) {
     const mine = rows.filter((row) => row.task === name);
     const tr = document.createElement("tr");
     const usable = mine.length ? Math.round((mine.filter((row) => row.usable).length / mine.length) * 100) : 0;
-    [TASKS[name].title, mine.length, mine.length ? `${usable}%` : "—"].forEach((text) => {
+    [stepInfo({ task: name }).title, mine.length, mine.length ? `${usable}%` : "—"].forEach((text) => {
       const td = document.createElement("td");
       td.textContent = text;
       tr.append(td);
