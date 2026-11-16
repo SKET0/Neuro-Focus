@@ -62,6 +62,18 @@ Windows tested: 5482.
 | P16 | 536 | 87.1% | 65.9% |
 | P23 | 637 | 72.6% | 55.1% |
 
+## Over time (as the app shows it)
+
+The model's raw answer is usually very sure either way, so it jumps; the app averages it over about 3 s and only switches to not focused below 40% and back above 60%. Score change is the average move from one moment to the next (about 0.5 s apart, in points out of 100).
+
+| | Rules | LSTM (raw) | LSTM (smoothed, as in the app) |
+|---|---|---|---|
+| Focused correctly left alone | 99.1% | 83.5% | 88.7% |
+| Distracted caught | 26.5% | 76.8% | 77.7% |
+| Balanced accuracy | 62.8% | 80.1% | 83.2% |
+| Score change between moments | 1.8 | 7.4 | 2.1 |
+| Focused / not focused switches per minute | 3.4 | 9.2 | 1.6 |
+
 ## Confusion (windows)
 
 | | Predicted focused | Predicted distracted |

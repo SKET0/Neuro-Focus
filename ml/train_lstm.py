@@ -17,7 +17,9 @@ The app does the same: 20 seconds of "look at your screen" when tracking starts.
 """
 import argparse
 import csv
+import itertools
 import json
+import math
 import sys
 from collections import defaultdict
 from datetime import date
@@ -46,6 +48,10 @@ SEED = 7
 CALIBRATED = ["face_size", "eye_open", "gaze_y", "head_pitch"]  # measured against the person's baseline
 CALIBRATION_MS = 20000      # how long the baseline is measured for
 MIN_CALIBRATION = 40        # usable readings needed for a baseline (about 5 s)
+# How the app smooths the model's answers (createScoreSmoother in scripts/tracking/attention-model.js):
+# averaged over about 3 s, and switching to not focused below 40%, back to focused above 60%.
+SMOOTH_SECONDS = 3
+SMOOTH_LOW, SMOOTH_HIGH = 0.4, 0.6
 
 ROOT = Path(__file__).resolve().parent.parent
 RESULTS = ROOT / "ml" / "results"
@@ -311,6 +317,45 @@ def compare(tested, probabilities):
 
 
 # ---------- Report ----------
+def over_time(tested, probabilities):
+    """How each method behaves over time within a task, as a student would see it: how far the score
+    moves from one window to the next (about 0.5 s apart) and how often focused / not focused
+    switches, plus accuracy. The LSTM is shown raw and smoothed the way the app smooths it."""
+    step = STRIDE * READING_MS / 1000
+    focused = np.array([w["focused"] for w in tested])
+    groups = [list(g) for _, g in itertools.groupby(range(len(tested)), key=lambda i: (tested[i]["participant"], tested[i]["round"], tested[i]["task"]))]
+
+    smoothed_score, smoothed_state = np.zeros(len(tested)), np.zeros(len(tested), dtype=bool)
+    alpha = 1 - math.exp(-step / SMOOTH_SECONDS)
+    for group in groups:
+        value, state = None, None
+        for i in group:
+            if value is None:
+                value, state = probabilities[i], probabilities[i] >= 0.5
+            else:
+                value += alpha * (probabilities[i] - value)
+                state = (value >= SMOOTH_LOW) if state else (value > SMOOTH_HIGH)
+            smoothed_score[i], smoothed_state[i] = value * 100, state
+
+    def describe(score, state):
+        changes, switches, minutes = [], 0, 0.0
+        for group in groups:
+            changes += list(np.abs(np.diff(score[group])))
+            switches += int(np.sum(state[group][1:] != state[group][:-1]))
+            minutes += len(group) * step / 60
+        left_alone, caught = float(state[focused == 1].mean()), float((~state[focused == 0]).mean())
+        return {"focused_left_alone": left_alone, "distracted_caught": caught, "balanced_accuracy": (left_alone + caught) / 2,
+                "score_change": float(np.mean(changes)), "switches_per_minute": switches / minutes}
+
+    rules_score = np.nan_to_num(np.array([w["rule_score"] for w in tested]))
+    rules_state = np.array([w["rule_focused"] for w in tested]).astype(bool)
+    return {
+        "rules": describe(rules_score, rules_state),
+        "lstm_raw": describe(probabilities * 100, probabilities >= 0.5),
+        "lstm_smoothed": describe(smoothed_score, smoothed_state),
+    }
+
+
 def pct(value):
     return "—" if value is None or value != value else f"{value * 100:.1f}%"
 
@@ -330,7 +375,7 @@ def data_summary(files, rows, windows):
     return lines
 
 
-def report(files, rows, windows, method, overall, by_task, by_person):
+def report(files, rows, windows, method, overall, by_task, by_person, timing):
     lstm, rules = overall["lstm"], overall["rules"]
     lines = [
         "# Attention model: test results", "",
@@ -357,6 +402,13 @@ def report(files, rows, windows, method, overall, by_task, by_person):
     lines += ["", f"## Balanced accuracy by person ({heading})", "", "| Person | Windows | LSTM | Rules |", "|---|---|---|---|"]
     for person, row in by_person.items():
         lines.append(f"| {person} | {row['windows']} | {pct(row['lstm'])} | {pct(row['rules'])} |")
+    lines += ["", "## Over time (as the app shows it)", "",
+              f"The model's raw answer is usually very sure either way, so it jumps; the app averages it over about {SMOOTH_SECONDS} s and only switches to not focused below {SMOOTH_LOW:.0%} and back above {SMOOTH_HIGH:.0%}. Score change is the average move from one moment to the next (about {STRIDE * READING_MS / 1000:.1f} s apart, in points out of 100).", "",
+              "| | Rules | LSTM (raw) | LSTM (smoothed, as in the app) |", "|---|---|---|---|"]
+    for key, name, fmt in [("focused_left_alone", "Focused correctly left alone", pct), ("distracted_caught", "Distracted caught", pct),
+                           ("balanced_accuracy", "Balanced accuracy", pct), ("score_change", "Score change between moments", lambda v: f"{v:.1f}"),
+                           ("switches_per_minute", "Focused / not focused switches per minute", lambda v: f"{v:.1f}")]:
+        lines.append(f"| {name} | {fmt(timing['rules'][key])} | {fmt(timing['lstm_raw'][key])} | {fmt(timing['lstm_smoothed'][key])} |")
     lines += ["", "## Confusion (windows)", "", "| | Predicted focused | Predicted distracted |", "|---|---|---|"]
     for name, result in [("LSTM", lstm), ("Rules", rules)]:
         c = result["confusion"]
@@ -455,11 +507,12 @@ def main():
 
     method, tested, probabilities = evaluate(windows)
     overall, by_task, by_person = compare(tested, probabilities)
-    text = report(files, rows, windows, method, overall, by_task, by_person)
+    timing = over_time(tested, probabilities)
+    text = report(files, rows, windows, method, overall, by_task, by_person, timing)
 
     RESULTS.mkdir(parents=True, exist_ok=True)
     (RESULTS / "report.md").write_text(text)
-    (RESULTS / "results.json").write_text(json.dumps(clean({"method": method, "overall": overall, "by_task": by_task, "by_person": by_person}), indent=2))
+    (RESULTS / "results.json").write_text(json.dumps(clean({"method": method, "overall": overall, "by_task": by_task, "by_person": by_person, "over_time": timing}), indent=2))
     print(text)
     print(f"Saved {RESULTS.relative_to(ROOT)}/report.md and results.json")
 

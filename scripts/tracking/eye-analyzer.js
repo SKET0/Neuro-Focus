@@ -11,7 +11,7 @@
 import { assessFrame, createReadingFilter } from "./gaze-reading.js";
 import { loadFaceLandmarker } from "./face-model.js";
 import { every } from "../shared/background-clock.js";
-import { loadAttentionModel, createModelWindow, createCalibration, calibrated } from "./attention-model.js";
+import { loadAttentionModel, createModelWindow, createCalibration, calibrated, createScoreSmoother } from "./attention-model.js";
 import { ENGAGEMENT, SAMPLE_STATE } from "../shared/tracking-states.js";
 import { REASONS } from "../shared/tracking-states.js";
 
@@ -37,12 +37,12 @@ if (video) {
   let model = null;        // the trained attention model, or null to keep using the rules
   let modelWindow = null;  // its last two seconds of usable readings
   let calibration = null;  // the student's baseline for the model
+  const smoother = createScoreSmoother(); // the model's answers, averaged over about 3 seconds
   const modelToggle = document.querySelector("#modelToggle");
   const modelOn = () => Boolean(modelToggle?.checked && model);
 
-  // A rules reading with the model's estimate instead: score = probability of focused.
-  function withModel(reading, probability) {
-    const focused = probability >= model.threshold;
+  // A rules reading with the model's estimate instead: score = smoothed probability of focused.
+  function withModel(reading, { probability, focused }) {
     return {
       ...reading,
       score: Math.round(probability * 100),
@@ -55,6 +55,7 @@ if (video) {
   function resetReadings() {
     filter.reset();
     modelWindow?.reset();
+    smoother.reset();
   }
 
   // Readings stay on this page (stats, nudges, saved history). They reach a teacher only through
@@ -80,7 +81,7 @@ if (video) {
       if (scoreOutput) scoreOutput.textContent = "Unavailable";
     } else if (reading.source === "model") {
       showStatus(reading.engagement === ENGAGEMENT.LOOKING_AWAY ? "Not focused" : "Focused",
-        "Estimated on this device by the trained attention model, from your face and eyes over the last 2 seconds.");
+        "Estimated on this device by the trained attention model, from your face and eyes over the last few seconds.");
       if (scoreOutput) scoreOutput.textContent = `${reading.score}%`;
     } else if (reading.calibrating) {
       showStatus(`Calibrating · look at your screen (${Math.round(calibration.progress * 100)}%)`,
@@ -120,8 +121,8 @@ if (video) {
         ? modelWindow.push(calibrated(model, assessment.features, calibration.baseline), now)
         : null;
       if (!reading) return; // a short glitch such as a blink: the last reading still stands
-      if (reading.tracking === "unavailable") modelWindow?.reset();
-      else if (probability !== null) reading = withModel(reading, probability);
+      if (reading.tracking === "unavailable") { modelWindow?.reset(); smoother.reset(); }
+      else if (probability !== null) reading = withModel(reading, smoother.next(probability, now));
       else reading = { ...reading, source: "rules", calibrating: modelOn() && !calibration.ready };
       showReading(reading);
       publish(reading);
@@ -152,6 +153,7 @@ if (video) {
   // Switching mid-session: the model starts from a fresh window (and calibrates first if needed).
   modelToggle?.addEventListener("change", () => {
     modelWindow?.reset();
+    smoother.reset();
     if (modelToggle.checked && timer) void prepareModel();
   });
 

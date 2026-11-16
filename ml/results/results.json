@@ -112,5 +112,28 @@
       "lstm": 0.7257692307692307,
       "rules": 0.5506410256410257
     }
+  },
+  "over_time": {
+    "rules": {
+      "focused_left_alone": 0.9911213416639263,
+      "distracted_caught": 0.26464563703400246,
+      "balanced_accuracy": 0.6278834893489644,
+      "score_change": 1.8423691050872633,
+      "switches_per_minute": 3.3746807734403492
+    },
+    "lstm_raw": {
+      "focused_left_alone": 0.8352515619861888,
+      "distracted_caught": 0.7677181482998771,
+      "balanced_accuracy": 0.8014848551430329,
+      "score_change": 7.374918111623731,
+      "switches_per_minute": 9.1891645384896
+    },
+    "lstm_smoothed": {
+      "focused_left_alone": 0.8865504768168365,
+      "distracted_caught": 0.7771405161818926,
+      "balanced_accuracy": 0.8318454964993646,
+      "score_change": 2.13686303038747,
+      "switches_per_minute": 1.5505290040131334
+    }
   }
 }

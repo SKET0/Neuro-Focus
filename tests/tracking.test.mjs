@@ -6,7 +6,7 @@ import {
   hasQualityInfo, missingQualityColumns
 } from "../scripts/shared/tracking-states.js";
 import { assessFrame, createReadingFilter, headAngles, FEATURE_NAMES } from "../scripts/tracking/gaze-reading.js";
-import { createAttentionModel, createModelWindow, createCalibration, calibrated } from "../scripts/tracking/attention-model.js";
+import { createAttentionModel, createModelWindow, createCalibration, calibrated, createScoreSmoother } from "../scripts/tracking/attention-model.js";
 import { readFileSync } from "node:fs";
 import { averageFocus, focusedSeconds, buildCoaching, buildInsights, evidenceFor, compareGroups, timeOfDay, COACH_MINIMUM } from "../scripts/student/focus-analysis.js";
 
@@ -385,6 +385,30 @@ const measured = calibrated(model, reading(0), baseline);
 ok("calibrated readings are differences from the baseline; the others are unchanged", Math.abs(measured.eye_open - (0.3 - 0.34)) < 1e-9 && measured.face_size === 0 && measured.gaze_x === 0.5);
 const plain = createAttentionModel({ ...modelData, calibration: undefined });
 ok("a model without calibration needs no baseline", createCalibration(plain).ready && calibrated(plain, reading(0), {}).eye_open === 0.3);
+
+// Smoothing: about 3 s, switching below 40% and back above 60%.
+const smooth = createScoreSmoother();
+let out = smooth.next(0.95, 0);
+ok("the first answer is used as it is", out.probability === 0.95 && out.focused);
+for (let t = 120; t <= 600; t += 120) out = smooth.next(0.05, t);
+ok("one short dip doesn't flip it: half a second of 5% still reads focused", out.focused && out.probability > 0.6);
+for (let t = 720; t <= 6000; t += 120) out = smooth.next(0.05, t);
+ok("a few seconds of 5% reads not focused", !out.focused && out.probability < 0.2);
+for (let t = 6120; t <= 6600; t += 120) out = smooth.next(0.55, t);
+ok("between 40% and 60% it keeps its last state", !out.focused);
+const steady = createScoreSmoother();
+let jumps = 0, last = null;
+for (let i = 0, t = 0; i < 100; i += 1, t += 120) {
+  const next = steady.next(i % 2 ? 0.2 : 0.9, t); // the raw answer jumping every reading
+  if (last && next.focused !== last.focused) jumps += 1;
+  last = next;
+}
+ok("an answer jumping between 20% and 90% gives a steady score and state", jumps === 0 && Math.abs(last.probability - 0.55) < 0.03);
+smooth.next(0.05, 7000);
+out = smooth.next(0.9, 7000 + 2500);
+ok("after a break of more than 2 s it starts again from the new answer", out.probability === 0.9 && out.focused);
+smooth.reset();
+ok("reset starts again", smooth.next(0.2, 0).probability === 0.2);
 
 console.log(failures ? `\n${failures} CHECK(S) FAILED` : "\nALL TRACKING CHECKS PASSED");
 process.exit(failures ? 1 : 0);

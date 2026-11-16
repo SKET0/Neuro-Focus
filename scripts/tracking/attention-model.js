@@ -122,6 +122,34 @@ export function calibrated(model, features, baseline) {
   return out;
 }
 
+// Smooths the model's answers over time. The model is usually very sure either way, so its raw
+// probability jumps (5% one moment, 95% the next). This averages it over about 3 seconds and only
+// switches between focused and not focused on a clear change: below 40% to become not focused,
+// above 60% to become focused again. Tested leave-one-person-out on the recordings
+// (ml/results/report.md), it changes state about 6 times less often and is slightly more accurate.
+// next() takes a probability and its time and returns { probability, focused }.
+export function createScoreSmoother({ seconds = 3, low = 0.4, high = 0.6, restartMs = 2000 } = {}) {
+  let value = null;
+  let focused = null;
+  let lastAt = null;
+  return {
+    next(probability, at) {
+      if (value === null || at - lastAt > restartMs) {
+        // First answer, or after a break in the answers: start from this one.
+        value = probability;
+        focused = probability >= 0.5;
+      } else {
+        value += (1 - Math.exp(-(at - lastAt) / (seconds * 1000))) * (probability - value);
+        if (focused && value < low) focused = false;
+        else if (!focused && value > high) focused = true;
+      }
+      lastAt = at;
+      return { probability: value, focused };
+    },
+    reset() { value = null; focused = null; lastAt = null; }
+  };
+}
+
 // Keeps the last readings and scores them once there are enough. push() takes the features of
 // a usable reading ({ gaze_x: …, … }) and its time, and returns the probability of focused, or
 // null while the window is still filling. reset() after anything unusable.
