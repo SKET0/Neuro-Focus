@@ -25,7 +25,9 @@ A student-centered classroom prototype built with static HTML/CSS/JavaScript, Su
 
 ## Live site (https://neurofocus.site)
 
-The site is hosted on Netlify, which publishes `main` automatically on every push. `netlify.toml` publishes only the website files (`index.html`, the redirect pages, `pages/`, `scripts/`, `styles/`, `assets/`); the report drafts, backend, database, Supabase project files and tests are never public. The domain is registered at Namecheap; its DNS (Advanced DNS) points at Netlify, and `neurofocus.site` is the primary address (`www.neurofocus.site` redirects to it).
+The site is hosted on **GitHub Pages**, published by the `publish` job in `.github/workflows/tests.yml`: on every push to `main` the tests run first, and only if they pass are the website files (`index.html`, the redirect pages, `pages/`, `scripts/`, `styles/`, `assets/`) published. The report drafts, backend, database, Supabase project files, ML training, tests and tools are never public. A red cross on a commit means it wasn't published; the site keeps the last version that passed. (Until November 2026 it was on Netlify, whose free plan allows only about 20 publishes a month.)
+
+The domain is registered at Namecheap and its DNS stays there (**Advanced DNS**), so the email records below are untouched. For the website: four **A records** at `@` pointing to GitHub Pages (`185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153`) and a **CNAME** `www` → `sket0.github.io`. In the repository's **Settings → Pages**, the source is **GitHub Actions**, the custom domain is `neurofocus.site` (the primary address; `www.neurofocus.site` redirects to it) and **Enforce HTTPS** is on.
 
 For sign-in and NeuroBuddy to work on the live site:
 

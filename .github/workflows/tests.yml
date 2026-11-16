@@ -1,6 +1,10 @@
 # Runs the automated tests on every push to main (and on pull requests): the tracker's rules
 # (tests/tracking.test.mjs) and the database access rules against every migration
 # (tests/access-rules.test.mjs). A red cross on a commit means a check failed; open the run to see which.
+#
+# Then, for pushes to main only, publishes the website to GitHub Pages (https://neurofocus.site).
+# It only publishes if the tests passed, and only the website files: the report drafts, backend,
+# database, Supabase project files, ML training, tests and tools are never public.
 name: Tests
 
 on:
@@ -24,3 +28,30 @@ jobs:
           cache-dependency-path: tests/package-lock.json
       - run: npm ci
       - run: npm test
+
+  publish:
+    needs: test
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Collect the website files
+        run: |
+          mkdir site
+          cp -R index.html login.html student.html teacher.html pages scripts styles assets site/
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4
