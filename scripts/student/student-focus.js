@@ -77,7 +77,7 @@ if (app) {
 
   // ---------- Settings remembered on this device, per account ----------
   const prefsKey = `neuroFocusPrefs:${app.user.id}`;
-  const PREF_IDS = ["nudgeToggle", "chimeToggle", "shareToggle", "timerWithTracking"];
+  const PREF_IDS = ["nudgeToggle", "chimeToggle", "shareToggle", "timerWithTracking", "modelToggle"];
   try {
     const prefs = JSON.parse(localStorage.getItem(prefsKey) || "{}");
     PREF_IDS.forEach((id) => {

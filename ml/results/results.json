@@ -1,0 +1,116 @@
+{
+  "method": "Leave one person out (10 people)",
+  "overall": {
+    "lstm": {
+      "windows": 5482,
+      "accuracy": 0.8051805910251733,
+      "balanced_accuracy": 0.8014848551430329,
+      "distracted_recall": 0.7677181482998771,
+      "distracted_precision": 0.7890526315789473,
+      "focused_recall": 0.8352515619861888,
+      "distracted_f1": 0.7782392026578073,
+      "confusion": {
+        "focused_as_focused": 2540,
+        "focused_as_distracted": 501,
+        "distracted_as_focused": 567,
+        "distracted_as_distracted": 1874
+      },
+      "auc": 0.8494896526119007
+    },
+    "rules": {
+      "windows": 5482,
+      "accuracy": 0.6676395476103612,
+      "balanced_accuracy": 0.6278834893489644,
+      "distracted_recall": 0.26464563703400246,
+      "distracted_precision": 0.9598811292719168,
+      "focused_recall": 0.9911213416639263,
+      "distracted_f1": 0.41490044958253053,
+      "confusion": {
+        "focused_as_focused": 3014,
+        "focused_as_distracted": 27,
+        "distracted_as_focused": 1795,
+        "distracted_as_distracted": 646
+      },
+      "auc": 0.7618664675759297
+    }
+  },
+  "by_task": {
+    "read": {
+      "windows": 1522,
+      "lstm": 0.8896189224704336,
+      "rules": 0.9973718791064389
+    },
+    "dot": {
+      "windows": 1519,
+      "lstm": 0.7807768268597761,
+      "rules": 0.9848584595128373
+    },
+    "phone": {
+      "windows": 932,
+      "lstm": 0.7778969957081545,
+      "rules": 0.09012875536480687
+    },
+    "away": {
+      "windows": 785,
+      "lstm": 0.8433121019108281,
+      "rules": 0.6331210191082802
+    },
+    "tired": {
+      "windows": 724,
+      "lstm": 0.6726519337016574,
+      "rules": 0.08977900552486189
+    }
+  },
+  "by_person": {
+    "P01": {
+      "windows": 504,
+      "lstm": 0.881257876045366,
+      "rules": 0.7158895635238859
+    },
+    "P02": {
+      "windows": 544,
+      "lstm": 0.8176222562670319,
+      "rules": 0.6916783036646376
+    },
+    "P03": {
+      "windows": 569,
+      "lstm": 0.8963001563314226,
+      "rules": 0.5209062259609419
+    },
+    "P04": {
+      "windows": 494,
+      "lstm": 0.8975688144730704,
+      "rules": 0.5863874345549738
+    },
+    "P05": {
+      "windows": 647,
+      "lstm": 0.6875669728281668,
+      "rules": 0.6492537313432836
+    },
+    "P10": {
+      "windows": 626,
+      "lstm": 0.6143842887473461,
+      "rules": 0.5827821329413686
+    },
+    "P11": {
+      "windows": 428,
+      "lstm": 0.8961480767170256,
+      "rules": 0.7443212257580628
+    },
+    "P15": {
+      "windows": 497,
+      "lstm": 0.9030100334448161,
+      "rules": 0.7029069963852572
+    },
+    "P16": {
+      "windows": 536,
+      "lstm": 0.8709860755896561,
+      "rules": 0.658695652173913
+    },
+    "P23": {
+      "windows": 637,
+      "lstm": 0.7257692307692307,
+      "rules": 0.5506410256410257
+    }
+  }
+}

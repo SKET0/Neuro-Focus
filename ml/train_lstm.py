@@ -8,6 +8,12 @@ The recorder (pages/model-data.html) saves one CSV per person. Put them in ml/da
 Testing is leave-one-person-out: each person is tested by a model trained only on everyone
 else, so the numbers show how the model does on someone it has never seen. The app's current
 rules are scored on exactly the same windows for comparison.
+
+Calibration: people differ in ways that have nothing to do with attention (how open their eyes
+look, how far they sit, where the camera points). So four readings are measured against the
+person's own baseline: the median of their first 20 seconds looking at the screen (the
+recorder's "calibrate" step; older recordings use the first 20 s of their first reading task).
+The app does the same: 20 seconds of "look at your screen" when tracking starts.
 """
 import argparse
 import csv
@@ -37,6 +43,9 @@ EPOCHS = 40
 BATCH = 64
 LEARNING_RATE = 0.005
 SEED = 7
+CALIBRATED = ["face_size", "eye_open", "gaze_y", "head_pitch"]  # measured against the person's baseline
+CALIBRATION_MS = 20000      # how long the baseline is measured for
+MIN_CALIBRATION = 40        # usable readings needed for a baseline (about 5 s)
 
 ROOT = Path(__file__).resolve().parent.parent
 RESULTS = ROOT / "ml" / "results"
@@ -62,6 +71,42 @@ def load_rows(folder):
     return files, rows
 
 
+def baselines(rows):
+    """Each recording's baseline: the median of the CALIBRATED readings over its calibration step
+    (task "calibrate"), or, in recordings made before that step existed, over the first 20 s of
+    its first reading task. Keyed by (participant, session)."""
+    calibration, fallback = defaultdict(list), defaultdict(list)
+    for row in rows:
+        if row["usable"] != "1" or any(row[name] == "" for name in FEATURES):
+            continue
+        key = (row["participant"], row["session"])
+        if row["task"] == "calibrate":
+            calibration[key].append(row)
+        elif row["task"] == "read" and row["round"] == "1" and int(row["t_ms"]) < CALIBRATION_MS:
+            fallback[key].append(row)
+    result = {}
+    for key in set(calibration) | set(fallback):
+        source = calibration[key] if len(calibration[key]) >= MIN_CALIBRATION else fallback[key]
+        if len(source) < MIN_CALIBRATION:
+            print(f"Warning: {key[0]} has only {len(source)} usable calibration readings.")
+        if source:
+            result[key] = {name: float(np.median([float(row[name]) for row in source])) for name in CALIBRATED}
+    return result
+
+
+def calibrate(rows, base):
+    """The rows with the CALIBRATED readings measured against each recording's baseline."""
+    out = []
+    for row in rows:
+        b = base.get((row["participant"], row["session"]))
+        if b and row["usable"] == "1" and all(row[name] != "" for name in FEATURES):
+            row = dict(row)
+            for name in CALIBRATED:
+                row[name] = str(float(row[name]) - b[name])
+        out.append(row)
+    return out
+
+
 def make_windows(rows):
     """Cut each task into 2-second windows of usable readings.
 
@@ -70,10 +115,11 @@ def make_windows(rows):
     """
     segments = defaultdict(list)
     for row in rows:
-        segments[(row["participant"], row["session"], row["round"], row["task"])].append(row)
+        if row["task"] in TASKS:  # the calibration step is not a task to score
+            segments[(row["participant"], row["session"], row["round"], row["task"])].append(row)
 
     windows = []
-    for (participant, _, _, task), segment in segments.items():
+    for (participant, session, _, task), segment in segments.items():
         segment.sort(key=lambda row: int(row["t_ms"]))
         runs, run, last_t = [], [], None
         for row in segment:
@@ -95,6 +141,7 @@ def make_windows(rows):
                     "x": [[float(row[name]) for name in FEATURES] for row in part],
                     "focused": int(last["label"]),
                     "participant": participant,
+                    "session": session,
                     "task": task,
                     "round": last["round"],
                     "rule_focused": 1 if last.get("rule_engagement") == "on-screen" else 0,
@@ -293,6 +340,7 @@ def report(files, rows, windows, method, overall, by_task, by_person):
         f"- Features per reading ({len(FEATURES)}): {', '.join(FEATURES)}",
         f"- Window: {WINDOW} readings (about {WINDOW * READING_MS / 1000:.1f} s), a new window every {STRIDE} readings; each task's first {SETTLE_MS / 1000:.0f} s skipped; unusable readings are gaps, never inputs",
         f"- Model: LSTM ({HIDDEN} units) then one output (probability of focused); {EPOCHS} epochs, Adam, learning rate {LEARNING_RATE}, classes weighted equally; every training window also used left-right mirrored",
+        f"- Calibration: {', '.join(CALIBRATED)} measured against each person's median over their first {CALIBRATION_MS // 1000} s looking at the screen",
         f"- Testing: {method}",
         "- Rules: the app's current rule-based estimate (on-screen / looking-away) on the same windows", "",
         "## LSTM compared with the current rules", "",
@@ -318,7 +366,7 @@ def report(files, rows, windows, method, overall, by_task, by_person):
 
 
 # ---------- Export for the website ----------
-def export(windows, overall, method):
+def export(windows, overall, method, base):
     X, y = as_arrays(windows)
     X_all, y_all = with_mirrored(X, y)
     mean, std = normaliser(X_all)
@@ -332,16 +380,32 @@ def export(windows, overall, method):
     # Check values for the website's own LSTM code: a few windows and what PyTorch gives for them.
     rng = np.random.default_rng(SEED)
     picks = rng.choice(len(X), size=min(4, len(X)), replace=False)
-    check = [{"input": np.round(X[i], 6).tolist(), "focused_probability": float(predict(model, ((np.round(X[i], 6) - mean) / std)[None].astype(np.float32))[0])} for i in picks]
+    # The logit (score before the sigmoid) is checked too: probabilities near 0 or 1 hide small errors.
+    check = []
+    for i in picks:
+        x = ((np.round(X[i], 6) - mean) / std)[None].astype(np.float32)
+        with torch.no_grad():
+            logit = float(model(torch.from_numpy(x))[0])
+        # The readings as the tracker gives them (before calibration) and the baseline, so the
+        # website's test also checks that it applies the baseline the same way.
+        b = base[(windows[i]["participant"], windows[i]["session"])]
+        offsets = np.array([b.get(name, 0.0) for name in FEATURES])
+        raw = np.round(np.round(X[i], 6) + offsets, 6)
+        check.append({"input": raw.tolist(), "baseline": {name: round(b[name], 6) for name in CALIBRATED},
+                      "calibrated": np.round(X[i], 6).tolist(), "focused_logit": logit, "focused_probability": float(predict(model, x)[0])})
 
     hidden = HIDDEN
     data = {
         "format": "neurofocus-attention-lstm-1",
         "trained": date.today().isoformat(),
+        "tracker_version": int(TRACKER_VERSION),
         "features": FEATURES,
         "window": WINDOW,
         "reading_ms": READING_MS,
         "threshold": 0.5,
+        # Measure these readings against the person's baseline: the median of their first
+        # `seconds` of usable readings while looking at the screen (at least `min_readings`).
+        "calibration": {"features": CALIBRATED, "seconds": CALIBRATION_MS // 1000, "min_readings": MIN_CALIBRATION},
         "mean": mean.tolist(),
         "std": std.tolist(),
         "hidden": hidden,
@@ -384,7 +448,8 @@ def main():
     files, rows = load_rows(args.data)
     if not rows:
         sys.exit(f"No recordings to use in {args.data}")
-    windows = make_windows(rows)
+    base = baselines(rows)
+    windows = make_windows(calibrate(rows, base))
     if len({w["focused"] for w in windows}) < 2:
         sys.exit("Need both focused and distracted windows to train.")
 
@@ -400,7 +465,7 @@ def main():
 
     if args.export:
         overall = clean(overall)
-        path = export(windows, overall, method)
+        path = export(windows, overall, method, base)
         print(f"Saved the model for the website: {path.relative_to(ROOT)}")
 
 

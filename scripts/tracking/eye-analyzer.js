@@ -3,9 +3,16 @@
 // estimated score and engagement. Frames that can't be measured (no face, more than one face,
 // face partly out of view, too far away, eyes not visible) give "Tracking unavailable" with no
 // score, never a score of 0. During the focus timer's break readings are marked as a break.
+// The score comes from the rules in gaze-reading.js. A student can switch on the trained attention
+// model instead ("Trained model (beta)", off by default, while it's still being tested): it then
+// scores once it has their baseline (their first 20 seconds looking at the screen, kept for as long
+// as the page is open) and about two seconds of readings. Until then, or if the model can't load,
+// the rules score.
 import { assessFrame, createReadingFilter } from "./gaze-reading.js";
 import { loadFaceLandmarker } from "./face-model.js";
 import { every } from "../shared/background-clock.js";
+import { loadAttentionModel, createModelWindow, createCalibration, calibrated } from "./attention-model.js";
+import { ENGAGEMENT, SAMPLE_STATE } from "../shared/tracking-states.js";
 import { REASONS } from "../shared/tracking-states.js";
 
 const video = document.querySelector("#analyzerVideo");
@@ -27,6 +34,28 @@ if (video) {
   let startToken = 0; // a stop while the camera is still starting cancels that start
   let starting = false;
   const filter = createReadingFilter();
+  let model = null;        // the trained attention model, or null to keep using the rules
+  let modelWindow = null;  // its last two seconds of usable readings
+  let calibration = null;  // the student's baseline for the model
+  const modelToggle = document.querySelector("#modelToggle");
+  const modelOn = () => Boolean(modelToggle?.checked && model);
+
+  // A rules reading with the model's estimate instead: score = probability of focused.
+  function withModel(reading, probability) {
+    const focused = probability >= model.threshold;
+    return {
+      ...reading,
+      score: Math.round(probability * 100),
+      engagement: focused ? ENGAGEMENT.ON_SCREEN : ENGAGEMENT.LOOKING_AWAY,
+      state: focused ? SAMPLE_STATE.ON_SCREEN : SAMPLE_STATE.LOOKING_AWAY,
+      source: "model"
+    };
+  }
+
+  function resetReadings() {
+    filter.reset();
+    modelWindow?.reset();
+  }
 
   // Readings stay on this page (stats, nudges, saved history). They reach a teacher only through
   // student-classes.js, during a live session the student has joined.
@@ -49,6 +78,14 @@ if (video) {
         ? "Only one face should be in view. Nothing is counted until then."
         : "Make sure your face is in view and well lit. Nothing is counted until tracking is back.");
       if (scoreOutput) scoreOutput.textContent = "Unavailable";
+    } else if (reading.source === "model") {
+      showStatus(reading.engagement === ENGAGEMENT.LOOKING_AWAY ? "Not focused" : "Focused",
+        "Estimated on this device by the trained attention model, from your face and eyes over the last 2 seconds.");
+      if (scoreOutput) scoreOutput.textContent = `${reading.score}%`;
+    } else if (reading.calibrating) {
+      showStatus(`Calibrating · look at your screen (${Math.round(calibration.progress * 100)}%)`,
+        "For the first 20 seconds the tracker learns how your face and eyes look when you're focused.");
+      if (scoreOutput) scoreOutput.textContent = `${reading.score}%`;
     } else {
       showStatus(reading.engagement === "looking-away" ? "Looking away" : "Looking at the screen",
         "Worked out on this device from where your face and eyes point.");
@@ -61,7 +98,7 @@ if (video) {
     const now = Date.now();
     // The focus timer's break (student-focus.js): keep the camera on, but measure nothing.
     if (window.neuroFocusBreakActive ? window.neuroFocusBreakActive() : window.neuroFocusOnBreak) {
-      filter.reset();
+      resetReadings();
       const reading = { timestamp: now, tracking: "break", reason: null, score: null, engagement: null, state: "Break", gazeRatio: null };
       showReading(reading);
       publish(reading);
@@ -72,8 +109,20 @@ if (video) {
     try {
       const result = landmarker.detectForVideo(video, performance.now());
       const aspect = video.videoWidth ? video.videoHeight / video.videoWidth : 0.75;
-      const reading = filter.next(assessFrame(result.faceLandmarks || [], result.facialTransformationMatrixes || [], aspect), now);
+      const assessment = assessFrame(result.faceLandmarks || [], result.facialTransformationMatrixes || [], aspect);
+      // Only usable readings go into the model's window; a gap of more than 600 ms restarts it.
+      let reading = filter.next(assessment, now);
+      // The baseline only counts readings where the rules say the student is looking at the screen.
+      if (modelOn() && !calibration.ready && assessment.usable && reading?.engagement === ENGAGEMENT.ON_SCREEN) {
+        calibration.add(assessment.features, now);
+      }
+      const probability = modelOn() && assessment.usable && calibration.ready
+        ? modelWindow.push(calibrated(model, assessment.features, calibration.baseline), now)
+        : null;
       if (!reading) return; // a short glitch such as a blink: the last reading still stands
+      if (reading.tracking === "unavailable") modelWindow?.reset();
+      else if (probability !== null) reading = withModel(reading, probability);
+      else reading = { ...reading, source: "rules", calibrating: modelOn() && !calibration.ready };
       showReading(reading);
       publish(reading);
     } catch (error) {
@@ -84,9 +133,27 @@ if (video) {
     }
   }
 
-  async function loadAnalyzer() {
-    landmarker ??= await loadFaceLandmarker();
+  // Loads the trained model, only once the switch is on. Without it (file missing or from another
+  // tracker version) the rules keep scoring.
+  async function prepareModel() {
+    if (!modelToggle?.checked || model) return;
+    const trained = await loadAttentionModel();
+    if (!trained || model) return;
+    model = trained;
+    modelWindow = createModelWindow(model);
+    calibration = createCalibration(model);
   }
+
+  async function loadAnalyzer() {
+    const [faces] = await Promise.all([landmarker ?? loadFaceLandmarker(), prepareModel()]);
+    landmarker = faces;
+  }
+
+  // Switching mid-session: the model starts from a fresh window (and calibrates first if needed).
+  modelToggle?.addEventListener("change", () => {
+    modelWindow?.reset();
+    if (modelToggle.checked && timer) void prepareModel();
+  });
 
   function cameraProblem(error) {
     switch (error?.name) {
@@ -143,7 +210,7 @@ if (video) {
       }
       if (token !== startToken) return;
 
-      filter.reset();
+      resetReadings();
       // A worker keeps the beat, so tracking carries on at full speed while the student is in
       // another tab or app (e.g. Zoom or Google Meet). A page timer would slow to once a second.
       timer = every(120, analyze);
@@ -179,7 +246,7 @@ if (video) {
     startButton.hidden = false;
     startButton.textContent = defaultStartLabel;
     stopButton.hidden = true;
-    filter.reset();
+    resetReadings();
     if (scoreOutput) scoreOutput.textContent = "—";
     showStatus(text, detail);
     if (wasTracking) window.dispatchEvent(new CustomEvent("neurofocus:tracking-stopped"));

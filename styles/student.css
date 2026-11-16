@@ -366,7 +366,7 @@ textarea.field-input { resize: vertical; min-height: 120px; line-height: 1.55; }
 /* Camera button and the two tracking switches on one row */
 .tracker-controls { display: flex; align-items: center; gap: 12px 18px; flex-wrap: wrap; }
 .tracker-controls .camera-actions { flex: 1 1 220px; }
-.tracker-toggles { display: flex; align-items: center; gap: 16px; }
+.tracker-toggles { display: flex; align-items: center; gap: 10px 16px; flex-wrap: wrap; }
 .mini-switch { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--text-soft); cursor: pointer; user-select: none; }
 .mini-switch .switch { gap: 0; }
 .mini-switch:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 8px; }

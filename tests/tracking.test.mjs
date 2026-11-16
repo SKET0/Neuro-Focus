@@ -6,6 +6,8 @@ import {
   hasQualityInfo, missingQualityColumns
 } from "../scripts/shared/tracking-states.js";
 import { assessFrame, createReadingFilter, headAngles, FEATURE_NAMES } from "../scripts/tracking/gaze-reading.js";
+import { createAttentionModel, createModelWindow, createCalibration, calibrated } from "../scripts/tracking/attention-model.js";
+import { readFileSync } from "node:fs";
 import { averageFocus, focusedSeconds, buildCoaching, buildInsights, evidenceFor, compareGroups, timeOfDay, COACH_MINIMUM } from "../scripts/student/focus-analysis.js";
 
 let failures = 0;
@@ -322,6 +324,67 @@ const settled = { nudgesOn: true, stepsPlanned: true, timerPreset: "25-5" };
 section("Before the database update");
 ok("a missing tracking-quality column is recognised", missingQualityColumns({ code: "PGRST204", message: "Could not find the 'usable_seconds' column of 'attention_sessions' in the schema cache" }));
 ok("other errors are not mistaken for it", !missingQualityColumns({ code: "42501", message: "new row violates row-level security policy" }));
+
+// ---------- Attention model (LSTM) ----------
+section("Attention model");
+const modelData = JSON.parse(readFileSync(new URL("../assets/models/attention-lstm.json", import.meta.url), "utf8"));
+const model = createAttentionModel(modelData);
+ok("model file loads; features match the tracker's", JSON.stringify(model.features) === JSON.stringify(FEATURE_NAMES));
+const asFeatures = (values) => Object.fromEntries(FEATURE_NAMES.map((name, i) => [name, values[i]]));
+const asValues = (features) => FEATURE_NAMES.map((name) => features[name]);
+// The check windows hold the raw readings and the person's baseline, as the app would see them.
+const calibratedWindow = (check) => check.input.map((values) => asValues(calibrated(model, asFeatures(values), check.baseline)));
+ok("the model reads face size, eye openness and up/down against a 20 s baseline",
+  JSON.stringify(model.calibration?.features) === JSON.stringify(["face_size", "eye_open", "gaze_y", "head_pitch"]) && model.calibration.seconds === 20);
+modelData.check.forEach((check, i) => {
+  const input = calibratedWindow(check);
+  const sameAsTraining = input.every((row, r) => row.every((value, c) => Math.abs(value - check.calibrated[r][c]) < 1e-5));
+  const logit = model.logit(input);
+  const probability = model.probability(input);
+  ok(`check window ${i + 1}: baseline applied as in training, and matches PyTorch`, sameAsTraining && Math.abs(logit - check.focused_logit) < 1e-3 && Math.abs(probability - check.focused_probability) < 1e-4,
+    `logit ${logit.toFixed(5)} vs ${check.focused_logit.toFixed(5)}`);
+});
+let wrongVersion = false;
+try { createAttentionModel({ ...modelData, tracker_version: 1 }); } catch { wrongVersion = true; }
+ok("a model trained on another tracker version is refused", wrongVersion);
+let wrongSize = false;
+try { createAttentionModel({ ...modelData, hidden: 12 }); } catch { wrongSize = true; }
+ok("a model file with the wrong sizes is refused", wrongSize);
+let wrongCalibration = false;
+try { createAttentionModel({ ...modelData, calibration: { ...modelData.calibration, features: ["pupil_size"] } }); } catch { wrongCalibration = true; }
+ok("a calibration naming unknown readings is refused", wrongCalibration);
+
+const sample = modelData.check[0];
+const sampleRows = calibratedWindow(sample);
+const fill = (win, from = 0, count = model.size) => {
+  let result = null;
+  for (let i = 0; i < count; i += 1) result = win.push(asFeatures(sampleRows[i % sampleRows.length]), from + i * 120);
+  return result;
+};
+const win = createModelWindow(model);
+ok("no model score until 16 readings", fill(win, 0, model.size - 1) === null);
+ok("the 16th reading gives the same score as the check window", Math.abs(win.push(asFeatures(sampleRows[15]), 15 * 120) - sample.focused_probability) < 1e-4);
+ok("a gap of more than 600 ms starts again", win.push(asFeatures(sampleRows[0]), 15 * 120 + 700) === null);
+win.reset();
+ok("after reset the window starts again", fill(win, 0, model.size - 1) === null);
+ok("a reading with a missing value is a gap", win.push(asFeatures([...sampleRows[0].slice(0, 5), null, null, null]), 2000) === null && fill(win, 3000, model.size - 1) === null);
+
+// Calibration: 20 seconds and at least 40 readings, then the median of each calibrated reading.
+const cal = createCalibration(model);
+const reading = (i) => asFeatures(FEATURE_NAMES.map((name) => (name === "eye_open" ? 0.3 + (i % 5) * 0.02 : 0.5)));
+let baseline = null;
+for (let i = 0; i < 39; i += 1) baseline = cal.add(reading(i), i * 600); // 39 readings over 22.8 s
+ok("not calibrated with fewer than 40 readings, even after 20 s", baseline === null && !cal.ready && cal.progress < 1);
+baseline = cal.add(reading(39), 39 * 600);
+ok("calibrated at 40 readings: the median", cal.ready && Math.abs(baseline.eye_open - 0.34) < 1e-9 && baseline.face_size === 0.5 && !("gaze_x" in baseline));
+const quick = createCalibration(model);
+for (let i = 0; i < 100; i += 1) quick.add(reading(i), i * 120); // 100 readings in 11.9 s
+ok("not calibrated before 20 s, however many readings", !quick.ready && quick.progress > 0.5);
+ok("a reading with a missing value doesn't count", createCalibration(model).add({ ...reading(0), eye_open: null }, 0) === null);
+const measured = calibrated(model, reading(0), baseline);
+ok("calibrated readings are differences from the baseline; the others are unchanged", Math.abs(measured.eye_open - (0.3 - 0.34)) < 1e-9 && measured.face_size === 0 && measured.gaze_x === 0.5);
+const plain = createAttentionModel({ ...modelData, calibration: undefined });
+ok("a model without calibration needs no baseline", createCalibration(plain).ready && calibrated(plain, reading(0), {}).eye_open === 0.3);
 
 console.log(failures ? `\n${failures} CHECK(S) FAILED` : "\nALL TRACKING CHECKS PASSED");
 process.exit(failures ? 1 : 0);
