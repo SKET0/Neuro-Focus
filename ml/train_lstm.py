@@ -52,6 +52,14 @@ MIN_CALIBRATION = 40        # usable readings needed for a baseline (about 5 s)
 # averaged over about 3 s, and switching to not focused below 40%, back to focused above 60%.
 SMOOTH_SECONDS = 3
 SMOOTH_LOW, SMOOTH_HIGH = 0.4, 0.6
+# Screen edges: following the dot across the whole screen, people turned their heads only about
+# 10 degrees (their eyes did the rest), so the model learned that any bigger turn means distracted
+# and flagged people looking at a corner of a large screen. Every focused training window also
+# gets a copy turned and tilted by a random amount up to these limits (see with_edges).
+EDGE_YAW = 12              # degrees left or right
+EDGE_PITCH = 6             # degrees up or down
+TURN_PER_DEGREE = 0.0094   # head_turn change per degree of head_yaw (measured in the dot task)
+EDGE_TEST = [10, 15, 20]   # head turns checked in the report's screen-edge test
 
 ROOT = Path(__file__).resolve().parent.parent
 RESULTS = ROOT / "ml" / "results"
@@ -193,6 +201,24 @@ def with_mirrored(X, y):
     return np.concatenate([X, flipped]), np.concatenate([y, y])
 
 
+def turned(X, yaw, pitch=0.0):
+    """The same windows with the head turned by `yaw` and tilted by `pitch` degrees."""
+    X = X.copy()
+    X[..., FEATURES.index("head_yaw")] += yaw
+    X[..., FEATURES.index("head_turn")] += yaw * TURN_PER_DEGREE
+    X[..., FEATURES.index("head_pitch")] += pitch
+    return X
+
+
+def with_edges(X, y, rng):
+    """Add a copy of every focused window as if the person were looking at another part of the
+    screen: the whole window turned and tilted by one random amount (see EDGE_YAW)."""
+    focused = X[y == 1]
+    n = len(focused)
+    edges = turned(focused, rng.uniform(-EDGE_YAW, EDGE_YAW, (n, 1)), rng.uniform(-EDGE_PITCH, EDGE_PITCH, (n, 1)))
+    return np.concatenate([X, edges]).astype(np.float32), np.concatenate([y, np.ones(n)]).astype(np.float32)
+
+
 def train(X, y, seed=SEED):
     torch.manual_seed(seed)
     model = AttentionLSTM()
@@ -266,6 +292,12 @@ def auc(focused, probability):
 
 
 # ---------- Testing ----------
+def rules_on_screen(readings):
+    """The rules' looking-away limits (LIMITS in scripts/tracking/gaze-reading.js) on single readings."""
+    gaze = readings[:, FEATURES.index("gaze_x")]
+    return (np.abs(readings[:, FEATURES.index("head_turn")]) <= 0.25) & (gaze >= 0.36) & (gaze <= 0.64)
+
+
 def evaluate(windows):
     people = sorted({w["participant"] for w in windows})
     if len(people) >= 2:
@@ -276,16 +308,27 @@ def evaluate(windows):
         folds = [([w for w in windows if w["round"] == "1"], [w for w in windows if w["round"] == "2"])]
 
     tested, probabilities = [], []
+    rng = np.random.default_rng(SEED)
+    # Screen-edge test: each person's focused windows turned left and right by each EDGE_TEST angle.
+    edge_kept = {degrees: [] for degrees in EDGE_TEST}
+    edge_rules = {degrees: [] for degrees in EDGE_TEST}
     for train_windows, test_windows in folds:
         if not train_windows or not test_windows:
             continue
-        X_train, y_train = with_mirrored(*as_arrays(train_windows))
+        X_train, y_train = with_edges(*with_mirrored(*as_arrays(train_windows)), rng)
         mean, std = normaliser(X_train)
         model = train((X_train - mean) / std, y_train)
-        X_test, _ = as_arrays(test_windows)
+        X_test, y_test = as_arrays(test_windows)
         probabilities.extend(predict(model, (X_test - mean) / std).tolist())
         tested.extend(test_windows)
-    return method, tested, np.array(probabilities)
+        for degrees in EDGE_TEST:
+            for side in (1, -1):
+                moved = turned(X_test[y_test == 1], side * degrees)
+                edge_kept[degrees] += (predict(model, (moved - mean) / std) >= 0.5).tolist()
+                edge_rules[degrees] += rules_on_screen(moved[:, -1]).tolist()
+    edges = {degrees: {"lstm": float(np.mean(edge_kept[degrees])), "rules": float(np.mean(edge_rules[degrees]))}
+             for degrees in EDGE_TEST if edge_kept[degrees]}
+    return method, tested, np.array(probabilities), edges
 
 
 def compare(tested, probabilities):
@@ -375,7 +418,7 @@ def data_summary(files, rows, windows):
     return lines
 
 
-def report(files, rows, windows, method, overall, by_task, by_person, timing):
+def report(files, rows, windows, method, overall, by_task, by_person, timing, edges):
     lstm, rules = overall["lstm"], overall["rules"]
     lines = [
         "# Attention model: test results", "",
@@ -385,6 +428,7 @@ def report(files, rows, windows, method, overall, by_task, by_person, timing):
         f"- Features per reading ({len(FEATURES)}): {', '.join(FEATURES)}",
         f"- Window: {WINDOW} readings (about {WINDOW * READING_MS / 1000:.1f} s), a new window every {STRIDE} readings; each task's first {SETTLE_MS / 1000:.0f} s skipped; unusable readings are gaps, never inputs",
         f"- Model: LSTM ({HIDDEN} units) then one output (probability of focused); {EPOCHS} epochs, Adam, learning rate {LEARNING_RATE}, classes weighted equally; every training window also used left-right mirrored",
+        f"- Screen edges: every focused training window also used turned up to {EDGE_YAW}° left or right and tilted up to {EDGE_PITCH}° up or down (one random amount per copy), so looking at the edge of a large screen still counts as focused",
         f"- Calibration: {', '.join(CALIBRATED)} measured against each person's median over their first {CALIBRATION_MS // 1000} s looking at the screen",
         f"- Testing: {method}",
         "- Rules: the app's current rule-based estimate (on-screen / looking-away) on the same windows", "",
@@ -409,6 +453,11 @@ def report(files, rows, windows, method, overall, by_task, by_person, timing):
                            ("balanced_accuracy", "Balanced accuracy", pct), ("score_change", "Score change between moments", lambda v: f"{v:.1f}"),
                            ("switches_per_minute", "Focused / not focused switches per minute", lambda v: f"{v:.1f}")]:
         lines.append(f"| {name} | {fmt(timing['rules'][key])} | {fmt(timing['lstm_raw'][key])} | {fmt(timing['lstm_smoothed'][key])} |")
+    lines += ["", "## Screen-edge test", "",
+              "Each person's focused windows, tested again as if their head were turned further to look at the edge of a large screen (both sides). The rules column applies the rules' looking-away limits to the last reading of each window.", "",
+              "| Head turned | LSTM: still focused | Rules: still on-screen |", "|---|---|---|"]
+    for degrees, row in edges.items():
+        lines.append(f"| {degrees}° | {pct(row['lstm'])} | {pct(row['rules'])} |")
     lines += ["", "## Confusion (windows)", "", "| | Predicted focused | Predicted distracted |", "|---|---|---|"]
     for name, result in [("LSTM", lstm), ("Rules", rules)]:
         c = result["confusion"]
@@ -420,7 +469,7 @@ def report(files, rows, windows, method, overall, by_task, by_person, timing):
 # ---------- Export for the website ----------
 def export(windows, overall, method, base):
     X, y = as_arrays(windows)
-    X_all, y_all = with_mirrored(X, y)
+    X_all, y_all = with_edges(*with_mirrored(X, y), np.random.default_rng(SEED))
     mean, std = normaliser(X_all)
     model = train((X_all - mean) / std, y_all)
 
@@ -505,14 +554,14 @@ def main():
     if len({w["focused"] for w in windows}) < 2:
         sys.exit("Need both focused and distracted windows to train.")
 
-    method, tested, probabilities = evaluate(windows)
+    method, tested, probabilities, edges = evaluate(windows)
     overall, by_task, by_person = compare(tested, probabilities)
     timing = over_time(tested, probabilities)
-    text = report(files, rows, windows, method, overall, by_task, by_person, timing)
+    text = report(files, rows, windows, method, overall, by_task, by_person, timing, edges)
 
     RESULTS.mkdir(parents=True, exist_ok=True)
     (RESULTS / "report.md").write_text(text)
-    (RESULTS / "results.json").write_text(json.dumps(clean({"method": method, "overall": overall, "by_task": by_task, "by_person": by_person, "over_time": timing}), indent=2))
+    (RESULTS / "results.json").write_text(json.dumps(clean({"method": method, "overall": overall, "by_task": by_task, "by_person": by_person, "over_time": timing, "screen_edges": edges}), indent=2))
     print(text)
     print(f"Saved {RESULTS.relative_to(ROOT)}/report.md and results.json")
 

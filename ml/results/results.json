@@ -1,139 +1,158 @@
 {
-  "method": "Leave one person out (10 people)",
+  "method": "Leave one person out (11 people)",
   "overall": {
     "lstm": {
-      "windows": 5482,
-      "accuracy": 0.8051805910251733,
-      "balanced_accuracy": 0.8014848551430329,
-      "distracted_recall": 0.7677181482998771,
-      "distracted_precision": 0.7890526315789473,
-      "focused_recall": 0.8352515619861888,
-      "distracted_f1": 0.7782392026578073,
+      "windows": 6004,
+      "accuracy": 0.786309127248501,
+      "balanced_accuracy": 0.7765569843671205,
+      "distracted_recall": 0.6947806354009077,
+      "distracted_precision": 0.7942066580198875,
+      "focused_recall": 0.8583333333333333,
+      "distracted_f1": 0.7411740972362315,
       "confusion": {
-        "focused_as_focused": 2540,
-        "focused_as_distracted": 501,
-        "distracted_as_focused": 567,
-        "distracted_as_distracted": 1874
+        "focused_as_focused": 2884,
+        "focused_as_distracted": 476,
+        "distracted_as_focused": 807,
+        "distracted_as_distracted": 1837
       },
-      "auc": 0.8494896526119007
+      "auc": 0.8560675901412002
     },
     "rules": {
-      "windows": 5482,
-      "accuracy": 0.6676395476103612,
-      "balanced_accuracy": 0.6278834893489644,
-      "distracted_recall": 0.26464563703400246,
-      "distracted_precision": 0.9598811292719168,
-      "focused_recall": 0.9911213416639263,
-      "distracted_f1": 0.41490044958253053,
+      "windows": 6004,
+      "accuracy": 0.6798800799467022,
+      "balanced_accuracy": 0.6376235952020748,
+      "distracted_recall": 0.28328290468986383,
+      "distracted_precision": 0.9652061855670103,
+      "focused_recall": 0.9919642857142857,
+      "distracted_f1": 0.43801169590643274,
       "confusion": {
-        "focused_as_focused": 3014,
+        "focused_as_focused": 3333,
         "focused_as_distracted": 27,
-        "distracted_as_focused": 1795,
-        "distracted_as_distracted": 646
+        "distracted_as_focused": 1895,
+        "distracted_as_distracted": 749
       },
-      "auc": 0.7618664675759297
+      "auc": 0.7683672826165262
     }
   },
   "by_task": {
     "read": {
-      "windows": 1522,
-      "lstm": 0.8896189224704336,
-      "rules": 0.9973718791064389
+      "windows": 1682,
+      "lstm": 0.8775267538644471,
+      "rules": 0.9976218787158145
     },
     "dot": {
-      "windows": 1519,
-      "lstm": 0.7807768268597761,
-      "rules": 0.9848584595128373
+      "windows": 1678,
+      "lstm": 0.8390941597139452,
+      "rules": 0.9862932061978545
     },
     "phone": {
-      "windows": 932,
-      "lstm": 0.7778969957081545,
-      "rules": 0.09012875536480687
+      "windows": 998,
+      "lstm": 0.6673346693386774,
+      "rules": 0.0841683366733467
     },
     "away": {
-      "windows": 785,
-      "lstm": 0.8433121019108281,
-      "rules": 0.6331210191082802
+      "windows": 866,
+      "lstm": 0.8337182448036952,
+      "rules": 0.6628175519630485
     },
     "tired": {
-      "windows": 724,
-      "lstm": 0.6726519337016574,
-      "rules": 0.08977900552486189
+      "windows": 780,
+      "lstm": 0.5756410256410256,
+      "rules": 0.11666666666666667
     }
   },
   "by_person": {
     "P01": {
       "windows": 504,
-      "lstm": 0.881257876045366,
+      "lstm": 0.9532019704433498,
       "rules": 0.7158895635238859
     },
     "P02": {
       "windows": 544,
-      "lstm": 0.8176222562670319,
+      "lstm": 0.8029596388237368,
       "rules": 0.6916783036646376
     },
     "P03": {
       "windows": 569,
-      "lstm": 0.8963001563314226,
+      "lstm": 0.8607719794535844,
       "rules": 0.5209062259609419
     },
     "P04": {
       "windows": 494,
-      "lstm": 0.8975688144730704,
+      "lstm": 0.797349368444698,
       "rules": 0.5863874345549738
     },
     "P05": {
       "windows": 647,
-      "lstm": 0.6875669728281668,
+      "lstm": 0.7112944890929966,
       "rules": 0.6492537313432836
+    },
+    "P07": {
+      "windows": 522,
+      "lstm": 0.8860277653381101,
+      "rules": 0.7536945812807883
     },
     "P10": {
       "windows": 626,
-      "lstm": 0.6143842887473461,
+      "lstm": 0.6289400620610812,
       "rules": 0.5827821329413686
     },
     "P11": {
       "windows": 428,
-      "lstm": 0.8961480767170256,
+      "lstm": 0.8501553626915247,
       "rules": 0.7443212257580628
     },
     "P15": {
       "windows": 497,
-      "lstm": 0.9030100334448161,
+      "lstm": 0.8184098510185467,
       "rules": 0.7029069963852572
     },
     "P16": {
       "windows": 536,
-      "lstm": 0.8709860755896561,
+      "lstm": 0.935848252344416,
       "rules": 0.658695652173913
     },
     "P23": {
       "windows": 637,
-      "lstm": 0.7257692307692307,
+      "lstm": 0.47820512820512817,
       "rules": 0.5506410256410257
     }
   },
   "over_time": {
     "rules": {
-      "focused_left_alone": 0.9911213416639263,
-      "distracted_caught": 0.26464563703400246,
-      "balanced_accuracy": 0.6278834893489644,
-      "score_change": 1.8423691050872633,
-      "switches_per_minute": 3.3746807734403492
+      "focused_left_alone": 0.9919642857142857,
+      "distracted_caught": 0.28328290468986383,
+      "balanced_accuracy": 0.6376235952020748,
+      "score_change": 1.7899287894201423,
+      "switches_per_minute": 3.1437375083277797
     },
     "lstm_raw": {
-      "focused_left_alone": 0.8352515619861888,
-      "distracted_caught": 0.7677181482998771,
-      "balanced_accuracy": 0.8014848551430329,
-      "score_change": 7.374918111623731,
-      "switches_per_minute": 9.1891645384896
+      "focused_left_alone": 0.8583333333333333,
+      "distracted_caught": 0.6947806354009077,
+      "balanced_accuracy": 0.7765569843671205,
+      "score_change": 6.935722429255417,
+      "switches_per_minute": 8.535976015989336
     },
     "lstm_smoothed": {
-      "focused_left_alone": 0.8865504768168365,
-      "distracted_caught": 0.7771405161818926,
-      "balanced_accuracy": 0.8318454964993646,
-      "score_change": 2.13686303038747,
-      "switches_per_minute": 1.5505290040131334
+      "focused_left_alone": 0.8913690476190477,
+      "distracted_caught": 0.7129349470499243,
+      "balanced_accuracy": 0.8021519973344859,
+      "score_change": 1.9102597773520416,
+      "switches_per_minute": 1.6030979347101924
+    }
+  },
+  "screen_edges": {
+    "10": {
+      "lstm": 0.8575892857142857,
+      "rules": 0.9833333333333333
+    },
+    "15": {
+      "lstm": 0.8242559523809524,
+      "rules": 0.9613095238095238
+    },
+    "20": {
+      "lstm": 0.7654761904761904,
+      "rules": 0.8769345238095239
     }
   }
 }
